@@ -1,0 +1,25 @@
+image: mrcyjanek/linstack:ubuntu-devel
+matrix:
+ - env: DISTRO=ubuntu-devel
+   image: mrcyjanek/linstack:ubuntu-devel
+ - env: DISTRO=sid
+   image: mrcyjanek/linstack:sid
+ - env: DISTRO=bookworm
+   image: mrcyjanek/linstack:bookworm
+ - env: DISTRO=bullseye
+   image: mrcyjanek/linstack:bullseye
+ - env: DISTRO=lunar
+   image: mrcyjanek/linstack:lunar
+ - env: DISTRO=jammy
+   image: mrcyjanek/linstack:jammy
+ - env: DISTRO=focal
+   image: mrcyjanek/linstack:focal
+ - env: DISTRO=mantic
+   image: mrcyjanek/linstack:mantic
+script:
+ - apt update
+ - build_changelog
+ - mk-build-deps -ir -t "apt-get -o Debug::pkgProblemResolver=yes -y --no-install-recommends"
+ - debuild -b -uc -us
+ - mkdir -p /apt/$DISTRO/ || true
+ - mv ../*.deb /apt/$DISTRO/

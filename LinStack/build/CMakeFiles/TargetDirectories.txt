@@ -1,0 +1,9 @@
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/LinStack.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/edit_cache.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/rebuild_cache.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/list_install_components.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/install.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/install/local.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/install/strip.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/LinStack_autogen_timestamp_deps.dir
+/home/muhammad/LinStack/LinStack/build/CMakeFiles/LinStack_autogen.dir

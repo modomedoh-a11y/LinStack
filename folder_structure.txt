@@ -1,0 +1,314 @@
+.
+├── bundle.py
+├── folder_structure.txt
+├── LinStack
+│   ├── build
+│   │   ├── CMakeCache.txt
+│   │   ├── CMakeFiles
+│   │   │   ├── 4.3.0
+│   │   │   │   ├── CMakeCXXCompiler.cmake
+│   │   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
+│   │   │   │   ├── CMakeSystem.cmake
+│   │   │   │   └── CompilerIdCXX
+│   │   │   │       ├── a.out
+│   │   │   │       ├── CMakeCXXCompilerId.cpp
+│   │   │   │       └── tmp
+│   │   │   ├── cmake.check_cache
+│   │   │   ├── CMakeConfigureLog.yaml
+│   │   │   ├── CMakeDirectoryInformation.cmake
+│   │   │   ├── CMakeRuleHashes.txt
+│   │   │   ├── InstallScripts.json
+│   │   │   ├── linStack_autogen.dir
+│   │   │   │   ├── AutogenInfo.json
+│   │   │   │   ├── AutogenUsed.txt
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.internal
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   ├── ParseCache.txt
+│   │   │   │   └── progress.make
+│   │   │   ├── linStack_autogen_timestamp_deps.dir
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   └── progress.make
+│   │   │   ├── linStack.dir
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.internal
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   ├── depend.make
+│   │   │   │   ├── flags.make
+│   │   │   │   ├── link.d
+│   │   │   │   ├── link.txt
+│   │   │   │   ├── linStack_autogen
+│   │   │   │   │   ├── mocs_compilation.cpp.o
+│   │   │   │   │   └── mocs_compilation.cpp.o.d
+│   │   │   │   ├── progress.make
+│   │   │   │   └── src
+│   │   │   │       ├── AndroidCanvas.cpp.o
+│   │   │   │       ├── AndroidCanvas.cpp.o.d
+│   │   │   │       ├── DiagnosticsEngine.cpp.o
+│   │   │   │       ├── DiagnosticsEngine.cpp.o.d
+│   │   │   │       ├── InputTranslator.cpp.o
+│   │   │   │       ├── InputTranslator.cpp.o.d
+│   │   │   │       ├── KeymapperOverlay.cpp.o
+│   │   │   │       ├── KeymapperOverlay.cpp.o.d
+│   │   │   │       ├── Logger.cpp.o
+│   │   │   │       ├── Logger.cpp.o.d
+│   │   │   │       ├── main.cpp.o
+│   │   │   │       ├── main.cpp.o.d
+│   │   │   │       ├── MainWindow.cpp.o
+│   │   │   │       ├── MainWindow.cpp.o.d
+│   │   │   │       ├── SelfHealingManager.cpp.o
+│   │   │   │       ├── SelfHealingManager.cpp.o.d
+│   │   │   │       ├── SettingsDialog.cpp.o
+│   │   │   │       ├── SettingsDialog.cpp.o.d
+│   │   │   │       ├── SideToolBar.cpp.o
+│   │   │   │       ├── SideToolBar.cpp.o.d
+│   │   │   │       ├── Theme.cpp.o
+│   │   │   │       ├── Theme.cpp.o.d
+│   │   │   │       ├── TitleBar.cpp.o
+│   │   │   │       ├── TitleBar.cpp.o.d
+│   │   │   │       ├── UInputTouchBridge.cpp.o
+│   │   │   │       ├── UInputTouchBridge.cpp.o.d
+│   │   │   │       ├── WaydroidService.cpp.o
+│   │   │   │       └── WaydroidService.cpp.o.d
+│   │   │   ├── Makefile2
+│   │   │   ├── Makefile.cmake
+│   │   │   ├── pkgRedirects
+│   │   │   ├── progress.marks
+│   │   │   └── TargetDirectories.txt
+│   │   ├── cmake_install.cmake
+│   │   ├── install_manifest.txt
+│   │   ├── linStack
+│   │   ├── linStack_autogen
+│   │   │   ├── deps
+│   │   │   ├── include
+│   │   │   ├── moc_predefs.h
+│   │   │   ├── mocs_compilation.cpp
+│   │   │   ├── timestamp
+│   │   │   └── UVLADIE3JM
+│   │   │       ├── moc_AndroidCanvas.cpp
+│   │   │       ├── moc_AndroidCanvas.cpp.d
+│   │   │       ├── moc_DiagnosticsEngine.cpp
+│   │   │       ├── moc_DiagnosticsEngine.cpp.d
+│   │   │       ├── moc_InputTranslator.cpp
+│   │   │       ├── moc_InputTranslator.cpp.d
+│   │   │       ├── moc_KeymapperOverlay.cpp
+│   │   │       ├── moc_KeymapperOverlay.cpp.d
+│   │   │       ├── moc_Logger.cpp
+│   │   │       ├── moc_Logger.cpp.d
+│   │   │       ├── moc_MainWindow.cpp
+│   │   │       ├── moc_MainWindow.cpp.d
+│   │   │       ├── moc_SelfHealingManager.cpp
+│   │   │       ├── moc_SelfHealingManager.cpp.d
+│   │   │       ├── moc_SettingsDialog.cpp
+│   │   │       ├── moc_SettingsDialog.cpp.d
+│   │   │       ├── moc_SideToolBar.cpp
+│   │   │       ├── moc_SideToolBar.cpp.d
+│   │   │       ├── moc_TitleBar.cpp
+│   │   │       ├── moc_TitleBar.cpp.d
+│   │   │       ├── moc_UInputTouchBridge.cpp
+│   │   │       ├── moc_UInputTouchBridge.cpp.d
+│   │   │       ├── moc_WaydroidService.cpp
+│   │   │       └── moc_WaydroidService.cpp.d
+│   │   ├── Makefile
+│   │   └── .qt
+│   │       ├── QtDeploySupport.cmake
+│   │       └── QtDeployTargets.cmake
+│   ├── CMakeLists.txt
+│   ├── preview_keymapper_edit.png
+│   ├── preview_keymapper.png
+│   ├── preview_main.png
+│   ├── preview.png
+│   ├── preview_service.png
+│   ├── preview_settings.png
+│   ├── resources
+│   ├── src
+│   │   ├── AndroidCanvas.cpp
+│   │   ├── AndroidCanvas.h
+│   │   ├── DiagnosticsEngine.cpp
+│   │   ├── DiagnosticsEngine.h
+│   │   ├── InputTranslator.cpp
+│   │   ├── InputTranslator.h
+│   │   ├── KeymapperOverlay.cpp
+│   │   ├── KeymapperOverlay.h
+│   │   ├── Logger.cpp
+│   │   ├── Logger.h
+│   │   ├── main.cpp
+│   │   ├── MainWindow.cpp
+│   │   ├── MainWindow.h
+│   │   ├── ScriptEngine.cpp
+│   │   ├── ScriptEngine.h
+│   │   ├── SelfHealingManager.cpp
+│   │   ├── SelfHealingManager.h
+│   │   ├── SettingsDialog.cpp
+│   │   ├── SettingsDialog.h
+│   │   ├── SideToolBar.cpp
+│   │   ├── SideToolBar.h
+│   │   ├── Theme.cpp
+│   │   ├── Theme.h
+│   │   ├── TitleBar.cpp
+│   │   ├── TitleBar.h
+│   │   ├── UInputTouchBridge.cpp
+│   │   ├── UInputTouchBridge.h
+│   │   ├── WaydroidService.cpp
+│   │   └── WaydroidService.h
+│   ├── تقرير هندسة linStack 1.0 -Keymapping وتحديثات الواجهة.pdf
+│   └── تقرير هندسة استنساخ linStack 1.0.pdf
+├── linstack_context.txt
+├── LinStack_core
+│   ├── .abstruse.yml
+│   ├── data
+│   │   ├── AppIcon.png
+│   │   ├── configs
+│   │   │   ├── apparmor_profiles
+│   │   │   │   ├── adbd
+│   │   │   │   ├── android_app
+│   │   │   │   └── lxc-linstack
+│   │   │   ├── config_1
+│   │   │   ├── config_3
+│   │   │   ├── config_4
+│   │   │   ├── config_base
+│   │   │   └── linstack.seccomp
+│   │   ├── id.linstack.metainfo.xml
+│   │   ├── linstack.app.install.desktop
+│   │   ├── Linstack.desktop
+│   │   ├── linstack.directory
+│   │   ├── linstack.market.desktop
+│   │   ├── linstack.menu
+│   │   └── scripts
+│   │       ├── linstack-net.sh
+│   │       └── linstack-post-stop.sh
+│   ├── dbus
+│   │   ├── id.linstack.Container.conf
+│   │   ├── id.linstack.Container.policy
+│   │   └── id.linstack.Container.service
+│   ├── debian
+│   │   ├── changelog
+│   │   ├── compat
+│   │   ├── control
+│   │   ├── copyright
+│   │   ├── linstack.postinst
+│   │   ├── rules
+│   │   └── source
+│   │       └── format
+│   ├── folder_structure.txt
+│   ├── FUNDING.yml
+│   ├── .git
+│   │   ├── config
+│   │   ├── description
+│   │   ├── HEAD
+│   │   ├── hooks
+│   │   │   ├── applypatch-msg.sample
+│   │   │   ├── commit-msg.sample
+│   │   │   ├── fsmonitor-watchman.sample
+│   │   │   ├── post-update.sample
+│   │   │   ├── pre-applypatch.sample
+│   │   │   ├── pre-commit.sample
+│   │   │   ├── pre-merge-commit.sample
+│   │   │   ├── prepare-commit-msg.sample
+│   │   │   ├── pre-push.sample
+│   │   │   ├── pre-rebase.sample
+│   │   │   ├── pre-receive.sample
+│   │   │   ├── push-to-checkout.sample
+│   │   │   ├── sendemail-validate.sample
+│   │   │   └── update.sample
+│   │   ├── index
+│   │   ├── info
+│   │   │   └── exclude
+│   │   ├── logs
+│   │   │   ├── HEAD
+│   │   │   └── refs
+│   │   │       ├── heads
+│   │   │       │   └── main
+│   │   │       └── remotes
+│   │   │           └── origin
+│   │   │               └── HEAD
+│   │   ├── objects
+│   │   │   ├── info
+│   │   │   └── pack
+│   │   │       ├── pack-1658c07f79ad807c1eac6c306bf227da0d321398.idx
+│   │   │       ├── pack-1658c07f79ad807c1eac6c306bf227da0d321398.pack
+│   │   │       └── pack-1658c07f79ad807c1eac6c306bf227da0d321398.rev
+│   │   ├── packed-refs
+│   │   └── refs
+│   │       ├── heads
+│   │       │   └── main
+│   │       ├── remotes
+│   │       │   └── origin
+│   │       │       └── HEAD
+│   │       └── tags
+│   ├── .github
+│   │   ├── dependabot.yaml
+│   │   ├── ISSUE_TEMPLATE
+│   │   │   ├── bug_report.yml
+│   │   │   └── feature_request.yml
+│   │   └── workflows
+│   │       └── check.yaml
+│   ├── .gitignore
+│   ├── LICENSE
+│   ├── linstack.py
+│   ├── Makefile
+│   ├── pyproject.toml
+│   ├── README.md
+│   ├── systemd
+│   │   └── linstack-container.service
+│   └── tools
+│       ├── actions
+│       │   ├── app_manager.py
+│       │   ├── bugreport.py
+│       │   ├── container_manager.py
+│       │   ├── initializer.py
+│       │   ├── __init__.py
+│       │   ├── prop.py
+│       │   ├── session_manager.py
+│       │   ├── status.py
+│       │   └── upgrader.py
+│       ├── config
+│       │   ├── __init__.py
+│       │   ├── load.py
+│       │   └── save.py
+│       ├── helpers
+│       │   ├── arch.py
+│       │   ├── arguments.py
+│       │   ├── drivers.py
+│       │   ├── gpu.py
+│       │   ├── http.py
+│       │   ├── images.py
+│       │   ├── __init__.py
+│       │   ├── ipc.py
+│       │   ├── logging.py
+│       │   ├── lxc.py
+│       │   ├── mount.py
+│       │   ├── net.py
+│       │   ├── props.py
+│       │   ├── protocol.py
+│       │   ├── run_core.py
+│       │   ├── run.py
+│       │   └── version.py
+│       ├── __init__.py
+│       ├── interfaces
+│       │   ├── IClipboard.py
+│       │   ├── IHardware.py
+│       │   ├── INotificationCallback.py
+│       │   ├── INotifications.py
+│       │   ├── IPlatform.py
+│       │   ├── IStatusBarService.py
+│       │   └── IUserMonitor.py
+│       └── services
+│           ├── clipboard_manager.py
+│           ├── hardware_manager.py
+│           ├── __init__.py
+│           ├── notification_manager.py
+│           └── user_manager.py
+└── structure.sh
+
+53 directories, 259 files
