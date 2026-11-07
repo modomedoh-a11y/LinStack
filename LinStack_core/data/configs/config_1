@@ -1,0 +1,14 @@
+lxc.utsname = linstack
+
+lxc.init_cmd = /init
+
+lxc.aa_profile = unconfined
+lxc.seccomp = /var/lib/linstack/lxc/linstack/linstack.seccomp
+
+lxc.network.type = veth
+lxc.network.flags = up
+lxc.network.link = linstack0
+lxc.network.name = eth0
+lxc.network.hwaddr = 00:16:3e:f9:d3:03
+lxc.network.mtu = 1500
+
