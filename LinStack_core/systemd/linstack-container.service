@@ -1,0 +1,10 @@
+[Unit]
+Description=Linstack Container
+
+[Service]
+UMask=0022
+BusName=id.linstack.Container
+ExecStart=/usr/bin/linstack container start
+
+[Install]
+WantedBy=multi-user.target
