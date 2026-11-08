@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Install in Linstack
-Name[ru]=Установить в Linstack
-NoDisplay=true
-MimeType=application/vnd.android.package-archive
-Exec=linstack app install %f
-Icon=linstack
