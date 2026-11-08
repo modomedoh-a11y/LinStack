@@ -1,5 +1,0 @@
-[D-BUS Service]
-Name=id.linstack.Container
-Exec=/usr/bin/linstack container start
-User=root
-SystemdService=linstack-container.service
