@@ -1,9 +1,13 @@
 #include "KeymapperOverlay.h"
 #include "UInputTouchBridge.h"
 #include "Theme.h"
+#include "InputMapper.h"
 
 #include <QComboBox>
 #include <QSlider>
+#include <QDoubleSpinBox>
+#include <QSpinBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QFrame>
 #include <QPainter>
@@ -17,38 +21,100 @@
 #include <QFile>
 #include <QDir>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QSettings>
 #include <QCursor>
 #include <cmath>
 
+// Helper to map hardware scancode to readable key label regardless of Arabic/English layout
+static QString scanCodeToLabel(quint32 scanCode, int fallbackQtKey = 0)
+{
+    switch (scanCode) {
+        case 65: return "SPACE";
+        case 25: return "W";
+        case 38: return "A";
+        case 39: return "S";
+        case 40: return "D";
+        case 24: return "Q";
+        case 26: return "E";
+        case 27: return "R";
+        case 28: return "T";
+        case 52: return "Z";
+        case 53: return "X";
+        case 54: return "C";
+        case 55: return "V";
+        case 56: return "B";
+        case 33: return "F";
+        case 34: return "G";
+        case 50: return "SHIFT";
+        case 37: return "CTRL";
+        case 64: return "ALT";
+        case 23: return "TAB";
+        case 67: return "F1";
+        case 68: return "F2";
+        case 69: return "F3";
+        case 70: return "F4";
+        case 111: return "UP";
+        case 116: return "DOWN";
+        case 113: return "LEFT";
+        case 114: return "RIGHT";
+        default: break;
+    }
+    if (fallbackQtKey != 0) {
+        QString s = QKeySequence(fallbackQtKey).toString().toUpper();
+        if (!s.isEmpty()) return s;
+    }
+    return QString("KEY_%1").arg(scanCode);
+}
+
 KeymapperOverlay::KeymapperOverlay(QWidget *parent)
-    : QWidget(parent)
+: QWidget(parent)
 {
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
 
     m_translator = new InputTranslator(nullptr, this);
-    connect(m_translator, &InputTranslator::aimLockToggled, this, [this](bool active) {
+    connect(m_translator, &InputTranslator::aimLockToggled, this, [this](bool active, QPointF anchorNorm) {
+        m_activeAimAnchorNorm = anchorNorm;
         if (active) {
             setCursor(Qt::BlankCursor);
-            emit toastRequested("🎯 Aim Lock Active: Mouse moves camera look. Press ESC or RMB to exit.");
+            // Lock cursor right on top of the AimLock button itself!
+            QPoint localAnchor(qRound(anchorNorm.x() * width()), qRound(anchorNorm.y() * height()));
+            QPoint globalAnchor = mapToGlobal(localAnchor);
+            QCursor::setPos(globalAnchor);
+            m_lastMousePos = globalAnchor;
+            m_ignoreNextMouseMove = true;
+            emit toastRequested("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)");
         } else {
             setCursor(Qt::ArrowCursor);
-            emit toastRequested("Aim Lock Released.");
+            emit toastRequested("Aim Lock Released");
         }
+        emit aimLockAnchorChanged(active, anchorNorm);
         update();
     });
 
     connect(m_translator, &InputTranslator::smartCastAimUpdated, this,
             [this](const QString &id, const QPointF &center, const QPointF &target) {
-        Q_UNUSED(id);
-        m_smartCastCenter = center;
-        m_smartCastTarget = target;
-        m_showSmartCastLine = true;
-        update();
-    });
+                Q_UNUSED(id);
+                m_smartCastCenter = center;
+                m_smartCastTarget = target;
+                m_showSmartCastLine = true;
+                update();
+            });
 
     setupEditorUi();
-    resetToDefaultBinds();
+    setupNodeSettingsPanel();
+
+    // Auto-load the last used profile on startup!
+    QSettings settings("LinStack", "Keymapper");
+    QString lastProfile = settings.value("lastProfile", "Default").toString();
+    refreshProfileList(lastProfile);
+    if (!loadProfileByName(lastProfile)) {
+        resetToDefaultBinds();
+        saveProfileByName("Default");
+        refreshProfileList("Default");
+    }
+
     setMode(Mode::Play);
 }
 
@@ -60,62 +126,185 @@ void KeymapperOverlay::setBridge(UInputTouchBridge *bridge)
     }
     m_translator = new InputTranslator(m_bridge, this);
     m_translator->setScreenGeometry(width(), height());
+    connect(m_translator, &InputTranslator::aimLockToggled, this, [this](bool active, QPointF anchorNorm) {
+        m_activeAimAnchorNorm = anchorNorm;
+        if (active) {
+            setCursor(Qt::BlankCursor);
+            QPoint localAnchor(qRound(anchorNorm.x() * width()), qRound(anchorNorm.y() * height()));
+            QPoint globalAnchor = mapToGlobal(localAnchor);
+            QCursor::setPos(globalAnchor);
+            m_lastMousePos = globalAnchor;
+            m_ignoreNextMouseMove = true;
+            emit toastRequested("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)");
+        } else {
+            setCursor(Qt::ArrowCursor);
+            emit toastRequested("Aim Lock Released");
+        }
+        emit aimLockAnchorChanged(active, anchorNorm);
+        update();
+    });
     syncTranslatorNodes();
 }
 
 void KeymapperOverlay::setCurrentAppId(const QString &appId)
 {
     m_appId = appId.isEmpty() ? "default" : appId;
-    // Attempt auto-load for this game
-    QString path = QString("%1/.config/LinStack/keymaps/%2.json").arg(QDir::homePath()).arg(m_appId);
-    if (QFileInfo::exists(path)) {
-        loadLayoutFromJson(path);
+}
+
+QString KeymapperOverlay::profilesDir() const
+{
+    QString dir = QString("%1/.config/LinStack/keymaps/profiles").arg(QDir::homePath());
+    QDir().mkpath(dir);
+    return dir;
+}
+
+void KeymapperOverlay::refreshProfileList(const QString &selectProfile)
+{
+    if (!m_profileCombo) return;
+    m_profileCombo->blockSignals(true);
+    m_profileCombo->clear();
+
+    QDir dir(profilesDir());
+    QStringList files = dir.entryList(QStringList() << "*.json", QDir::Files, QDir::Name);
+    for (const QString &f : files) {
+        m_profileCombo->addItem(QFileInfo(f).completeBaseName());
+    }
+
+    if (m_profileCombo->count() == 0) {
+        m_profileCombo->addItem("Default");
+    }
+
+    if (!selectProfile.isEmpty()) {
+        int idx = m_profileCombo->findText(selectProfile);
+        if (idx >= 0) {
+            m_profileCombo->setCurrentIndex(idx);
+            m_currentProfileName = selectProfile;
+        }
+    }
+    m_profileCombo->blockSignals(false);
+}
+
+void KeymapperOverlay::createNewProfile()
+{
+    bool ok = false;
+    QString name = QInputDialog::getText(this, "New Keymap Profile",
+                                         "Enter profile name (e.g. FreeFire, PUBG, BrawlStars):",
+                                         QLineEdit::Normal, "", &ok).trimmed();
+                                         if (!ok || name.isEmpty()) return;
+
+                                         name.replace('/', '_').replace('\\', '_');
+    resetToDefaultBinds();
+    m_currentProfileName = name;
+    saveProfileByName(name);
+    refreshProfileList(name);
+    emit toastRequested(QString("✔ Created new profile: %1").arg(name));
+}
+
+void KeymapperOverlay::duplicateCurrentProfile()
+{
+    bool ok = false;
+    QString name = QInputDialog::getText(this, "Duplicate Profile",
+                                         "Enter name for the copied profile:",
+                                         QLineEdit::Normal, m_currentProfileName + " Copy", &ok).trimmed();
+                                         if (!ok || name.isEmpty()) return;
+
+                                         name.replace('/', '_').replace('\\', '_');
+    m_currentProfileName = name;
+    saveProfileByName(name);
+    refreshProfileList(name);
+    emit toastRequested(QString("✔ Duplicated profile as: %1").arg(name));
+}
+
+void KeymapperOverlay::deleteCurrentProfile()
+{
+    if (m_profileCombo->count() <= 1) {
+        emit toastRequested("Cannot delete the last remaining profile.");
+        return;
+    }
+    QString path = QString("%1/%2.json").arg(profilesDir(), m_currentProfileName);
+    QFile::remove(path);
+
+    refreshProfileList();
+    QString nextName = m_profileCombo->currentText();
+    loadProfileByName(nextName);
+    emit toastRequested(QString("🗑 Deleted profile. Switched to: %1").arg(nextName));
+}
+
+void KeymapperOverlay::exportProfileToFile()
+{
+    QString defaultFile = QString("%1/%2.json").arg(QDir::homePath(), m_currentProfileName);
+    QString outPath = QFileDialog::getSaveFileName(this, "Export Keymap Profile", defaultFile, "JSON Keymap (*.json)");
+    if (outPath.isEmpty()) return;
+    if (!outPath.endsWith(".json", Qt::CaseInsensitive)) outPath += ".json";
+
+    saveProfileByName(m_currentProfileName);
+    QString srcPath = QString("%1/%2.json").arg(profilesDir(), m_currentProfileName);
+    QFile::remove(outPath);
+    if (QFile::copy(srcPath, outPath)) {
+        emit toastRequested(QString("📤 Exported profile to: %1").arg(QFileInfo(outPath).fileName()));
+    } else {
+        emit toastRequested("❌ Failed to export profile file.");
+    }
+}
+
+void KeymapperOverlay::importProfileFromFile()
+{
+    QString inPath = QFileDialog::getOpenFileName(this, "Import Keymap Profile", QDir::homePath(), "JSON Keymap (*.json)");
+    if (inPath.isEmpty()) return;
+
+    QString importedName = QFileInfo(inPath).completeBaseName();
+    QString destPath = QString("%1/%2.json").arg(profilesDir(), importedName);
+    QFile::remove(destPath);
+    if (QFile::copy(inPath, destPath)) {
+        refreshProfileList(importedName);
+        loadProfileByName(importedName);
+        emit toastRequested(QString("📥 Imported and loaded profile: %1").arg(importedName));
+    } else {
+        emit toastRequested("❌ Failed to import profile file.");
     }
 }
 
 void KeymapperOverlay::setupEditorUi()
 {
-    // ── Shared stylesheet for all buttons ─────────────────────────────────────
     const QString btnSS =
-        "QPushButton {"
-        "  background-color: #161F30;"
-        "  color: #E5E7EB;"
-        "  border: 1px solid #1F2937;"
-        "  border-radius: 12px;"
-        "  padding: 3px 8px;"
-        "  font-size: 10px;"
-        "  font-weight: 600;"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: #1E293B;"
-        "  border-color: #00FF66;"
-        "  color: #00FF66;"
-        "}"
-        "QPushButton[primary='true'] {"
-        "  background-color: #10B981;"
-        "  color: #0B0F19;"
-        "  font-weight: 700;"
-        "}"
-        "QPushButton[primary='true']:hover {"
-        "  background-color: #00FF66;"
-        "}";
+    "QPushButton {"
+    "  background-color: #161F30;"
+    "  color: #E5E7EB;"
+    "  border: 1px solid #1F2937;"
+    "  border-radius: 10px;"
+    "  padding: 3px 8px;"
+    "  font-size: 10px;"
+    "  font-weight: 600;"
+    "}"
+    "QPushButton:hover {"
+    "  background-color: #1E293B;"
+    "  border-color: #00FF66;"
+    "  color: #00FF66;"
+    "}"
+    "QPushButton[primary='true'] {"
+    "  background-color: #10B981;"
+    "  color: #0B0F19;"
+    "  font-weight: 700;"
+    "}"
+    "QPushButton[primary='true']:hover {"
+    "  background-color: #00FF66;"
+    "}";
 
-    // ── Floating top toolbar ───────────────────────────────────────────────────
     m_editorBar = new QWidget(this);
-    m_editorBar->setFixedHeight(46);
+    m_editorBar->setFixedHeight(44);
     m_editorBar->setStyleSheet(
         "QWidget {"
-        "  background-color: rgba(17,24,39,230);"
+        "  background-color: rgba(17,24,39,235);"
         "  border: 1px solid #10B981;"
-        "  border-radius: 23px;"
+        "  border-radius: 22px;"
         "}"
         + btnSS +
         "QComboBox {"
-        "  background: #161F30; color: #E5E7EB; border: 1px solid #1F2937;"
-        "  border-radius: 8px; padding: 2px 6px; font-size: 10px;"
+        "  background: #161F30; color: #00FF66; border: 1px solid #1F2937;"
+        "  border-radius: 8px; padding: 2px 8px; font-size: 10px; font-weight: 700;"
         "}"
         "QComboBox:hover { border-color: #10B981; }"
-        "QComboBox QAbstractItemView { background: #111827; color: #E5E7EB; }"
+        "QComboBox QAbstractItemView { background: #111827; color: #E5E7EB; selection-background-color: #10B981; selection-color: #0B0F19; }"
         "QSlider::groove:horizontal { height: 3px; background: #1F2937; border-radius: 2px; }"
         "QSlider::handle:horizontal { background: #10B981; width: 12px; height: 12px; border-radius: 6px; margin: -5px 0; }"
         "QSlider::sub-page:horizontal { background: #10B981; border-radius: 2px; }"
@@ -123,63 +312,75 @@ void KeymapperOverlay::setupEditorUi()
 
     auto *barLayout = new QHBoxLayout(m_editorBar);
     barLayout->setContentsMargins(12, 4, 12, 4);
-    barLayout->setSpacing(5);
+    barLayout->setSpacing(4);
 
-    // Profile selector
     auto *profileLabel = new QLabel("Profile:", m_editorBar);
-    profileLabel->setStyleSheet("color: #9CA3AF; font-size: 9px; font-weight: 600;");
+    profileLabel->setStyleSheet("color: #9CA3AF; font-size: 9px; font-weight: 600; border: none; background: transparent;");
     barLayout->addWidget(profileLabel);
 
     m_profileCombo = new QComboBox(m_editorBar);
-    m_profileCombo->setFixedWidth(90);
-    m_profileCombo->addItems({"Default", "FPS Shooter", "MOBA / AoS", "Battle Royale", "Side-Scroller"});
+    m_profileCombo->setFixedWidth(115);
     connect(m_profileCombo, &QComboBox::currentTextChanged, this, [this](const QString &profile) {
-        emit toastRequested(QString("Profile switched to: %1").arg(profile));
+        if (!profile.isEmpty() && profile != m_currentProfileName) {
+            saveProfileByName(m_currentProfileName);
+            loadProfileByName(profile);
+            emit toastRequested(QString("Loaded profile: %1").arg(profile));
+        }
     });
     barLayout->addWidget(m_profileCombo);
 
-    // Opacity slider
-    auto *opLabel = new QLabel("Opacity:", m_editorBar);
-    opLabel->setStyleSheet("color: #9CA3AF; font-size: 9px; font-weight: 600;");
-    barLayout->addWidget(opLabel);
+    m_btnNewProfile = new QPushButton("+ New", m_editorBar);
+    m_btnNewProfile->setToolTip("Create new named profile");
+    connect(m_btnNewProfile, &QPushButton::clicked, this, &KeymapperOverlay::createNewProfile);
+    barLayout->addWidget(m_btnNewProfile);
 
-    m_opacitySlider = new QSlider(Qt::Horizontal, m_editorBar);
-    m_opacitySlider->setRange(20, 100);
-    m_opacitySlider->setValue(static_cast<int>(m_opacity * 100));
-    m_opacitySlider->setFixedWidth(70);
-    m_opacityLabel = new QLabel(QString("%1%").arg(m_opacitySlider->value()), m_editorBar);
-    m_opacityLabel->setStyleSheet("color: #10B981; font-size: 9px; font-weight: 700; min-width: 28px;");
-    connect(m_opacitySlider, &QSlider::valueChanged, this, [this](int v) {
-        m_opacityLabel->setText(QString("%1%").arg(v));
-        setOverlayOpacity(v / 100.0);
-    });
-    barLayout->addWidget(m_opacitySlider);
-    barLayout->addWidget(m_opacityLabel);
+    m_btnDupProfile = new QPushButton("Copy", m_editorBar);
+    m_btnDupProfile->setToolTip("Duplicate current profile");
+    connect(m_btnDupProfile, &QPushButton::clicked, this, &KeymapperOverlay::duplicateCurrentProfile);
+    barLayout->addWidget(m_btnDupProfile);
 
-    // Separator
+    m_btnDelProfile = new QPushButton("Del", m_editorBar);
+    m_btnDelProfile->setToolTip("Delete current profile");
+    connect(m_btnDelProfile, &QPushButton::clicked, this, &KeymapperOverlay::deleteCurrentProfile);
+    barLayout->addWidget(m_btnDelProfile);
+
+    auto *sep0 = new QFrame(m_editorBar);
+    sep0->setFrameShape(QFrame::VLine);
+    sep0->setStyleSheet("color: #1F2937; margin: 4px 2px;");
+    barLayout->addWidget(sep0);
+
+    m_btnImport = new QPushButton("📥 Import", m_editorBar);
+    connect(m_btnImport, &QPushButton::clicked, this, &KeymapperOverlay::importProfileFromFile);
+    barLayout->addWidget(m_btnImport);
+
+    m_btnExport = new QPushButton("📤 Export", m_editorBar);
+    connect(m_btnExport, &QPushButton::clicked, this, &KeymapperOverlay::exportProfileToFile);
+    barLayout->addWidget(m_btnExport);
+
     auto *sep1 = new QFrame(m_editorBar);
     sep1->setFrameShape(QFrame::VLine);
     sep1->setStyleSheet("color: #1F2937; margin: 4px 2px;");
     barLayout->addWidget(sep1);
 
-    // Clear All
-    m_btnClearAll = new QPushButton("🗑 Clear All", m_editorBar);
+    m_opacitySlider = new QSlider(Qt::Horizontal, m_editorBar);
+    m_opacitySlider->setRange(20, 100);
+    m_opacitySlider->setValue(static_cast<int>(m_opacity * 100));
+    m_opacitySlider->setFixedWidth(55);
+    m_opacitySlider->setToolTip("HUD Opacity");
+    connect(m_opacitySlider, &QSlider::valueChanged, this, [this](int v) {
+        setOverlayOpacity(v / 100.0);
+    });
+    barLayout->addWidget(m_opacitySlider);
+
+    m_btnClearAll = new QPushButton("🗑 Clear", m_editorBar);
     connect(m_btnClearAll, &QPushButton::clicked, this, [this]() {
         m_nodes.clear();
         m_selectedNodeIndex = -1;
+        updateNodeSettingsPanel();
         syncTranslatorNodes();
         update();
-        emit toastRequested("All keymap nodes cleared.");
     });
     barLayout->addWidget(m_btnClearAll);
-
-    m_btnSave = new QPushButton("💾 Save", m_editorBar);
-    connect(m_btnSave, &QPushButton::clicked, this, [this]() { saveLayoutToJson(); });
-    barLayout->addWidget(m_btnSave);
-
-    m_btnLoad = new QPushButton("📂 Load", m_editorBar);
-    connect(m_btnLoad, &QPushButton::clicked, this, [this]() { loadLayoutFromJson(); });
-    barLayout->addWidget(m_btnLoad);
 
     m_btnReset = new QPushButton("↺ Reset", m_editorBar);
     connect(m_btnReset, &QPushButton::clicked, this, &KeymapperOverlay::resetToDefaultBinds);
@@ -190,35 +391,33 @@ void KeymapperOverlay::setupEditorUi()
     connect(m_btnToggleMode, &QPushButton::clicked, this, [this]() { setMode(Mode::Play); });
     barLayout->addWidget(m_btnToggleMode);
 
-    // ── Right-side collapsible Node Catalog panel ─────────────────────────────
     setupNodeCatalogPanel();
 }
 
 void KeymapperOverlay::setupNodeCatalogPanel()
 {
     const QString btnSS =
-        "QPushButton {"
-        "  background-color: #111827;"
-        "  color: #E5E7EB;"
-        "  border: 1px solid #1F2937;"
-        "  border-radius: 8px;"
-        "  padding: 6px 8px;"
-        "  font-size: 10px;"
-        "  font-weight: 600;"
-        "  text-align: left;"
-        "}"
-        "QPushButton:hover {"
-        "  background-color: #161F30;"
-        "  border-color: #10B981;"
-        "  color: #00FF66;"
-        "}";
+    "QPushButton {"
+    "  background-color: #111827;"
+    "  color: #E5E7EB;"
+    "  border: 1px solid #1F2937;"
+    "  border-radius: 8px;"
+    "  padding: 6px 8px;"
+    "  font-size: 10px;"
+    "  font-weight: 600;"
+    "  text-align: left;"
+    "}"
+    "QPushButton:hover {"
+    "  background-color: #161F30;"
+    "  border-color: #10B981;"
+    "  color: #00FF66;"
+    "}";
 
-    // Container panel (right side, vertical)
     m_catalogPanel = new QWidget(this);
     m_catalogPanel->setFixedWidth(138);
     m_catalogPanel->setStyleSheet(
         "QWidget {"
-        "  background-color: rgba(11,15,25,215);"
+        "  background-color: rgba(11,15,25,225);"
         "  border: 1px solid #1F2937;"
         "  border-radius: 10px;"
         "}"
@@ -229,9 +428,8 @@ void KeymapperOverlay::setupNodeCatalogPanel()
     panelLayout->setContentsMargins(6, 8, 6, 8);
     panelLayout->setSpacing(5);
 
-    // Panel header with collapse toggle
     auto *headerRow = new QHBoxLayout();
-    auto *headerLabel = new QLabel("NODE CATALOG", m_catalogPanel);
+    auto *headerLabel = new QLabel("CONTROLS", m_catalogPanel);
     headerLabel->setStyleSheet("color: #10B981; font-size: 9px; font-weight: 700; letter-spacing: 1px; background: transparent; border: none;");
     headerRow->addWidget(headerLabel);
 
@@ -244,8 +442,7 @@ void KeymapperOverlay::setupNodeCatalogPanel()
     connect(m_btnToggleCatalog, &QPushButton::clicked, this, [this]() {
         m_catalogExpanded = !m_catalogExpanded;
         m_btnToggleCatalog->setText(m_catalogExpanded ? "◁" : "▷");
-        // Resize panel to collapsed/expanded width
-        m_catalogPanel->setFixedWidth(m_catalogExpanded ? 138 : 22);
+        m_catalogPanel->setFixedWidth(m_catalogExpanded ? 138 : 26);
         positionEditorBar();
         update();
     });
@@ -257,159 +454,366 @@ void KeymapperOverlay::setupNodeCatalogPanel()
     sep->setStyleSheet("color: #1F2937; background: #1F2937; border: none; max-height: 1px; margin: 2px 0;");
     panelLayout->addWidget(sep);
 
-    // ── a) Tap Node
     m_btnAddTap = new QPushButton("👆  Tap Spot", m_catalogPanel);
     connect(m_btnAddTap, &QPushButton::clicked, this, [this]() {
         KeyBindingNode tap;
-        tap.id         = QString("tap_%1").arg(m_nodes.size() + 1);
-        tap.type       = KeyNodeType::Tap;
-        tap.label      = "SPACE";
-        tap.action     = "Action";
-        tap.primaryKey = Qt::Key_Space;
-        tap.relX       = 0.85; tap.relY = 0.75;
-        tap.radius     = 24.0;
+        tap.id              = QString("tap_%1").arg(m_nodes.size() + 1);
+        tap.type            = KeyNodeType::Tap;
+        tap.label           = "SPACE";
+        tap.action          = "Tap";
+        tap.primaryKey      = Qt::Key_Space;
+        tap.primaryScanCode = 65;
+        tap.relX            = 0.85; tap.relY = 0.75;
+        tap.radius          = 24.0;
         addNode(tap);
     });
     panelLayout->addWidget(m_btnAddTap);
 
-    // ── f) Burst Tap Node
     m_btnAddBurstTap = new QPushButton("🔥  Burst Tap", m_catalogPanel);
     connect(m_btnAddBurstTap, &QPushButton::clicked, this, [this]() {
         KeyBindingNode bt;
-        bt.id         = QString("burst_%1").arg(m_nodes.size() + 1);
-        bt.type       = KeyNodeType::BurstTap;
-        bt.label      = "T";
-        bt.action     = "Burst (10/s)";
-        bt.primaryKey = Qt::Key_T;
-        bt.relX       = 0.78; bt.relY = 0.62;
-        bt.radius     = 24.0;
-        bt.burstHz    = 10;
+        bt.id              = QString("burst_%1").arg(m_nodes.size() + 1);
+        bt.type            = KeyNodeType::BurstTap;
+        bt.label           = "T";
+        bt.action          = "Burst";
+        bt.primaryKey      = Qt::Key_T;
+        bt.primaryScanCode = 28;
+        bt.relX            = 0.78; bt.relY = 0.62;
+        bt.radius          = 24.0;
+        bt.burstHz         = 10;
         addNode(bt);
     });
     panelLayout->addWidget(m_btnAddBurstTap);
 
-    // ── b) WASD D-Pad
     m_btnAddDpad = new QPushButton("🕹  D-Pad (WASD)", m_catalogPanel);
     connect(m_btnAddDpad, &QPushButton::clicked, this, [this]() {
         KeyBindingNode dpad;
-        dpad.id     = "dpad";
-        dpad.type   = KeyNodeType::Dpad;
-        dpad.label  = "WASD";
-        dpad.action = "Movement";
-        dpad.relX   = 0.18; dpad.relY = 0.70;
-        dpad.radius = 60.0;
+        dpad.id        = "dpad";
+        dpad.type      = KeyNodeType::Dpad;
+        dpad.label     = "WASD";
+        dpad.action    = "Movement";
+        dpad.relX      = 0.18; dpad.relY = 0.70;
+        dpad.radius    = 60.0;
+        dpad.scanUp    = 25;
+        dpad.scanLeft  = 38;
+        dpad.scanDown  = 39;
+        dpad.scanRight = 40;
         addNode(dpad);
     });
     panelLayout->addWidget(m_btnAddDpad);
 
-    // ── c) Aim, Pan & Shoot
-    m_btnAddAim = new QPushButton("🎯  Aim / Shoot", m_catalogPanel);
+    m_btnAddAim = new QPushButton("🎯  Aim Lock", m_catalogPanel);
     connect(m_btnAddAim, &QPushButton::clicked, this, [this]() {
+        int count = 0;
+        for (const auto &n : m_nodes) if (n.type == KeyNodeType::AimShoot) count++;
         KeyBindingNode aim;
-        aim.id              = "aim_shoot";
+        aim.id              = QString("aim_lock_%1").arg(count + 1);
         aim.type            = KeyNodeType::AimShoot;
-        aim.label           = "F1";
-        aim.action          = "Look & Fire";
-        aim.primaryKey      = Qt::Key_F1;
-        aim.aimActivationKey = Qt::Key_F1;
-        aim.aimSuspendKey   = Qt::Key_Alt;
-        aim.relX            = 0.50; aim.relY = 0.50;
+        aim.primaryScanCode = (count == 0) ? 67 : 37;
+        aim.primaryKey      = (count == 0) ? Qt::Key_F1 : Qt::Key_Control;
+        aim.label           = scanCodeToLabel(aim.primaryScanCode, aim.primaryKey);
+        aim.action          = "Aim Lock";
+        aim.relX            = 0.55 + (count * 0.08);
+        aim.relY            = 0.50;
         aim.radius          = 28.0;
-        aim.sensitivityX    = 1.2; aim.sensitivityY = 1.2;
-        aim.fireRelX        = 0.82; aim.fireRelY = 0.64;
+        aim.sensitivityX    = 1.2;
+        aim.sensitivityY    = 1.2;
+        aim.acceleration    = false;
+        aim.enableFireButton = (count == 0);
+        aim.fireRelX        = 0.82;
+        aim.fireRelY        = 0.64;
         addNode(aim);
     });
     panelLayout->addWidget(m_btnAddAim);
 
-    // ── g) Free Look / Eye
     m_btnAddFreeLook = new QPushButton("👁  Free Look", m_catalogPanel);
     connect(m_btnAddFreeLook, &QPushButton::clicked, this, [this]() {
         KeyBindingNode fl;
-        fl.id            = QString("freelook_%1").arg(m_nodes.size() + 1);
-        fl.type          = KeyNodeType::FreeLook;
-        fl.label         = "Z";
-        fl.action        = "360° Camera";
-        fl.primaryKey    = Qt::Key_Z;
-        fl.relX          = 0.60; fl.relY = 0.45;
-        fl.radius        = 26.0;
-        fl.sensitivityX  = 1.0; fl.sensitivityY = 1.0;
+        fl.id              = QString("freelook_%1").arg(m_nodes.size() + 1);
+        fl.type            = KeyNodeType::FreeLook;
+        fl.label           = "Z";
+        fl.action          = "Free Look";
+        fl.primaryKey      = Qt::Key_Z;
+        fl.primaryScanCode = 52;
+        fl.relX            = 0.60; fl.relY = 0.45;
+        fl.radius          = 26.0;
+        fl.sensitivityX    = 1.0; fl.sensitivityY = 1.0;
         addNode(fl);
     });
     panelLayout->addWidget(m_btnAddFreeLook);
 
-    // ── d) Swipe Node
     m_btnAddSwipe = new QPushButton("💨  Swipe", m_catalogPanel);
     connect(m_btnAddSwipe, &QPushButton::clicked, this, [this]() {
         KeyBindingNode sw;
-        sw.id         = QString("swipe_%1").arg(m_nodes.size() + 1);
-        sw.type       = KeyNodeType::Swipe;
-        sw.label      = "UP";
-        sw.action     = "Swipe Up";
-        sw.primaryKey = Qt::Key_Up;
-        sw.direction  = "up";
-        sw.relX       = 0.50; sw.relY = 0.75;
-        sw.endRelX    = 0.50; sw.endRelY = 0.40;
-        sw.durationMs = 150;
-        sw.radius     = 22.0;
+        sw.id              = QString("swipe_%1").arg(m_nodes.size() + 1);
+        sw.type            = KeyNodeType::Swipe;
+        sw.label           = "UP";
+        sw.action          = "Swipe";
+        sw.primaryKey      = Qt::Key_Up;
+        sw.primaryScanCode = 111;
+        sw.direction       = "up";
+        sw.relX            = 0.50; sw.relY = 0.75;
+        sw.endRelX         = 0.50; sw.endRelY = 0.40;
+        sw.durationMs      = 150;
+        sw.radius          = 22.0;
         addNode(sw);
     });
     panelLayout->addWidget(m_btnAddSwipe);
 
-    // ── e) Smart Cast / Skill Radius
     m_btnAddSmartCast = new QPushButton("⚡  Smart Cast", m_catalogPanel);
     connect(m_btnAddSmartCast, &QPushButton::clicked, this, [this]() {
         KeyBindingNode sc;
-        sc.id         = QString("smart_cast_%1").arg(m_nodes.size() + 1);
-        sc.type       = KeyNodeType::SmartCast;
-        sc.label      = "Q";
-        sc.action     = "Skill Cast";
-        sc.primaryKey = Qt::Key_Q;
-        sc.relX       = 0.75; sc.relY = 0.75;
-        sc.radius     = 28.0;
-        sc.castRadius = 160.0;
+        sc.id              = QString("smart_cast_%1").arg(m_nodes.size() + 1);
+        sc.type            = KeyNodeType::SmartCast;
+        sc.label           = "Q";
+        sc.action          = "Smart Cast";
+        sc.primaryKey      = Qt::Key_Q;
+        sc.primaryScanCode = 24;
+        sc.relX            = 0.75; sc.relY = 0.75;
+        sc.radius          = 28.0;
+        sc.castRadius      = 160.0;
         addNode(sc);
     });
     panelLayout->addWidget(m_btnAddSmartCast);
 
-    // ── h) Edge Scroll
-    m_btnAddEdgeScroll = new QPushButton("⬡  Edge Scroll", m_catalogPanel);
-    connect(m_btnAddEdgeScroll, &QPushButton::clicked, this, [this]() {
-        KeyBindingNode es;
-        es.id              = QString("edge_scroll_%1").arg(m_nodes.size() + 1);
-        es.type            = KeyNodeType::EdgeScroll;
-        es.label           = "LEFT";
-        es.action          = "Pan Map";
-        es.primaryKey      = Qt::Key_Left;
-        es.direction       = "left";
-        es.relX            = 0.5; es.relY = 0.5;
-        es.radius          = 20.0;
-        es.edgeThreshold   = 40;
-        es.edgeScrollSpeed = 12.0;
-        addNode(es);
-    });
-    panelLayout->addWidget(m_btnAddEdgeScroll);
-
     panelLayout->addStretch(1);
+}
+
+void KeymapperOverlay::setupNodeSettingsPanel()
+{
+    m_nodeSettingsPanel = new QWidget(this);
+    m_nodeSettingsPanel->setFixedWidth(220);
+    m_nodeSettingsPanel->setStyleSheet(
+        "QWidget {"
+        "  background-color: rgba(11, 15, 25, 242);"
+        "  border: 1px solid #00FF66;"
+        "  border-radius: 10px;"
+        "}"
+        "QLabel { color: #E5E7EB; font-size: 10px; font-weight: 600; border: none; background: transparent; }"
+        "QDoubleSpinBox, QSpinBox {"
+        "  background: #161F30; color: #00FF66; border: 1px solid #1F2937; border-radius: 4px; padding: 2px 6px; font-weight: 700;"
+        "}"
+        "QCheckBox { color: #E5E7EB; font-size: 10px; font-weight: 600; spacing: 6px; border: none; background: transparent; }"
+        "QCheckBox::indicator { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #10B981; background: #161F30; }"
+        "QCheckBox::indicator:checked { background: #00FF66; }"
+    );
+
+    auto *mainLay = new QVBoxLayout(m_nodeSettingsPanel);
+    mainLay->setContentsMargins(10, 8, 10, 10);
+    mainLay->setSpacing(8);
+
+    auto *header = new QHBoxLayout();
+    m_settingsTitle = new QLabel("⚙ Control Settings", m_nodeSettingsPanel);
+    m_settingsTitle->setStyleSheet("color: #00FF66; font-size: 11px; font-weight: 700; border: none; background: transparent;");
+    header->addWidget(m_settingsTitle);
+
+    auto *btnClose = new QPushButton("✕", m_nodeSettingsPanel);
+    btnClose->setFixedSize(18, 18);
+    btnClose->setStyleSheet("QPushButton { background: transparent; color: #9CA3AF; border: none; font-weight: 700; } QPushButton:hover { color: #EF4444; }");
+    connect(btnClose, &QPushButton::clicked, this, [this]() {
+        m_settingsOpen = false;
+        m_nodeSettingsPanel->hide();
+    });
+    header->addWidget(btnClose);
+    mainLay->addLayout(header);
+
+    m_settingsBody = new QVBoxLayout();
+    m_settingsBody->setSpacing(6);
+    mainLay->addLayout(m_settingsBody);
+
+    m_nodeSettingsPanel->hide();
+}
+
+bool KeymapperOverlay::hasNodeSettings(KeyNodeType type) const
+{
+    return (type == KeyNodeType::AimShoot ||
+    type == KeyNodeType::Dpad ||
+    type == KeyNodeType::BurstTap ||
+    type == KeyNodeType::Swipe ||
+    type == KeyNodeType::FreeLook);
+}
+
+void KeymapperOverlay::updateNodeSettingsPanel()
+{
+    if (!m_nodeSettingsPanel || !m_settingsBody) return;
+
+    QLayoutItem *item;
+    while ((item = m_settingsBody->takeAt(0)) != nullptr) {
+        if (item->widget()) delete item->widget();
+        delete item;
+    }
+
+    if (m_mode != Mode::Edit || !m_settingsOpen || m_selectedNodeIndex < 0 || m_selectedNodeIndex >= m_nodes.size()) {
+        m_nodeSettingsPanel->hide();
+        return;
+    }
+
+    KeyBindingNode &node = m_nodes[m_selectedNodeIndex];
+    if (!hasNodeSettings(node.type)) {
+        m_nodeSettingsPanel->hide();
+        return;
+    }
+
+    if (node.type == KeyNodeType::AimShoot) {
+        m_settingsTitle->setText("🎯 Aim Lock Settings");
+
+        auto *rowX = new QHBoxLayout();
+        rowX->addWidget(new QLabel("Sensitivity X:", m_nodeSettingsPanel));
+        auto *spinX = new QDoubleSpinBox(m_nodeSettingsPanel);
+        spinX->setRange(0.1, 10.0);
+        spinX->setSingleStep(0.1);
+        spinX->setValue(node.sensitivityX);
+        connect(spinX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double val) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].sensitivityX = val;
+                syncTranslatorNodes();
+            }
+        });
+        rowX->addWidget(spinX);
+        m_settingsBody->addLayout(rowX);
+
+        auto *rowY = new QHBoxLayout();
+        rowY->addWidget(new QLabel("Sensitivity Y:", m_nodeSettingsPanel));
+        auto *spinY = new QDoubleSpinBox(m_nodeSettingsPanel);
+        spinY->setRange(0.1, 10.0);
+        spinY->setSingleStep(0.1);
+        spinY->setValue(node.sensitivityY);
+        connect(spinY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double val) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].sensitivityY = val;
+                syncTranslatorNodes();
+            }
+        });
+        rowY->addWidget(spinY);
+        m_settingsBody->addLayout(rowY);
+
+        auto *chkAccel = new QCheckBox("Mouse Acceleration (Off = 1:1)", m_nodeSettingsPanel);
+        chkAccel->setChecked(node.acceleration);
+        connect(chkAccel, &QCheckBox::toggled, this, [this](bool checked) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].acceleration = checked;
+                syncTranslatorNodes();
+            }
+        });
+        m_settingsBody->addWidget(chkAccel);
+
+        auto *chkFire = new QCheckBox("Enable LMB Fire Button", m_nodeSettingsPanel);
+        chkFire->setChecked(node.enableFireButton);
+        connect(chkFire, &QCheckBox::toggled, this, [this](bool checked) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].enableFireButton = checked;
+                syncTranslatorNodes();
+                update();
+            }
+        });
+        m_settingsBody->addWidget(chkFire);
+
+    } else if (node.type == KeyNodeType::Dpad) {
+        m_settingsTitle->setText("🕹 D-Pad Settings");
+
+        auto *rowRad = new QHBoxLayout();
+        rowRad->addWidget(new QLabel("Size:", m_nodeSettingsPanel));
+
+        auto *sliderRad = new QSlider(Qt::Horizontal, m_nodeSettingsPanel);
+        sliderRad->setRange(30, 150);
+        sliderRad->setValue(qRound(node.radius));
+
+        auto *lblVal = new QLabel(QString("%1 px").arg(qRound(node.radius)), m_nodeSettingsPanel);
+        lblVal->setStyleSheet("color: #00FF66; font-family: monospace; min-width: 42px;");
+
+        connect(sliderRad, &QSlider::valueChanged, this, [this, lblVal](int val) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].radius = val;
+                lblVal->setText(QString("%1 px").arg(val));
+                syncTranslatorNodes();
+                update();
+            }
+        });
+
+        rowRad->addWidget(sliderRad);
+        rowRad->addWidget(lblVal);
+        m_settingsBody->addLayout(rowRad);
+
+    } else if (node.type == KeyNodeType::BurstTap) {
+
+        m_settingsTitle->setText("🔥 Burst Tap Settings");
+
+        auto *rowHz = new QHBoxLayout();
+        rowHz->addWidget(new QLabel("Clicks / Sec:", m_nodeSettingsPanel));
+        auto *spinHz = new QSpinBox(m_nodeSettingsPanel);
+        spinHz->setRange(1, 40);
+        spinHz->setSuffix(" Hz");
+        spinHz->setValue(node.burstHz);
+        connect(spinHz, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int val) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].burstHz = val;
+                syncTranslatorNodes();
+            }
+        });
+        rowHz->addWidget(spinHz);
+        m_settingsBody->addLayout(rowHz);
+
+    } else if (node.type == KeyNodeType::Swipe) {
+        m_settingsTitle->setText("💨 Swipe Settings");
+
+        auto *rowDur = new QHBoxLayout();
+        rowDur->addWidget(new QLabel("Swipe Duration:", m_nodeSettingsPanel));
+        auto *spinDur = new QSpinBox(m_nodeSettingsPanel);
+        spinDur->setRange(50, 1000);
+        spinDur->setSingleStep(25);
+        spinDur->setSuffix(" ms");
+        spinDur->setValue(node.durationMs);
+        connect(spinDur, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int val) {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].durationMs = val;
+                syncTranslatorNodes();
+            }
+        });
+        rowDur->addWidget(spinDur);
+        m_settingsBody->addLayout(rowDur);
+    }
+
+    m_nodeSettingsPanel->adjustSize();
+    int px = qBound(10, qRound(node.relX * width() + node.radius + 14), width() - m_nodeSettingsPanel->width() - 150);
+    int py = qBound(90, qRound(node.relY * height() - 30), height() - m_nodeSettingsPanel->height() - 10);
+    m_nodeSettingsPanel->move(px, py);
+    m_nodeSettingsPanel->show();
+    m_nodeSettingsPanel->raise();
 }
 
 void KeymapperOverlay::setMode(Mode mode)
 {
+    Mode prevMode = m_mode;
     m_mode = mode;
     m_selectedNodeIndex = -1;
     m_isDraggingNode = false;
     m_isDraggingSwipeEnd = false;
+    m_isDraggingFireBtn = false;
+    m_settingsOpen = false;
+    if (m_nodeSettingsPanel) m_nodeSettingsPanel->hide();
 
     if (m_mode == Mode::Edit) {
+        if (m_translator && m_translator->isAimLockActive()) {
+            m_translator->setAimLockActive(false, -1);
+        }
         m_editorBar->show();
         m_editorBar->raise();
-        setAttribute(Qt::WA_TransparentForMouseEvents, false);
+        m_catalogPanel->show();
+        m_catalogPanel->raise();
+        positionEditorBar();
         setCursor(Qt::ArrowCursor);
-        emit toastRequested("⌨ Keymapper Edit Mode: Drag nodes, click to rebind, or click Save.");
+        emit toastRequested("⌨ Keymapper Edit Mode: Drag controls, click ⚙️ for settings, click Done to auto-save.");
     } else {
         m_editorBar->hide();
-        setAttribute(Qt::WA_TransparentForMouseEvents, false);
+        m_catalogPanel->hide();
         setCursor(Qt::ArrowCursor);
         m_showSmartCastLine = false;
+
+        // Auto-save profile automatically upon exiting Edit mode!
+        if (prevMode == Mode::Edit) {
+            saveProfileByName(m_currentProfileName);
+            emit toastRequested(QString("✔ Auto-saved profile: %1").arg(m_currentProfileName));
+        }
     }
 
     emit modeChanged(m_mode);
@@ -422,11 +826,58 @@ void KeymapperOverlay::setOverlayOpacity(qreal opacity)
     update();
 }
 
+void KeymapperOverlay::setInputMapper(InputMapper *mapper)
+{
+    m_inputMapper = mapper;
+    syncTranslatorNodes();
+}
+
 void KeymapperOverlay::syncTranslatorNodes()
 {
     if (m_translator) {
         m_translator->setNodes(m_nodes);
         m_translator->setScreenGeometry(width(), height());
+    }
+
+    if (m_inputMapper) {
+        m_inputMapper->clearTapNodes();
+        m_inputMapper->clearAimNodes();
+        int tapSlot = 3;
+        for (const auto &node : m_nodes) {
+            if (node.type == KeyNodeType::Tap || node.type == KeyNodeType::BurstTap) {
+                KeyNode kn;
+                kn.id = node.id.toStdString();
+                kn.type = WlrKeyNodeType::Tap;
+                kn.scanCode = node.primaryScanCode;
+                kn.relX = static_cast<float>(node.relX);
+                kn.relY = static_cast<float>(node.relY);
+                kn.touchSlot = tapSlot++;
+                if (tapSlot > 9) tapSlot = 3;
+                m_inputMapper->addTapNode(kn);
+            } else if (node.type == KeyNodeType::Dpad) {
+                DpadConfig dp = m_inputMapper->getDpad();
+                dp.centerX = static_cast<float>(node.relX);
+                dp.centerY = static_cast<float>(node.relY);
+                dp.radius = static_cast<float>(node.radius / 350.0f);
+                dp.scanUp = node.scanUp;
+                dp.scanDown = node.scanDown;
+                dp.scanLeft = node.scanLeft;
+                dp.scanRight = node.scanRight;
+                m_inputMapper->setDpad(dp);
+            } else if (node.type == KeyNodeType::AimShoot) {
+                AimLockNodeConfig aim;
+                aim.id = node.id.toStdString();
+                aim.toggleScanCode = node.primaryScanCode;
+                aim.centerX = static_cast<float>(node.relX);
+                aim.centerY = static_cast<float>(node.relY);
+                aim.fireX = static_cast<float>(node.fireRelX);
+                aim.fireY = static_cast<float>(node.fireRelY);
+                aim.sensitivityX = static_cast<float>(node.sensitivityX);
+                aim.sensitivityY = static_cast<float>(node.sensitivityY);
+                aim.acceleration = node.acceleration;
+                m_inputMapper->addAimNode(aim);
+            }
+        }
     }
 }
 
@@ -443,18 +894,8 @@ void KeymapperOverlay::addNode(const KeyBindingNode &node)
             }
         }
     }
-    if (node.type == KeyNodeType::AimShoot) {
-        for (int i = 0; i < m_nodes.size(); ++i) {
-            if (m_nodes[i].type == KeyNodeType::AimShoot) {
-                m_nodes[i] = node;
-                m_selectedNodeIndex = i;
-                syncTranslatorNodes();
-                update();
-                return;
-            }
-        }
-    }
 
+    // Notice: AimShoot allows MULTIPLE nodes with different shortcuts!
     m_nodes.append(node);
     m_selectedNodeIndex = m_nodes.size() - 1;
     syncTranslatorNodes();
@@ -466,6 +907,8 @@ void KeymapperOverlay::removeSelectedNode()
     if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
         m_nodes.removeAt(m_selectedNodeIndex);
         m_selectedNodeIndex = -1;
+        m_settingsOpen = false;
+        updateNodeSettingsPanel();
         syncTranslatorNodes();
         update();
     }
@@ -475,190 +918,121 @@ void KeymapperOverlay::resetToDefaultBinds()
 {
     m_nodes.clear();
 
-    // 1. WASD D-Pad (8-way)
-    m_nodes.append(KeyBindingNode{
-        "dpad", KeyNodeType::Dpad, "WASD", "Movement", 0,
-        0.18, 0.70, 60.0, 1.0
-    });
+    KeyBindingNode dpad;
+    dpad.id = "dpad"; dpad.type = KeyNodeType::Dpad; dpad.label = "WASD"; dpad.action = "Move";
+    dpad.relX = 0.18; dpad.relY = 0.70; dpad.radius = 60.0;
+    dpad.scanUp = 25; dpad.scanLeft = 38; dpad.scanDown = 39; dpad.scanRight = 40;
+    m_nodes.append(dpad);
 
-    // 2. Aim, Pan & Shoot
     KeyBindingNode aim;
-    aim.id = "aim_shoot";
-    aim.type = KeyNodeType::AimShoot;
-    aim.label = "F1 / RMB";
-    aim.action = "Aim & Shoot";
-    aim.primaryKey = Qt::Key_F1;
-    aim.relX = 0.50;
-    aim.relY = 0.50;
-    aim.radius = 28.0;
-    aim.sensitivity = 1.2;
-    aim.fireRelX = 0.82;
-    aim.fireRelY = 0.64;
+    aim.id = "aim_lock_1"; aim.type = KeyNodeType::AimShoot; aim.label = "F1"; aim.action = "Aim Lock";
+    aim.primaryKey = Qt::Key_F1; aim.primaryScanCode = 67;
+    aim.relX = 0.55; aim.relY = 0.50; aim.radius = 28.0;
+    aim.sensitivityX = 1.2; aim.sensitivityY = 1.2; aim.acceleration = false;
+    aim.enableFireButton = true; aim.fireRelX = 0.82; aim.fireRelY = 0.64;
     m_nodes.append(aim);
 
-    // 3. Tap Nodes
-    m_nodes.append(KeyBindingNode{"tap_jump", KeyNodeType::Tap, "SPACE", "Jump", Qt::Key_Space, 0.88, 0.78, 24.0, 1.0});
-    m_nodes.append(KeyBindingNode{"tap_crouch", KeyNodeType::Tap, "C", "Crouch", Qt::Key_C, 0.82, 0.86, 22.0, 1.0});
-    m_nodes.append(KeyBindingNode{"tap_reload", KeyNodeType::Tap, "R", "Reload", Qt::Key_R, 0.88, 0.52, 22.0, 1.0});
-    m_nodes.append(KeyBindingNode{"tap_sprint", KeyNodeType::Tap, "SHIFT", "Sprint", Qt::Key_Shift, 0.18, 0.44, 22.0, 1.0});
-
-    // 4. Swipe Node (Subway Surfers gesture)
-    KeyBindingNode sw;
-    sw.id = "swipe_up";
-    sw.type = KeyNodeType::Swipe;
-    sw.label = "UP";
-    sw.action = "Swipe Jump";
-    sw.primaryKey = Qt::Key_Up;
-    sw.direction = "up";
-    sw.relX = 0.50;
-    sw.relY = 0.75;
-    sw.endRelX = 0.50;
-    sw.endRelY = 0.40;
-    sw.durationMs = 150;
-    sw.radius = 22.0;
-    m_nodes.append(sw);
-
-    // 5. Smart Cast Node (MOBA skill)
-    KeyBindingNode sc;
-    sc.id = "smart_cast_q";
-    sc.type = KeyNodeType::SmartCast;
-    sc.label = "Q";
-    sc.action = "Smart Cast";
-    sc.primaryKey = Qt::Key_Q;
-    sc.relX = 0.76;
-    sc.relY = 0.76;
-    sc.radius = 26.0;
-    sc.castRadius = 150.0;
-    m_nodes.append(sc);
+    KeyBindingNode jump{"tap_jump", KeyNodeType::Tap, "SPACE", "Jump", Qt::Key_Space, 65, 0.88, 0.78, 24.0};
+    KeyBindingNode crouch{"tap_crouch", KeyNodeType::Tap, "C", "Crouch", Qt::Key_C, 54, 0.82, 0.86, 22.0};
+    KeyBindingNode reload{"tap_reload", KeyNodeType::Tap, "R", "Reload", Qt::Key_R, 27, 0.88, 0.52, 22.0};
+    m_nodes.append(jump);
+    m_nodes.append(crouch);
+    m_nodes.append(reload);
 
     syncTranslatorNodes();
     update();
 }
 
-bool KeymapperOverlay::saveLayoutToJson(const QString &filePath)
+bool KeymapperOverlay::saveProfileByName(const QString &profileName)
 {
-    QString targetPath = filePath;
-    if (targetPath.isEmpty()) {
-        QString dir = QString("%1/.config/LinStack/keymaps").arg(QDir::homePath());
-        QDir().mkpath(dir);
-        targetPath = QString("%1/%2.json").arg(dir).arg(m_appId.isEmpty() ? "default" : m_appId);
-    }
+    QString name = profileName.isEmpty() ? "Default" : profileName;
+    QString targetPath = QString("%1/%2.json").arg(profilesDir(), name);
 
     QJsonObject root;
-    root["game_id"]      = m_appId.isEmpty() ? "LinStack.default" : m_appId;
-    root["format"]       = "relative_v2"; // Relative coordinate format (0.0–1.0)
+    root["profile_name"] = name;
+    root["format"]       = "relative_v3";
 
     QJsonArray controlsArray;
     for (const auto &node : m_nodes) {
         QJsonObject c;
-
-        // ── All positions stored as normalised relative coords (0.0–1.0) ──────
-        c["rel_x"]  = node.relX;
-        c["rel_y"]  = node.relY;
-        c["radius"] = node.radius;
+        c["id"]        = node.id;
+        c["rel_x"]     = node.relX;
+        c["rel_y"]     = node.relY;
+        c["radius"]    = node.radius;
+        c["label"]     = node.label;
+        c["action"]    = node.action;
+        c["key"]       = node.primaryKey;
+        c["scan_code"] = static_cast<qint64>(node.primaryScanCode);
 
         switch (node.type) {
-        case KeyNodeType::Dpad:
-            c["type"]      = "dpad";
-            c["key_up"]    = "W";
-            c["key_down"]  = "S";
-            c["key_left"]  = "A";
-            c["key_right"] = "D";
-            break;
-        case KeyNodeType::AimShoot:
-            c["type"]           = "aim_shoot";
-            c["activation_key"] = "F1";
-            c["sensitivity"]    = node.sensitivity;
-            c["fire_rel_x"]     = node.fireRelX;  // relative, not absolute
-            c["fire_rel_y"]     = node.fireRelY;
-            break;
-        case KeyNodeType::Tap:
-            c["type"]   = "tap";
-            c["key"]    = node.label;
-            c["action"] = node.action;
-            break;
-        case KeyNodeType::Swipe:
-            c["type"]        = "swipe";
-            c["direction"]   = node.direction;
-            c["key"]         = node.label;
-            c["end_rel_x"]   = node.endRelX;  // relative, not absolute
-            c["end_rel_y"]   = node.endRelY;
-            c["duration_ms"] = node.durationMs;
-            break;
-        case KeyNodeType::SmartCast:
-            c["type"]        = "smart_cast";
-            c["key"]         = node.label;
-            c["cast_radius"] = node.castRadius;
-            break;
-        case KeyNodeType::BurstTap:
-            c["type"]     = "burst_tap";
-            c["key"]      = node.label;
-            c["action"]   = node.action;
-            c["burst_hz"] = node.burstHz;
-            break;
-        case KeyNodeType::FreeLook:
-            c["type"]          = "free_look";
-            c["key"]           = node.label;
-            c["sensitivity_x"] = node.sensitivityX;
-            c["sensitivity_y"] = node.sensitivityY;
-            break;
-        case KeyNodeType::EdgeScroll:
-            c["type"]             = "edge_scroll";
-            c["key"]              = node.label;
-            c["direction"]        = node.direction;
-            c["edge_threshold"]   = node.edgeThreshold;
-            c["edge_scroll_speed"]= node.edgeScrollSpeed;
-            break;
+            case KeyNodeType::Dpad:
+                c["type"]       = "dpad";
+                c["scan_up"]    = static_cast<qint64>(node.scanUp);
+                c["scan_down"]  = static_cast<qint64>(node.scanDown);
+                c["scan_left"]  = static_cast<qint64>(node.scanLeft);
+                c["scan_right"] = static_cast<qint64>(node.scanRight);
+                break;
+            case KeyNodeType::AimShoot:
+                c["type"]          = "aim_lock";
+                c["sensitivity_x"] = node.sensitivityX;
+                c["sensitivity_y"] = node.sensitivityY;
+                c["acceleration"]  = node.acceleration;
+                c["enable_fire"]   = node.enableFireButton;
+                c["fire_rel_x"]    = node.fireRelX;
+                c["fire_rel_y"]    = node.fireRelY;
+                break;
+            case KeyNodeType::Swipe:
+                c["type"]        = "swipe";
+                c["end_rel_x"]   = node.endRelX;
+                c["end_rel_y"]   = node.endRelY;
+                c["duration_ms"] = node.durationMs;
+                break;
+            case KeyNodeType::BurstTap:
+                c["type"]     = "burst_tap";
+                c["burst_hz"] = node.burstHz;
+                break;
+            case KeyNodeType::FreeLook:
+                c["type"]          = "free_look";
+                c["sensitivity_x"] = node.sensitivityX;
+                c["sensitivity_y"] = node.sensitivityY;
+                break;
+            case KeyNodeType::SmartCast:
+                c["type"]        = "smart_cast";
+                c["cast_radius"] = node.castRadius;
+                break;
+            case KeyNodeType::Tap:
+            default:
+                c["type"] = "tap";
+                break;
         }
         controlsArray.append(c);
     }
     root["controls"] = controlsArray;
 
     QFile file(targetPath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        emit toastRequested("Failed to write keymap JSON file.");
-        return false;
-    }
-
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
     file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     file.close();
 
+    QSettings("LinStack", "Keymapper").setValue("lastProfile", name);
     emit layoutSaved(targetPath);
-    emit toastRequested(QString("✔ Keymap saved: %1").arg(QFileInfo(targetPath).fileName()));
     return true;
 }
-
-bool KeymapperOverlay::loadLayoutFromJson(const QString &filePath)
+bool KeymapperOverlay::loadProfileByName(const QString &profileName)
 {
-    QString targetPath = filePath;
-    if (targetPath.isEmpty()) {
-        targetPath = QString("%1/.config/LinStack/keymaps/%2.json")
-                         .arg(QDir::homePath())
-                         .arg(m_appId.isEmpty() ? "default" : m_appId);
-    }
+    QString name = profileName.isEmpty() ? "Default" : profileName;
+    QString targetPath = QString("%1/%2.json").arg(profilesDir(), name);
 
     QFile file(targetPath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return false;
-    }
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return false;
 
     QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     file.close();
-
     if (!doc.isObject()) return false;
 
     QJsonObject root = doc.object();
-    m_appId = root["game_id"].toString(m_appId);
+    m_currentProfileName = name;
     QJsonArray controls = root["controls"].toArray();
-
-    // Detect format: new relative_v2 uses rel_x/rel_y; legacy uses absolute x/y
-    const bool isRelativeFormat = root["format"].toString() == "relative_v2";
-
-    // Legacy format may need pixel→relative conversion based on overlay size.
-    // Use a safe non-zero fallback so division is harmless.
-    const qreal legacyW = qMax(1, width());
-    const qreal legacyH = qMax(1, height());
-
     m_nodes.clear();
 
     for (const auto &val : controls) {
@@ -666,118 +1040,94 @@ bool KeymapperOverlay::loadLayoutFromJson(const QString &filePath)
         QString typeStr = c["type"].toString();
 
         KeyBindingNode node;
-
-        // ── Position: prefer relative coords; fall back to legacy absolute ───
-        if (isRelativeFormat) {
-            node.relX = c["rel_x"].toDouble(0.5);
-            node.relY = c["rel_y"].toDouble(0.5);
-        } else {
-            node.relX = c["x"].toDouble(legacyW * 0.5) / legacyW;
-            node.relY = c["y"].toDouble(legacyH * 0.5) / legacyH;
-        }
-        node.radius = c["radius"].toDouble(24.0);
+        node.id              = c["id"].toString();
+        node.relX            = c["rel_x"].toDouble(0.5);
+        node.relY            = c["rel_y"].toDouble(0.5);
+        node.radius          = c["radius"].toDouble(24.0);
+        node.label           = c["label"].toString();
+        node.action          = c["action"].toString();
+        node.primaryKey      = c["key"].toInt(0);
+        node.primaryScanCode = static_cast<quint32>(c["scan_code"].toInteger(0));
 
         if (typeStr == "dpad") {
-            node.type   = KeyNodeType::Dpad;
-            node.id     = "dpad";
-            node.label  = "WASD";
-            node.action = "Movement";
-        } else if (typeStr == "aim_shoot") {
-            node.type        = KeyNodeType::AimShoot;
-            node.id          = "aim_shoot";
-            node.label       = c["activation_key"].toString("F1");
-            node.action      = "Aim & Shoot";
-            node.sensitivity = c["sensitivity"].toDouble(1.2);
-            if (isRelativeFormat) {
-                node.fireRelX = c["fire_rel_x"].toDouble(0.82);
-                node.fireRelY = c["fire_rel_y"].toDouble(0.64);
-            } else {
-                node.fireRelX = c["fire_x"].toDouble(legacyW * 0.82) / legacyW;
-                node.fireRelY = c["fire_y"].toDouble(legacyH * 0.64) / legacyH;
-            }
+            node.type      = KeyNodeType::Dpad;
+            node.scanUp    = static_cast<quint32>(c["scan_up"].toInteger(25));
+            node.scanDown  = static_cast<quint32>(c["scan_down"].toInteger(39));
+            node.scanLeft  = static_cast<quint32>(c["scan_left"].toInteger(38));
+            node.scanRight = static_cast<quint32>(c["scan_right"].toInteger(40));
+        } else if (typeStr == "aim_lock" || typeStr == "aim_shoot") {
+            node.type             = KeyNodeType::AimShoot;
+            node.sensitivityX     = c["sensitivity_x"].toDouble(1.2);
+            node.sensitivityY     = c["sensitivity_y"].toDouble(1.2);
+            node.acceleration     = c["acceleration"].toBool(false);
+            node.enableFireButton = c["enable_fire"].toBool(true);
+            node.fireRelX         = c["fire_rel_x"].toDouble(0.82);
+            node.fireRelY         = c["fire_rel_y"].toDouble(0.64);
         } else if (typeStr == "swipe") {
             node.type       = KeyNodeType::Swipe;
-            node.id         = QString("swipe_%1").arg(m_nodes.size());
-            node.label      = c["key"].toString("UP");
-            node.direction  = c["direction"].toString("up");
+            node.endRelX    = c["end_rel_x"].toDouble(0.5);
+            node.endRelY    = c["end_rel_y"].toDouble(0.3);
             node.durationMs = c["duration_ms"].toInt(150);
-            node.primaryKey = Qt::Key_Up;
-            if (isRelativeFormat) {
-                node.endRelX = c["end_rel_x"].toDouble(0.5);
-                node.endRelY = c["end_rel_y"].toDouble(0.3);
-            } else {
-                node.endRelX = c["end_x"].toDouble(legacyW * 0.5) / legacyW;
-                node.endRelY = c["end_y"].toDouble(legacyH * 0.3) / legacyH;
-            }
-        } else if (typeStr == "smart_cast") {
-            node.type       = KeyNodeType::SmartCast;
-            node.id         = QString("smart_cast_%1").arg(m_nodes.size());
-            node.label      = c["key"].toString("Q");
-            node.castRadius = c["cast_radius"].isUndefined()
-                                  ? c["radius"].toDouble(160.0)   // legacy key
-                                  : c["cast_radius"].toDouble(160.0);
-            node.primaryKey = Qt::Key_Q;
         } else if (typeStr == "burst_tap") {
-            node.type       = KeyNodeType::BurstTap;
-            node.id         = QString("burst_%1").arg(m_nodes.size());
-            node.label      = c["key"].toString("T");
-            node.action     = c["action"].toString("Burst");
-            node.burstHz    = c["burst_hz"].toInt(10);
-            node.primaryKey = QKeySequence(node.label).isEmpty() ? Qt::Key_T
-                                  : QKeySequence(node.label)[0].toCombined();
+            node.type    = KeyNodeType::BurstTap;
+            node.burstHz = c["burst_hz"].toInt(10);
         } else if (typeStr == "free_look") {
-            node.type        = KeyNodeType::FreeLook;
-            node.id          = QString("freelook_%1").arg(m_nodes.size());
-            node.label       = c["key"].toString("Z");
+            node.type         = KeyNodeType::FreeLook;
             node.sensitivityX = c["sensitivity_x"].toDouble(1.0);
             node.sensitivityY = c["sensitivity_y"].toDouble(1.0);
-            node.primaryKey  = QKeySequence(node.label).isEmpty() ? Qt::Key_Z
-                                   : QKeySequence(node.label)[0].toCombined();
-        } else if (typeStr == "edge_scroll") {
-            node.type           = KeyNodeType::EdgeScroll;
-            node.id             = QString("edge_scroll_%1").arg(m_nodes.size());
-            node.label          = c["key"].toString("LEFT");
-            node.direction      = c["direction"].toString("left");
-            node.edgeThreshold  = c["edge_threshold"].toInt(40);
-            node.edgeScrollSpeed = c["edge_scroll_speed"].toDouble(12.0);
-            node.primaryKey     = Qt::Key_Left;
+        } else if (typeStr == "smart_cast") {
+            node.type       = KeyNodeType::SmartCast;
+            node.castRadius = c["cast_radius"].toDouble(160.0);
         } else {
-            // Default: Tap
-            node.type       = KeyNodeType::Tap;
-            node.id         = QString("tap_%1").arg(m_nodes.size());
-            node.label      = c["key"].toString("SPACE");
-            node.action     = c["action"].toString("Action");
-            node.primaryKey = QKeySequence(node.label).isEmpty() ? Qt::Key_Space
-                                  : QKeySequence(node.label)[0].toCombined();
+            node.type = KeyNodeType::Tap;
         }
         m_nodes.append(node);
     }
 
+    QSettings("LinStack", "Keymapper").setValue("lastProfile", name);
     syncTranslatorNodes();
     emit layoutLoaded(targetPath);
-    emit toastRequested(QString("✔ Keymap loaded: %1").arg(QFileInfo(targetPath).fileName()));
     update();
     return true;
+}
+
+bool KeymapperOverlay::isGearClicked(int nodeIndex, const QPointF &pos) const
+{
+    if (nodeIndex < 0 || nodeIndex >= m_nodes.size()) return false;
+    const auto &node = m_nodes[nodeIndex];
+    if (!hasNodeSettings(node.type)) return false;
+
+    qreal gx = node.relX * width() + node.radius * 0.75;
+    qreal gy = node.relY * height() - node.radius * 0.75;
+    qreal distSq = (pos.x() - gx) * (pos.x() - gx) + (pos.y() - gy) * (pos.y() - gy);
+    return distSq <= 14.0 * 14.0;
 }
 
 int KeymapperOverlay::findNodeAt(const QPointF &pos) const
 {
     for (int i = m_nodes.size() - 1; i >= 0; --i) {
+        if (isGearClicked(i, pos)) return i;
+
         qreal cx = m_nodes[i].relX * width();
         qreal cy = m_nodes[i].relY * height();
         qreal r = m_nodes[i].radius;
 
-        qreal distSq = (pos.x() - cx) * (pos.x() - cx) + (pos.y() - cy) * (pos.y() - cy);
-        if (distSq <= r * r) {
+        if ((pos.x() - cx) * (pos.x() - cx) + (pos.y() - cy) * (pos.y() - cy) <= r * r) {
             return i;
         }
 
-        // For swipe, check if clicking the end point
+        if (m_nodes[i].type == KeyNodeType::AimShoot && m_nodes[i].enableFireButton) {
+            qreal fx = m_nodes[i].fireRelX * width();
+            qreal fy = m_nodes[i].fireRelY * height();
+            if ((pos.x() - fx) * (pos.x() - fx) + (pos.y() - fy) * (pos.y() - fy) <= 24.0 * 24.0) {
+                return i;
+            }
+        }
+
         if (m_nodes[i].type == KeyNodeType::Swipe) {
             qreal ex = m_nodes[i].endRelX * width();
             qreal ey = m_nodes[i].endRelY * height();
-            qreal distEndSq = (pos.x() - ex) * (pos.x() - ex) + (pos.y() - ey) * (pos.y() - ey);
-            if (distEndSq <= 16.0 * 16.0) {
+            if ((pos.x() - ex) * (pos.x() - ex) + (pos.y() - ey) * (pos.y() - ey) <= 16.0 * 16.0) {
                 return i;
             }
         }
@@ -789,17 +1139,17 @@ void KeymapperOverlay::positionEditorBar()
 {
     if (m_editorBar) {
         m_editorBar->adjustSize();
-        m_editorBar->move((width() - m_editorBar->width()) / 2, 40);
+        m_editorBar->move(qMax(8, (width() - m_editorBar->width()) / 2), 12);
+    }
+    if (m_catalogPanel) {
+        m_catalogPanel->move(width() - m_catalogPanel->width() - 10, 68);
     }
 }
 
 void KeymapperOverlay::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    if (m_editorBar) {
-        m_editorBar->adjustSize();
-        m_editorBar->move((width() - m_editorBar->width()) / 2, 40);
-    }
+    positionEditorBar();
     if (m_translator) {
         m_translator->setScreenGeometry(width(), height());
     }
@@ -813,7 +1163,7 @@ void KeymapperOverlay::wheelEvent(QWheelEvent *event)
         if (node.type == KeyNodeType::SmartCast) {
             node.castRadius = qBound(60.0, node.castRadius + delta * 2, 400.0);
         } else {
-            node.radius = qBound(16.0, node.radius + delta, 120.0);
+            node.radius = qBound(16.0, node.radius + delta, 140.0);
         }
         syncTranslatorNodes();
         update();
@@ -830,33 +1180,71 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
             int idx = findNodeAt(event->position());
             if (idx >= 0) {
                 m_selectedNodeIndex = idx;
-                m_isDraggingNode = true;
 
-                // Check if user clicked the swipe endpoint
+                if (isGearClicked(idx, event->position())) {
+                    m_settingsOpen = !m_settingsOpen;
+                    updateNodeSettingsPanel();
+                    update();
+                    event->accept();
+                    return;
+                }
+
+                m_isDraggingNode = true;
+                m_isDraggingSwipeEnd = false;
+                m_isDraggingFireBtn = false;
+                m_isResizingDpad = false;
+
+                if (m_nodes[idx].type == KeyNodeType::Dpad) {
+                    qreal hx = m_nodes[idx].relX * width() + m_nodes[idx].radius * 0.72;
+                    qreal hy = m_nodes[idx].relY * height() + m_nodes[idx].radius * 0.72;
+                    if ((event->position().x() - hx) * (event->position().x() - hx) +
+                        (event->position().y() - hy) * (event->position().y() - hy) <= 16.0 * 16.0) {
+                        m_isResizingDpad = true;
+                    setCursor(Qt::SizeFDiagCursor);
+                    update();
+                    event->accept();
+                    return;
+                        }
+                }
+
+                if (m_nodes[idx].type == KeyNodeType::AimShoot && m_nodes[idx].enableFireButton) {
+                    qreal fx = m_nodes[idx].fireRelX * width();
+                    qreal fy = m_nodes[idx].fireRelY * height();
+                    if ((event->position().x() - fx) * (event->position().x() - fx) +
+                        (event->position().y() - fy) * (event->position().y() - fy) <= 24.0 * 24.0) {
+                        m_isDraggingFireBtn = true;
+                    m_dragOffset = event->position() - QPointF(fx, fy);
+                    update();
+                    event->accept();
+                    return;
+                        }
+                }
+
                 if (m_nodes[idx].type == KeyNodeType::Swipe) {
                     qreal ex = m_nodes[idx].endRelX * width();
                     qreal ey = m_nodes[idx].endRelY * height();
-                    qreal distEndSq = (event->position().x() - ex) * (event->position().x() - ex) +
-                                      (event->position().y() - ey) * (event->position().y() - ey);
-                    if (distEndSq <= 16.0 * 16.0) {
+                    if ((event->position().x() - ex) * (event->position().x() - ex) +
+                        (event->position().y() - ey) * (event->position().y() - ey) <= 16.0 * 16.0) {
                         m_isDraggingSwipeEnd = true;
-                        m_dragOffset = event->position() - QPointF(ex, ey);
-                        update();
-                        event->accept();
-                        return;
-                    }
+                    m_dragOffset = event->position() - QPointF(ex, ey);
+                    update();
+                    event->accept();
+                    return;
+                        }
                 }
 
-                m_isDraggingSwipeEnd = false;
                 qreal cx = m_nodes[idx].relX * width();
                 qreal cy = m_nodes[idx].relY * height();
                 m_dragOffset = event->position() - QPointF(cx, cy);
                 setCursor(Qt::ClosedHandCursor);
+                updateNodeSettingsPanel();
                 update();
                 event->accept();
                 return;
             } else {
                 m_selectedNodeIndex = -1;
+                m_settingsOpen = false;
+                updateNodeSettingsPanel();
                 update();
             }
         }
@@ -865,6 +1253,8 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
             event->accept();
             return;
         }
+        event->ignore();
+        return;
     }
     QWidget::mousePressEvent(event);
 }
@@ -877,7 +1267,16 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
             qreal relX = qBound(0.02, newPos.x() / width(), 0.98);
             qreal relY = qBound(0.02, newPos.y() / height(), 0.98);
 
-            if (m_isDraggingSwipeEnd) {
+            if (m_isResizingDpad) {
+                qreal cx = m_nodes[m_selectedNodeIndex].relX * width();
+                qreal cy = m_nodes[m_selectedNodeIndex].relY * height();
+                qreal dist = std::hypot(event->position().x() - cx, event->position().y() - cy);
+                m_nodes[m_selectedNodeIndex].radius = qBound(30.0, dist, 150.0);
+                if (m_settingsOpen) updateNodeSettingsPanel();
+            } else if (m_isDraggingFireBtn) {
+                m_nodes[m_selectedNodeIndex].fireRelX = relX;
+                m_nodes[m_selectedNodeIndex].fireRelY = relY;
+            } else if (m_isDraggingSwipeEnd) {
                 m_nodes[m_selectedNodeIndex].endRelX = relX;
                 m_nodes[m_selectedNodeIndex].endRelY = relY;
             } else {
@@ -894,7 +1293,6 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
             setCursor(hoverIdx >= 0 ? Qt::OpenHandCursor : Qt::ArrowCursor);
         }
     } else {
-        // Play mode mouse movement for Aim Look and Smart Cast
         if (m_translator) {
             if (m_translator->isAimLockActive()) {
                 QPoint currentPos = event->position().toPoint();
@@ -905,11 +1303,10 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
                 }
                 m_ignoreNextMouseMove = false;
 
-                // Infinite raw mouse deltas
-                QPoint center(width() / 2, height() / 2);
-                m_lastMousePos = center;
+                QPoint localAnchor(qRound(m_activeAimAnchorNorm.x() * width()), qRound(m_activeAimAnchorNorm.y() * height()));
+                m_lastMousePos = localAnchor;
                 m_ignoreNextMouseMove = true;
-                QCursor::setPos(mapToGlobal(center));
+                QCursor::setPos(mapToGlobal(localAnchor));
                 event->accept();
                 return;
             } else {
@@ -917,6 +1314,8 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
                 m_translator->handleMouseMove(0, 0, m_lastMousePos);
             }
         }
+        event->ignore();
+        return;
     }
     QWidget::mouseMoveEvent(event);
 }
@@ -927,6 +1326,8 @@ void KeymapperOverlay::mouseReleaseEvent(QMouseEvent *event)
         if (event->button() == Qt::LeftButton && m_isDraggingNode) {
             m_isDraggingNode = false;
             m_isDraggingSwipeEnd = false;
+            m_isDraggingFireBtn = false;
+            m_isResizingDpad = false;
             setCursor(Qt::OpenHandCursor);
             update();
             event->accept();
@@ -937,50 +1338,80 @@ void KeymapperOverlay::mouseReleaseEvent(QMouseEvent *event)
             event->accept();
             return;
         }
+        event->ignore();
+        return;
     }
     QWidget::mouseReleaseEvent(event);
 }
 
 void KeymapperOverlay::keyPressEvent(QKeyEvent *event)
 {
+    if (event->isAutoRepeat()) {
+        event->accept();
+        return;
+    }
+
     if (m_mode == Mode::Edit) {
         if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
             removeSelectedNode();
             event->accept();
             return;
         }
-        // Rebind key for selected node
+        // إذا كان هناك زر محدد (غير D-Pad) نعيد تعيين مفتاحه، ثم نلغي التحديد لتتمكن من تجربته فوراً
         if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
             auto &node = m_nodes[m_selectedNodeIndex];
             if (node.type != KeyNodeType::Dpad) {
-                node.primaryKey = event->key();
-                node.label = QKeySequence(event->key()).toString().toUpper();
-                syncTranslatorNodes();
-                update();
-                emit toastRequested(QString("Rebound node to key: %1").arg(node.label));
+                quint32 sc = event->nativeScanCode();
+                if (sc != 0) {
+                    node.primaryScanCode = sc;
+                    node.primaryKey = event->key();
+                    node.label = scanCodeToLabel(sc, event->key());
+                    m_selectedNodeIndex = -1;
+                    m_settingsOpen = false;
+                    updateNodeSettingsPanel();
+                    syncTranslatorNodes();
+                    update();
+                    emit toastRequested(QString("Rebound control to key: %1").arg(node.label));
+                    event->accept();
+                    return;
+                }
+            }
+        }
+
+        // منع تفعيل Aim Lock (F1) أثناء وضع التعديل حتى لا يقفل الماوس
+        quint32 sc = event->nativeScanCode();
+        for (const auto &node : m_nodes) {
+            if (node.type == KeyNodeType::AimShoot && (node.primaryScanCode == sc || event->key() == Qt::Key_F1)) {
                 event->accept();
                 return;
             }
         }
-    } else {
-        if (m_translator && m_translator->handleKeyPress(event->key())) {
-            event->accept();
-            return;
-        }
     }
+
+    // تمرير ضغطة الكيبورد إلى AndroidCanvas في كلا الوضعين (Play و Edit)
+    if (parentWidget()) {
+        QCoreApplication::sendEvent(parentWidget(), event);
+        if (event->isAccepted()) return;
+    }
+
     QWidget::keyPressEvent(event);
 }
 
 void KeymapperOverlay::keyReleaseEvent(QKeyEvent *event)
 {
-    if (m_mode == Mode::Play) {
-        if (m_translator && m_translator->handleKeyRelease(event->key())) {
-            event->accept();
-            return;
-        }
+    if (event->isAutoRepeat()) {
+        event->accept();
+        return;
     }
+
+    if (parentWidget()) {
+        QCoreApplication::sendEvent(parentWidget(), event);
+        if (event->isAccepted()) return;
+    }
+
     QWidget::keyReleaseEvent(event);
 }
+
 
 void KeymapperOverlay::paintEvent(QPaintEvent *event)
 {
@@ -992,38 +1423,13 @@ void KeymapperOverlay::paintEvent(QPaintEvent *event)
     const qreal w = width();
     const qreal h = height();
 
-    // In edit mode, draw subtle cyber grid
     if (m_mode == Mode::Edit) {
         p.setPen(QColor(16, 185, 129, 25));
         const int gridSize = 40;
-        for (int x = 0; x < w; x += gridSize) {
-            p.drawLine(x, 0, x, h);
-        }
-        for (int y = 0; y < h; y += gridSize) {
-            p.drawLine(0, y, w, y);
-        }
+        for (int x = 0; x < w; x += gridSize) p.drawLine(x, 0, x, h);
+        for (int y = 0; y < h; y += gridSize) p.drawLine(0, y, w, y);
     }
 
-    // Top status indicator in Play mode
-    if (m_mode == Mode::Play) {
-        QRectF banner(w * 0.5 - 150, 10, 300, 26);
-        p.setBrush(QColor(17, 24, 39, 210));
-        p.setPen(QPen(Theme::ColorEmerald, 1.2));
-        p.drawRoundedRect(banner, 13, 13);
-
-        p.setPen(m_translator && m_translator->isAimLockActive() ? Theme::ColorNeon : Theme::ColorMint);
-        QFont f = p.font();
-        f.setPointSize(9);
-        f.setBold(true);
-        p.setFont(f);
-
-        QString statusText = m_translator && m_translator->isAimLockActive()
-            ? "🎯 AIM LOCK ACTIVE (ESC / RMB to Exit)"
-            : "⌨ KEYMAPPER ACTIVE (Ctrl+Shift+K to Edit)";
-        p.drawText(banner, Qt::AlignCenter, statusText);
-    }
-
-    // Smart Cast dynamic direction line
     if (m_showSmartCastLine && m_mode == Mode::Play) {
         p.setPen(QPen(Theme::ColorNeon, 2.5, Qt::DashLine));
         p.drawLine(m_smartCastCenter, m_smartCastTarget);
@@ -1031,7 +1437,6 @@ void KeymapperOverlay::paintEvent(QPaintEvent *event)
         p.drawEllipse(m_smartCastTarget, 6, 6);
     }
 
-    // Draw all 5 node types
     for (int i = 0; i < m_nodes.size(); ++i) {
         const auto &node = m_nodes[i];
         const qreal cx = node.relX * w;
@@ -1039,188 +1444,140 @@ void KeymapperOverlay::paintEvent(QPaintEvent *event)
         const bool isSelected = (m_mode == Mode::Edit && m_selectedNodeIndex == i);
 
         switch (node.type) {
-        // b) WASD D-Pad Node
-        case KeyNodeType::Dpad: {
-            p.setBrush(QColor(17, 24, 39, isSelected ? 220 : 180));
-            p.setPen(QPen(isSelected ? Theme::ColorNeon : Theme::ColorEmerald, isSelected ? 2.5 : 1.5));
-            p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
+            case KeyNodeType::Dpad: {
+                p.setBrush(QColor(17, 24, 39, isSelected ? 220 : 180));
+                p.setPen(QPen(isSelected ? Theme::ColorNeon : Theme::ColorEmerald, isSelected ? 2.5 : 1.5));
+                p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
 
-            const qreal step = node.radius * 0.55;
-            struct SubKey { QString text; qreal dx; qreal dy; };
-            SubKey keys[] = {
-                {"W", 0, -step},
-                {"S", 0, step},
-                {"A", -step, 0},
-                {"D", step, 0}
-            };
+                const qreal step = node.radius * 0.55;
+                struct SubKey { QString text; qreal dx; qreal dy; };
+                SubKey keys[] = {{"W", 0, -step}, {"S", 0, step}, {"A", -step, 0}, {"D", step, 0}};
 
-            for (const auto &sk : keys) {
-                QPointF kp(cx + sk.dx, cy + sk.dy);
-                p.setBrush(QColor(22, 31, 48, 220));
-                p.setPen(QPen(Theme::ColorNeon, 1.2));
-                p.drawRoundedRect(QRectF(kp.x() - 12, kp.y() - 12, 24, 24), 4, 4);
+                for (const auto &sk : keys) {
+                    QPointF kp(cx + sk.dx, cy + sk.dy);
+                    p.setBrush(QColor(22, 31, 48, 220));
+                    p.setPen(QPen(Theme::ColorNeon, 1.2));
+                    p.drawRoundedRect(QRectF(kp.x() - 12, kp.y() - 12, 24, 24), 4, 4);
+                    p.setPen(Theme::ColorTextPrimary);
+                    QFont kf = p.font(); kf.setPointSize(9); kf.setBold(true); p.setFont(kf);
+                    p.drawText(QRectF(kp.x() - 12, kp.y() - 12, 24, 24), Qt::AlignCenter, sk.text);
+                }
+
+                // مقبض التكبير والتصغير أسفل يمين الـ D-Pad في وضع التعديل
+                if (m_mode == Mode::Edit) {
+                    qreal hx = cx + node.radius * 0.72;
+                    qreal hy = cy + node.radius * 0.72;
+                    p.setBrush(QColor(11, 15, 25, 245));
+                    p.setPen(QPen(Theme::ColorNeon, 1.5));
+                    p.drawEllipse(QPointF(hx, hy), 11, 11);
+
+                    // رسم سهم قطري مزدوج يشير للمركز وعكسه (↖↘)
+                    p.setPen(QPen(Theme::ColorNeon, 1.6));
+                    p.drawLine(QPointF(hx - 4, hy - 4), QPointF(hx + 4, hy + 4));
+                    p.drawLine(QPointF(hx - 4, hy - 4), QPointF(hx - 1, hy - 4));
+                    p.drawLine(QPointF(hx - 4, hy - 4), QPointF(hx - 4, hy - 1));
+                    p.drawLine(QPointF(hx + 4, hy + 4), QPointF(hx + 1, hy + 4));
+                    p.drawLine(QPointF(hx + 4, hy + 4), QPointF(hx + 4, hy + 1));
+                }
+                break;
+            }
+
+            case KeyNodeType::AimShoot: {
+                p.setBrush(QColor(17, 24, 39, isSelected ? 230 : 190));
+                p.setPen(QPen(QColor(59, 130, 246), isSelected ? 2.5 : 1.5));
+                p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
 
                 p.setPen(Theme::ColorTextPrimary);
-                QFont kf = p.font();
-                kf.setPointSize(9);
-                kf.setBold(true);
-                p.setFont(kf);
-                p.drawText(QRectF(kp.x() - 12, kp.y() - 12, 24, 24), Qt::AlignCenter, sk.text);
-            }
+                QFont f = p.font(); f.setPointSize(8); f.setBold(true); p.setFont(f);
+                p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
+                           Qt::AlignCenter, node.label);
 
-            p.setBrush(Theme::ColorEmerald);
-            p.setPen(Qt::NoPen);
-            p.drawEllipse(QPointF(cx, cy), 4, 4);
-            break;
-        }
-
-        // c) Aim, Pan & Shoot Node
-        case KeyNodeType::AimShoot: {
-            // Aim Look Center
-            p.setBrush(QColor(17, 24, 39, isSelected ? 230 : 190));
-            p.setPen(QPen(QColor(59, 130, 246), isSelected ? 2.5 : 1.5));
-            p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
-
-            p.setPen(Theme::ColorTextPrimary);
-            QFont f = p.font();
-            f.setPointSize(8);
-            f.setBold(true);
-            p.setFont(f);
-            p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
-                       Qt::AlignCenter, node.label);
-
-            QRectF subRect(cx - 45, cy + node.radius + 2, 90, 14);
-            p.setPen(QColor(147, 197, 253));
-            f.setPointSize(7);
-            f.setBold(false);
-            p.setFont(f);
-            p.drawText(subRect, Qt::AlignCenter, "Aim / Look");
-
-            // Fire Button Location
-            qreal fx = node.fireRelX * w;
-            qreal fy = node.fireRelY * h;
-            p.setBrush(QColor(239, 68, 68, 180));
-            p.setPen(QPen(Theme::ColorTextPrimary, 1.5));
-            p.drawEllipse(QPointF(fx, fy), 24, 24);
-            p.setPen(Theme::ColorTextPrimary);
-            f.setPointSize(8);
-            f.setBold(true);
-            p.setFont(f);
-            p.drawText(QRectF(fx - 24, fy - 24, 48, 48), Qt::AlignCenter, "LMB\nFire");
-            break;
-        }
-
-        // d) Swipe Node / Gesture
-        case KeyNodeType::Swipe: {
-            qreal ex = node.endRelX * w;
-            qreal ey = node.endRelY * h;
-
-            // Swipe path line with arrow
-            p.setPen(QPen(QColor(245, 158, 11), 3.0, Qt::DashLine));
-            p.drawLine(QPointF(cx, cy), QPointF(ex, ey));
-
-            // Start point
-            p.setBrush(QColor(17, 24, 39, 210));
-            p.setPen(QPen(QColor(245, 158, 11), isSelected ? 2.5 : 1.5));
-            p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
-
-            p.setPen(Theme::ColorTextPrimary);
-            QFont f = p.font();
-            f.setPointSize(8);
-            f.setBold(true);
-            p.setFont(f);
-            p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
-                       Qt::AlignCenter, node.label);
-
-            // End point handle
-            p.setBrush(QColor(245, 158, 11));
-            p.setPen(QPen(Theme::ColorTextPrimary, 1.5));
-            p.drawEllipse(QPointF(ex, ey), 10, 10);
-            break;
-        }
-
-        // e) Smart Cast / Skill Radius Node
-        case KeyNodeType::SmartCast: {
-            // Outer radius preview in edit mode or when selected
-            p.setBrush(QColor(168, 85, 247, 25));
-            p.setPen(QPen(QColor(168, 85, 247, 180), 1.2, Qt::DashLine));
-            p.drawEllipse(QPointF(cx, cy), node.castRadius, node.castRadius);
-
-            // Center skill button
-            p.setBrush(QColor(17, 24, 39, 210));
-            p.setPen(QPen(QColor(168, 85, 247), isSelected ? 2.5 : 1.5));
-            p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
-
-            p.setPen(Theme::ColorTextPrimary);
-            QFont f = p.font();
-            f.setPointSize(9);
-            f.setBold(true);
-            p.setFont(f);
-            p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
-                       Qt::AlignCenter, node.label);
-
-            QRectF sub(cx - 45, cy + node.radius + 2, 90, 14);
-            p.setPen(QColor(216, 180, 254));
-            f.setPointSize(7);
-            f.setBold(false);
-            p.setFont(f);
-            p.drawText(sub, Qt::AlignCenter, "Smart Cast");
-            break;
-        }
-
-        // a) Tap Node
-        case KeyNodeType::Tap:
-        default: {
-            QRectF nodeRect(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2);
-            p.setBrush(QColor(17, 24, 39, isSelected ? 230 : 190));
-            p.setPen(QPen(Theme::ColorEmerald, isSelected ? 2.5 : 1.5));
-            p.drawEllipse(nodeRect);
-
-            p.setBrush(Qt::NoBrush);
-            p.setPen(QPen(Theme::ColorNeon, 0.8));
-            p.drawEllipse(QPointF(cx, cy), node.radius - 3, node.radius - 3);
-
-            p.setPen(Theme::ColorTextPrimary);
-            QFont lf = p.font();
-            lf.setPointSize(node.radius > 24 ? 9 : 8);
-            lf.setBold(true);
-            p.setFont(lf);
-            p.drawText(nodeRect, Qt::AlignCenter, node.label);
-
-            if (!node.action.isEmpty()) {
                 QRectF subRect(cx - 45, cy + node.radius + 2, 90, 14);
-                p.setPen(Theme::ColorMint);
-                QFont sf = p.font();
-                sf.setPointSize(7);
-                sf.setBold(false);
-                p.setFont(sf);
-                p.drawText(subRect, Qt::AlignCenter, node.action);
+                p.setPen(QColor(147, 197, 253));
+                f.setPointSize(7); f.setBold(false); p.setFont(f);
+                p.drawText(subRect, Qt::AlignCenter, "Aim Lock");
+
+                if (node.enableFireButton) {
+                    qreal fx = node.fireRelX * w;
+                    qreal fy = node.fireRelY * h;
+                    p.setBrush(QColor(239, 68, 68, 180));
+                    p.setPen(QPen(Theme::ColorTextPrimary, 1.5));
+                    p.drawEllipse(QPointF(fx, fy), 22, 22);
+                    p.setPen(Theme::ColorTextPrimary);
+                    f.setPointSize(8); f.setBold(true); p.setFont(f);
+                    p.drawText(QRectF(fx - 22, fy - 22, 44, 44), Qt::AlignCenter, "Fire");
+                }
+                break;
             }
-            break;
-        }
+
+            case KeyNodeType::Swipe: {
+                qreal ex = node.endRelX * w;
+                qreal ey = node.endRelY * h;
+                p.setPen(QPen(QColor(245, 158, 11), 3.0, Qt::DashLine));
+                p.drawLine(QPointF(cx, cy), QPointF(ex, ey));
+
+                p.setBrush(QColor(17, 24, 39, 210));
+                p.setPen(QPen(QColor(245, 158, 11), isSelected ? 2.5 : 1.5));
+                p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
+
+                p.setPen(Theme::ColorTextPrimary);
+                QFont f = p.font(); f.setPointSize(8); f.setBold(true); p.setFont(f);
+                p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
+                           Qt::AlignCenter, node.label);
+
+                p.setBrush(QColor(245, 158, 11));
+                p.setPen(QPen(Theme::ColorTextPrimary, 1.5));
+                p.drawEllipse(QPointF(ex, ey), 10, 10);
+                break;
+            }
+
+            case KeyNodeType::SmartCast: {
+                p.setBrush(QColor(168, 85, 247, 25));
+                p.setPen(QPen(QColor(168, 85, 247, 180), 1.2, Qt::DashLine));
+                p.drawEllipse(QPointF(cx, cy), node.castRadius, node.castRadius);
+
+                p.setBrush(QColor(17, 24, 39, 210));
+                p.setPen(QPen(QColor(168, 85, 247), isSelected ? 2.5 : 1.5));
+                p.drawEllipse(QPointF(cx, cy), node.radius, node.radius);
+
+                p.setPen(Theme::ColorTextPrimary);
+                QFont f = p.font(); f.setPointSize(9); f.setBold(true); p.setFont(f);
+                p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
+                           Qt::AlignCenter, node.label);
+                break;
+            }
+
+            case KeyNodeType::Tap:
+            default: {
+                QRectF nodeRect(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2);
+                p.setBrush(QColor(17, 24, 39, isSelected ? 230 : 190));
+                p.setPen(QPen(Theme::ColorEmerald, isSelected ? 2.5 : 1.5));
+                p.drawEllipse(nodeRect);
+
+                p.setPen(Theme::ColorTextPrimary);
+                QFont lf = p.font(); lf.setPointSize(node.radius > 24 ? 9 : 8); lf.setBold(true); p.setFont(lf);
+                p.drawText(nodeRect, Qt::AlignCenter, node.label);
+                break;
+            }
         }
 
-        // Selection rectangle and coordinates readout in edit mode
+        if (m_mode == Mode::Edit && hasNodeSettings(node.type)) {
+            qreal gx = cx + node.radius * 0.75;
+            qreal gy = cy - node.radius * 0.75;
+            p.setBrush(QColor(11, 15, 25, 245));
+            p.setPen(QPen(Theme::ColorNeon, 1.3));
+            p.drawEllipse(QPointF(gx, gy), 11, 11);
+
+            p.setPen(Theme::ColorNeon);
+            QFont gf = p.font(); gf.setPointSize(9); gf.setBold(true); p.setFont(gf);
+            p.drawText(QRectF(gx - 11, gy - 11, 22, 22), Qt::AlignCenter, "⚙");
+        }
+
         if (isSelected) {
             p.setBrush(Qt::NoBrush);
             p.setPen(QPen(Theme::ColorNeon, 1.5, Qt::DashLine));
             p.drawRect(QRectF(cx - node.radius - 6, cy - node.radius - 6,
                               (node.radius + 6) * 2, (node.radius + 6) * 2));
-
-            QRectF infoBox(cx - 75, cy - node.radius - 22, 150, 16);
-            p.setBrush(QColor(11, 15, 25, 230));
-            p.setPen(QPen(Theme::ColorNeon, 1.0));
-            p.drawRoundedRect(infoBox, 3, 3);
-
-            p.setPen(Theme::ColorNeon);
-            QFont ifont = p.font();
-            ifont.setPointSize(7);
-            p.setFont(ifont);
-            p.drawText(infoBox, Qt::AlignCenter,
-                       QString("X: %1% Y: %2% | R: %3px")
-                           .arg(static_cast<int>(node.relX * 100))
-                           .arg(static_cast<int>(node.relY * 100))
-                           .arg(static_cast<int>(node.radius)));
         }
     }
 }

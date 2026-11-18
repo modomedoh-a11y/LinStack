@@ -8,6 +8,8 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QSlider>
+#include <QDoubleSpinBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -15,6 +17,7 @@
 #include "InputTranslator.h"
 
 class UInputTouchBridge;
+class InputMapper;
 
 class KeymapperOverlay : public QWidget
 {
@@ -32,6 +35,9 @@ public:
     void setBridge(UInputTouchBridge *bridge);
     InputTranslator *translator() const { return m_translator; }
 
+    void setInputMapper(InputMapper *mapper);
+    InputMapper *inputMapper() const { return m_inputMapper; }
+
     void setMode(Mode mode);
     Mode mode() const { return m_mode; }
 
@@ -41,9 +47,16 @@ public:
     void setOverlayOpacity(qreal opacity);
     qreal overlayOpacity() const { return m_opacity; }
 
-    // JSON Layout Management (~/.config/LinStack/keymaps/<app_id>.json)
-    bool saveLayoutToJson(const QString &filePath = QString());
-    bool loadLayoutFromJson(const QString &filePath = QString());
+    // Profile Management & Auto-Save/Load
+    QString profilesDir() const;
+    void refreshProfileList(const QString &selectProfile = QString());
+    bool saveProfileByName(const QString &profileName);
+    bool loadProfileByName(const QString &profileName);
+    void createNewProfile();
+    void duplicateCurrentProfile();
+    void deleteCurrentProfile();
+    void exportProfileToFile();
+    void importProfileFromFile();
     void resetToDefaultBinds();
 
     // Node management
@@ -55,6 +68,7 @@ signals:
     void layoutSaved(const QString &filePath);
     void layoutLoaded(const QString &filePath);
     void toastRequested(const QString &message);
+    void aimLockAnchorChanged(bool active, QPointF normPos);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -69,21 +83,22 @@ protected:
 private:
     void setupEditorUi();
     void setupNodeCatalogPanel();
+    void setupNodeSettingsPanel();
+    void updateNodeSettingsPanel();
     int  findNodeAt(const QPointF &pos) const;
+    bool isGearClicked(int nodeIndex, const QPointF &pos) const;
+    bool hasNodeSettings(KeyNodeType type) const;
     void syncTranslatorNodes();
     void positionEditorBar();
-
-    // Draw individual node types
-    void drawNodeBurstTap(QPainter &p, const KeyBindingNode &node, bool selected) const;
-    void drawNodeFreeLook(QPainter &p, const KeyBindingNode &node, bool selected) const;
-    void drawNodeEdgeScroll(QPainter &p, const KeyBindingNode &node, bool selected) const;
 
     Mode m_mode = Mode::Play;
     qreal m_opacity = 0.85;
     QString m_appId = "default";
+    QString m_currentProfileName = "Default";
 
     UInputTouchBridge *m_bridge = nullptr;
     InputTranslator   *m_translator = nullptr;
+    InputMapper       *m_inputMapper = nullptr;
 
     QList<KeyBindingNode> m_nodes;
 
@@ -91,41 +106,53 @@ private:
     int     m_selectedNodeIndex  = -1;
     bool    m_isDraggingNode     = false;
     bool    m_isDraggingSwipeEnd = false;
+    bool    m_isDraggingFireBtn  = false;
+    bool    m_isResizingDpad     = false;
     QPointF m_dragOffset;
 
-    // Mouse lock state in Play mode
-    QPoint m_lastMousePos;
-    bool   m_ignoreNextMouseMove = false;
+
+    // Mouse lock state in Play mode (anchored at AimLock node position)
+    QPoint  m_lastMousePos;
+    QPointF m_activeAimAnchorNorm = QPointF(0.5, 0.5);
+    bool    m_ignoreNextMouseMove = false;
 
     // Smart cast preview
     QPointF m_smartCastCenter;
     QPointF m_smartCastTarget;
     bool    m_showSmartCastLine = false;
 
-    // ── Floating editor toolbar (horizontal, top-center) ──────────────────────
-    QWidget     *m_editorBar       = nullptr;
-    QComboBox   *m_profileCombo    = nullptr;  // Profile selector dropdown
-    QSlider     *m_opacitySlider   = nullptr;  // Opacity 0–100%
-    QLabel      *m_opacityLabel    = nullptr;
+    // Floating editor toolbar
+    QWidget     *m_editorBar        = nullptr;
+    QComboBox   *m_profileCombo     = nullptr;
+    QPushButton *m_btnNewProfile    = nullptr;
+    QPushButton *m_btnDupProfile    = nullptr;
+    QPushButton *m_btnDelProfile    = nullptr;
+    QPushButton *m_btnExport        = nullptr;
+    QPushButton *m_btnImport        = nullptr;
+    QSlider     *m_opacitySlider    = nullptr;
+    QLabel      *m_opacityLabel     = nullptr;
+    QPushButton *m_btnClearAll      = nullptr;
+    QPushButton *m_btnReset         = nullptr;
+    QPushButton *m_btnToggleMode    = nullptr;
 
-    QPushButton *m_btnAddTap       = nullptr;
-    QPushButton *m_btnAddDpad      = nullptr;
-    QPushButton *m_btnAddAim       = nullptr;
-    QPushButton *m_btnAddSwipe     = nullptr;
-    QPushButton *m_btnAddSmartCast = nullptr;
-    QPushButton *m_btnAddBurstTap  = nullptr;
-    QPushButton *m_btnAddFreeLook  = nullptr;
-    QPushButton *m_btnAddEdgeScroll = nullptr;
-    QPushButton *m_btnClearAll     = nullptr;
-    QPushButton *m_btnSave         = nullptr;
-    QPushButton *m_btnLoad         = nullptr;
-    QPushButton *m_btnReset        = nullptr;
-    QPushButton *m_btnToggleMode   = nullptr;
-
-    // ── Right-side collapsible Node Catalog panel ─────────────────────────────
-    QWidget     *m_catalogPanel    = nullptr;
-    bool         m_catalogExpanded = true;
+    // Right-side collapsible Node Catalog panel
+    QWidget     *m_catalogPanel     = nullptr;
+    bool         m_catalogExpanded  = true;
     QPushButton *m_btnToggleCatalog = nullptr;
+    QPushButton *m_btnAddTap        = nullptr;
+    QPushButton *m_btnAddDpad       = nullptr;
+    QPushButton *m_btnAddAim        = nullptr;
+    QPushButton *m_btnAddSwipe      = nullptr;
+    QPushButton *m_btnAddSmartCast  = nullptr;
+    QPushButton *m_btnAddBurstTap   = nullptr;
+    QPushButton *m_btnAddFreeLook   = nullptr;
+    QPushButton *m_btnAddEdgeScroll = nullptr;
+
+    // Per-node Context Settings Popup (different per node type!)
+    QWidget        *m_nodeSettingsPanel = nullptr;
+    QLabel         *m_settingsTitle     = nullptr;
+    QVBoxLayout    *m_settingsBody      = nullptr;
+    bool            m_settingsOpen      = false;
 };
 
 #endif // KEYMAPPEROVERLAY_H

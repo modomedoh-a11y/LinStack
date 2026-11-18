@@ -26,6 +26,7 @@ signals:
     void volumeUpClicked();
     void volumeDownClicked();
     void keymapperToggled(bool active);
+    void keymapperEditRequested();
     void macroClicked();
     void rotateClicked();
     void ecoModeToggled(bool active);

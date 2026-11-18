@@ -98,9 +98,16 @@ public:
     ContainerState containerState() const { return m_containerState; }
 
     // --- Session Lifecycle (linstack session start/stop) ---
+    void setDesiredResolution(int width, int height) { m_desiredWidth = width; m_desiredHeight = height; }
+    int desiredWidth() const { return m_desiredWidth; }
+    int desiredHeight() const { return m_desiredHeight; }
     void startSession();
     void stopSession();
+    void launchFullUi();
+    bool isSessionRunning() const;
     SessionState sessionState() const { return m_sessionState; }
+    void setHasFirstFrame(bool hasFrame);
+    bool hasFirstFrame() const { return m_hasFirstFrame; }
 
     // --- linstack-scripts Integration (Casualsnek/linstack_script) ---
     void setScriptsPath(const QString &path);
@@ -152,6 +159,8 @@ private slots:
     void handleSessionProcessError(QProcess::ProcessError error);
     void handleSessionStdout();
     void handleSessionStderr();
+    void checkSessionStartupStatus();
+    void retryFullUi();
 
     void handleAdbSocketConnected();
     void handleAdbSocketError();
@@ -168,8 +177,15 @@ private:
 
     // Active long-running session process
     QProcess *m_sessionProcess = nullptr;
+    QProcess *m_uiProcess = nullptr;
+    QTimer *m_sessionPollTimer = nullptr;
+    QTimer *m_uiRetryTimer = nullptr;
+    int m_sessionPollCount = 0;
+    int m_uiRetryCount = 0;
+    bool m_hasFirstFrame = false;
 
     // Active script operation process
+
     QProcess *m_scriptProcess = nullptr;
     QString m_activeScriptOp;
 
@@ -188,6 +204,9 @@ private:
 
     QString m_scriptsPath;
     QMap<QString, DeviceProfileInfo> m_profiles;
+
+    int m_desiredWidth = 1920;
+    int m_desiredHeight = 1080;
 };
 
 #endif // LINSTACKSERVICE_H

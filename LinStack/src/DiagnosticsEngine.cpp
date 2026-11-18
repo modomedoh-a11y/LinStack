@@ -1,5 +1,6 @@
 #include "DiagnosticsEngine.h"
 #include "Logger.h"
+#include "PathResolver.h"
 
 #include <QFileInfo>
 #include <QDir>
@@ -81,6 +82,13 @@ void DiagnosticsWorker::performChecks()
         bool vndBinder = QFileInfo::exists("/dev/vndbinder") || QFileInfo::exists("/dev/binderfs/vndbinder");
         bool hwBinder = QFileInfo::exists("/dev/hwbinder") || QFileInfo::exists("/dev/binderfs/hwbinder");
 
+        // Check if binderfs filesystem is supported directly by kernel (e.g. built-in on Fedora)
+        bool binderfsBuiltin = false;
+        QFile fsFile("/proc/filesystems");
+        if (fsFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            binderfsBuiltin = fsFile.readAll().contains("binder");
+        }
+
         // Check /proc/modules for binder_linux
         bool moduleLoaded = false;
         QFile modFile("/proc/modules");
@@ -89,16 +97,20 @@ void DiagnosticsWorker::performChecks()
             moduleLoaded = content.contains("binder_linux") || content.contains("binder");
         }
 
-        if ((devBinder || devBinderfs) && vndBinder && hwBinder) {
+        if (devBinderfs || (devBinder && vndBinder && hwBinder)) {
             r.status = CheckStatus::Passed;
-            r.details = QString("Binder IPC nodes active (binder, vndbinder, hwbinder). FS: %1")
-                            .arg(devBinderfs ? "/dev/binderfs" : "/dev");
+            r.details = QString("Binder IPC nodes active (%1). FS: %2")
+                            .arg(devBinderfs ? "binderfs" : "dev", devBinderfs ? "/dev/binderfs" : "/dev");
             LOG_INFO("Diagnostics", r.details);
-        } else if (devBinder || devBinderfs) {
+        } else if (devBinder) {
+            r.status = CheckStatus::Passed;
+            r.details = "Binder IPC node active at /dev/binder.";
+            LOG_INFO("Diagnostics", r.details);
+        } else if (binderfsBuiltin) {
             r.status = CheckStatus::Warning;
-            r.errorCode = "WARN_BINDER_PARTIAL";
-            r.details = "Main binder active, but vndbinder or hwbinder nodes are missing.";
-            r.remediationHint = "modprobe binder_linux devices=binder,hwbinder,vndbinder";
+            r.errorCode = "WARN_BINDERFS_UNMOUNTED";
+            r.details = "Kernel has built-in binderfs support, but /dev/binderfs is not mounted.";
+            r.remediationHint = "mkdir -p /dev/binderfs && mount -t binder binder /dev/binderfs";
             LOG_WARN("Diagnostics", r.details);
         } else {
             r.status = CheckStatus::Failed;
@@ -106,7 +118,7 @@ void DiagnosticsWorker::performChecks()
             r.details = moduleLoaded
                 ? "Kernel module binder_linux is loaded but /dev/binderfs is not mounted."
                 : "Kernel binder driver is not loaded (/dev/binder and /dev/binderfs missing).";
-            r.remediationHint = "modprobe binder_linux devices=binder,hwbinder,vndbinder";
+            r.remediationHint = "modprobe binder_linux devices=binder,hwbinder,vndbinder || (mkdir -p /dev/binderfs && mount -t binder binder /dev/binderfs)";
             LOG_FAULT("Diagnostics", r.errorCode, r.details, r.remediationHint);
         }
         report.checks.append(r);
@@ -226,7 +238,7 @@ void DiagnosticsWorker::performChecks()
         r.canAutoHeal = true;
         r.requiresElevation = false;
 
-        QString userStorage = QDir::homePath() + "/.local/share/LinStack";
+        QString userStorage = PathResolver::userDataDir();
         bool created = QDir().mkpath(userStorage);
         QFileInfo userFi(userStorage);
 
@@ -262,6 +274,82 @@ void DiagnosticsWorker::performChecks()
                 r.details = QString("Rootfs storage writable. Available volume space: %1 GB.").arg(freeGb);
                 LOG_INFO("Diagnostics", r.details);
             }
+        }
+        report.checks.append(r);
+        emit checkCompleted(r);
+    }
+
+    {
+        DiagnosticCheckResult r;
+        r.id = "ANDROID_IMAGES";
+        r.category = DiagnosticCategory::ContainerRootfs;
+        r.name = "Android System & Vendor Images";
+        r.canAutoHeal = false;
+        r.requiresElevation = false;
+
+        QString sysImg = PathResolver::resolveResource("system.img");
+        if (QFileInfo::exists(sysImg)) {
+            qint64 sizeMb = QFileInfo(sysImg).size() / (1024 * 1024);
+            r.status = CheckStatus::Passed;
+            r.details = QString("Located system.img at %1 (%2 MB).").arg(sysImg).arg(sizeMb);
+            LOG_INFO("Diagnostics", r.details);
+        } else {
+            r.status = CheckStatus::Warning;
+            r.errorCode = "WARN_IMAGES_NOT_FOUND";
+            r.details = QString("system.img not yet found in %1 or standard system paths.").arg(PathResolver::resolveResourcesDir());
+            r.remediationHint = "Place system.img & vendor.img in resources/ or /usr/share/linstack/resources/";
+            LOG_WARN("Diagnostics", r.details);
+        }
+        report.checks.append(r);
+        emit checkCompleted(r);
+    }
+
+    {
+        DiagnosticCheckResult r;
+        r.id = "LINSTACK_CONFIG";
+        r.category = DiagnosticCategory::ContainerRootfs;
+        r.name = "LinStack Daemon Configuration (/var/lib/linstack/linstack.cfg)";
+        r.canAutoHeal = true;
+        r.requiresElevation = true;
+
+        QFile cfgFile("/var/lib/linstack/linstack.cfg");
+        if (!cfgFile.exists()) {
+            r.status = CheckStatus::Warning;
+            r.errorCode = "WARN_CONFIG_MISSING";
+            r.details = "System configuration /var/lib/linstack/linstack.cfg does not exist. First-time initialization required.";
+            r.remediationHint = QString("linstack init -f -i %1").arg(PathResolver::resolveResourcesDir());
+            LOG_WARN("Diagnostics", r.details);
+        } else if (cfgFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString configuredPath;
+            while (!cfgFile.atEnd()) {
+                QString line = QString::fromUtf8(cfgFile.readLine()).trimmed();
+                if (line.startsWith("images_path")) {
+                    configuredPath = line.section('=', 1, 1).trimmed();
+                    break;
+                }
+            }
+            cfgFile.close();
+
+            bool imgValid = !configuredPath.isEmpty() && QFileInfo::exists(configuredPath + "/system.img");
+            if (imgValid) {
+                r.status = CheckStatus::Passed;
+                r.details = QString("Configured images_path points to valid image directory: %1").arg(configuredPath);
+                LOG_INFO("Diagnostics", r.details);
+            } else {
+                r.status = CheckStatus::Warning;
+                r.errorCode = "WARN_CONFIG_IMAGES_STALE";
+                r.details = QString("Configured images_path '%1' does not contain system.img. Needs synchronization to %2")
+                                .arg(configuredPath, PathResolver::resolveResourcesDir());
+                r.remediationHint = QString("sed -i 's|images_path = .*|images_path = %1|' /var/lib/linstack/linstack.cfg")
+                                        .arg(PathResolver::resolveResourcesDir());
+                LOG_WARN("Diagnostics", r.details);
+            }
+        } else {
+            r.status = CheckStatus::Warning;
+            r.errorCode = "WARN_CONFIG_UNREADABLE";
+            r.details = "Could not open /var/lib/linstack/linstack.cfg for reading.";
+            r.remediationHint = "chmod 0644 /var/lib/linstack/linstack.cfg";
+            LOG_WARN("Diagnostics", r.details);
         }
         report.checks.append(r);
         emit checkCompleted(r);

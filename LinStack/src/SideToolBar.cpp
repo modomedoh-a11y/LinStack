@@ -6,17 +6,17 @@
 SideToolBar::SideToolBar(QWidget *parent)
     : QWidget(parent)
 {
-    setFixedWidth(46);
+    setFixedWidth(32);
     setupUi();
 }
 
 QPushButton *SideToolBar::createToolButton(const QString &tooltip, Theme::IconType iconType, const char *slot)
 {
     auto *btn = new QPushButton(this);
-    btn->setFixedSize(36, 34);
+    btn->setFixedSize(26, 26);
     btn->setCursor(Qt::PointingHandCursor);
     btn->setIcon(Theme::createIcon(iconType, Theme::ColorTextMuted, 18));
-    btn->setIconSize(QSize(18, 18));
+    btn->setIconSize(QSize(15, 15));
     btn->setToolTip(tooltip);
     btn->setStyleSheet(
         "QPushButton {"
@@ -44,7 +44,7 @@ QPushButton *SideToolBar::createToolButton(const QString &tooltip, Theme::IconTy
 void SideToolBar::setupUi()
 {
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(4, 4, 4, 6);
+    layout->setContentsMargins(3, 4, 3, 6);
     layout->setSpacing(3);
     layout->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
 
@@ -60,13 +60,18 @@ void SideToolBar::setupUi()
     m_btnVolumeDown = createToolButton("Volume Down (Ctrl+Down)", Theme::IconType::VolumeDown, SIGNAL(volumeDownClicked()));
     layout->addWidget(m_btnVolumeDown);
 
-    // 4. Keymapper Toggle (Ctrl+Shift+K)
-    m_btnKeymapper = createToolButton("Keymapper Overlay (Ctrl+Shift+K)", Theme::IconType::Keymapper);
+    // 4. Keymapper Toggle (Left Click: Enable/Disable, Right Click: Edit Mode when active)
+    m_btnKeymapper = createToolButton("Keymapper: Left-Click Toggle | Right-Click Edit (when active)", Theme::IconType::Keymapper);
+    m_btnKeymapper->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(m_btnKeymapper, &QPushButton::clicked, this, [this]() {
         setKeymapperActive(!m_keymapperActive);
         emit keymapperToggled(m_keymapperActive);
     });
+    connect(m_btnKeymapper, &QPushButton::customContextMenuRequested, this, [this](const QPoint &) {
+        emit keymapperEditRequested();
+    });
     layout->addWidget(m_btnKeymapper);
+
 
     // 5. Macro
     m_btnMacro = createToolButton("Macro Recorder / Script Automation", Theme::IconType::Macro, SIGNAL(macroClicked()));

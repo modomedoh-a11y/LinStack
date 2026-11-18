@@ -1,9 +1,11 @@
 #include "Logger.h"
+#include "PathResolver.h"
 
 #include <QDir>
 #include <QFileInfo>
 #include <QTextStream>
 #include <QThread>
+#include <QStandardPaths>
 #include <iostream>
 #include <execinfo.h>
 #include <cstdlib>
@@ -17,9 +19,9 @@ Logger &Logger::instance()
 Logger::Logger(QObject *parent)
     : QObject(parent)
 {
-    QString defaultDir = QDir::homePath() + "/.local/state/LinStack";
-    QDir().mkpath(defaultDir);
-    setLogFilePath(defaultDir + "/linstack.log");
+    // XDG-compliant state directory via portable PathResolver: ~/.local/state/linStack
+    QString stateDir = PathResolver::userStateDir();
+    setLogFilePath(stateDir + "/linstack.log");
 }
 
 Logger::~Logger()

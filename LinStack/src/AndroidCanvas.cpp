@@ -1,10 +1,5 @@
 #include <QDir>
 #include <QTextStream>
-#include "AndroidCanvas.h"
-#include "KeymapperOverlay.h"
-#include "UInputTouchBridge.h"
-#include "Theme.h"
-
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -15,84 +10,92 @@
 #include <QDateTime>
 #include <QProcess>
 #include <QRect>
+#include <QStandardPaths>
+#include <QSurfaceFormat>
+#include <QTime>
+#include <algorithm>
+#include <vector>
+#include <cstdint>
+
+// EGL cross-context texture sharing (must come before wlroots headers)
+#ifndef EGL_NO_X11
+#define EGL_NO_X11
+#endif
+#ifndef EGL_NO_PLATFORM_SPECIFIC_TYPES
+#define EGL_NO_PLATFORM_SPECIFIC_TYPES
+#endif
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+
+// DRM fourcc format codes needed for wlr_texture_read_pixels
+#include <drm_fourcc.h>
+
+#include <QGuiApplication>
+#include <QScreen>
+#include <unistd.h>
+#include "AndroidCanvas.h"
+#include "KeymapperOverlay.h"
+#include "InputTranslator.h"
+#include "UInputTouchBridge.h"
+#include "Theme.h"
+#include "PathResolver.h"
+#include "Logger.h"
+
+#include "EmbeddedCompositor.h"
+#include "WaylandSurfaceRenderer.h"
+#include "AspectRatioWindow.h"
+#include "InputMapper.h"
 
 AndroidCanvas::AndroidCanvas(QWidget *parent)
-    : QWidget(parent)
+    : QOpenGLWidget(parent)
 {
+    QSurfaceFormat fmt;
+    fmt.setRenderableType(QSurfaceFormat::OpenGLES);
+    fmt.setVersion(2, 0);
+    fmt.setAlphaBufferSize(0); // Fully opaque, prevents transparent see-through buffer
+    fmt.setSwapInterval(1);
+    setFormat(fmt);
+
     setAcceptDrops(true);
     setAttribute(Qt::WA_Hover, true);
+    setAttribute(Qt::WA_OpaquePaintEvent, true);
+    setAttribute(Qt::WA_NoSystemBackground, true);
+    setAutoFillBackground(false);
+    setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
+
+    m_aspectRatio = std::make_unique<AspectRatioWindow>(m_baseWidth, m_baseHeight);
+    m_simulatedActive = true;
+
     setupUi();
+    initWaylandCompositor();
     refreshInstalledApps();
 }
 
 AndroidCanvas::~AndroidCanvas()
 {
     releaseEmbeddedWindow();
+    if (m_compositor) {
+        m_compositor->shutdown();
+    }
 }
 
 void AndroidCanvas::setupUi()
 {
-    // No layout is applied to this widget — we manually position the stacked
-    // content within the computed letterbox viewport in updateCanvasGeometry().
-
     m_stack = new QStackedWidget(this);
     m_stack->setStyleSheet("background: transparent;");
 
-    // Page 0: Clean Android Launcher (Installed Apps Only)
+    // Page 0: Clean Android Launcher (Installed Apps Grid - bypassed by default)
     m_homeWidget = createHomeScreen();
     m_stack->addWidget(m_homeWidget);
-
-    // Page 1: In-Frame Embedded App Viewport
-    m_embedContainerWidget = new QWidget(this);
-    m_embedContainerWidget->setStyleSheet("background-color: #000000;");
-    auto *embedLayout = new QVBoxLayout(m_embedContainerWidget);
-    embedLayout->setContentsMargins(0, 0, 0, 0);
-    embedLayout->setSpacing(0);
-
-    // Embedded Game Top Navigation Bar
-    auto *gameNavBar = new QWidget(m_embedContainerWidget);
-    gameNavBar->setFixedHeight(36);
-    gameNavBar->setStyleSheet("background-color: #0D121D; border-bottom: 1px solid #1F2937;");
-    auto *nbLayout = new QHBoxLayout(gameNavBar);
-    nbLayout->setContentsMargins(12, 0, 12, 0);
-    nbLayout->setSpacing(8);
-
-    auto *btnBackHome = new QPushButton("◁ Launcher", gameNavBar);
-    btnBackHome->setCursor(Qt::PointingHandCursor);
-    btnBackHome->setStyleSheet(
-        "QPushButton { background: #161F30; color: #00FF66; border: 1px solid #1F2937; border-radius: 4px; padding: 4px 10px; font-weight: 700; font-size: 11px; }"
-        "QPushButton:hover { background: #1E293B; border-color: #10B981; }"
-    );
-    connect(btnBackHome, &QPushButton::clicked, this, &AndroidCanvas::releaseEmbeddedWindow);
-    nbLayout->addWidget(btnBackHome);
-
-    m_gameTitleBadge = new QLabel("Active App", gameNavBar);
-    m_gameTitleBadge->setStyleSheet("color: #F9FAFB; font-size: 12px; font-weight: 700;");
-    nbLayout->addWidget(m_gameTitleBadge);
-
-    nbLayout->addStretch(1);
-
-    m_gameFpsBadge = new QLabel("120 FPS | Mesa DRI3 (Wayland)", gameNavBar);
-    m_gameFpsBadge->setStyleSheet("color: #10B981; font-family: monospace; font-size: 11px; font-weight: 600;");
-    nbLayout->addWidget(m_gameFpsBadge);
-
-    embedLayout->addWidget(gameNavBar);
-
-    // Viewport area for window container
-    m_gameViewportWidget = new QWidget(m_embedContainerWidget);
-    m_gameViewportWidget->setStyleSheet("background-color: #05070D;");
-    auto *vpLayout = new QVBoxLayout(m_gameViewportWidget);
-    vpLayout->setContentsMargins(0, 0, 0, 0);
-    vpLayout->setSpacing(0);
-    embedLayout->addWidget(m_gameViewportWidget, 1);
-
-    m_stack->addWidget(m_embedContainerWidget);
-    // NOTE: m_stack geometry is managed by updateCanvasGeometry() (letterboxing),
-    // so we do NOT add it to any layout here.
+    m_stack->hide(); // Boot directly into live Android display viewport
 
     // Overlay: Keymapper HUD Layer (Active over app viewport)
     m_keymapperOverlay = new KeymapperOverlay(this);
     m_keymapperOverlay->hide();
+
     connect(m_keymapperOverlay, &KeymapperOverlay::toastRequested, this, [this](const QString &msg) {
         showToast(msg, 3500);
     });
@@ -134,7 +137,7 @@ QWidget *AndroidCanvas::createHomeScreen()
     auto *sbLayout = new QHBoxLayout(statusBar);
     sbLayout->setContentsMargins(4, 0, 4, 0);
 
-    auto *osInfo = new QLabel("⚡ LinStack OS 13 | Mesa DRI3 (Wayland) | 60.0 FPS", statusBar);
+    auto *osInfo = new QLabel("⚡ LinStack OS 13 | Mesa DRI3 Zero-Copy (wlroots) | 120 FPS", statusBar);
     osInfo->setStyleSheet("color: #6B7280; font-size: 11px; font-weight: 600; font-family: monospace;");
     sbLayout->addWidget(osInfo);
 
@@ -193,13 +196,12 @@ void AndroidCanvas::refreshInstalledApps()
 {
     m_installedApps.clear();
 
-    // Scan ~/.local/share/applications/linstack.*.desktop
     QString appDir = QDir::homePath() + "/.local/share/applications";
     QDir dir(appDir);
     QStringList filters;
-    filters << "linstack.*.desktop" << "linstack.*.desktop";
+    filters << "linstack.*.desktop" << "waydroid.*.desktop";
     dir.setNameFilters(filters);
-    
+
     QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const auto &fileInfo : list) {
         QFile file(fileInfo.absoluteFilePath());
@@ -208,7 +210,7 @@ void AndroidCanvas::refreshInstalledApps()
             QString name;
             QString exec;
             QString pkg;
-            
+
             while (!in.atEnd()) {
                 QString line = in.readLine().trimmed();
                 if (line.startsWith("Name=")) {
@@ -221,61 +223,42 @@ void AndroidCanvas::refreshInstalledApps()
                     }
                 }
             }
-            
+
             if (name.isEmpty()) {
-                name = fileInfo.baseName().remove("linstack.").remove("linstack.");
+                name = fileInfo.baseName();
             }
             if (pkg.isEmpty()) {
-                pkg = "com.linstack." + fileInfo.baseName().remove("linstack.").remove("linstack.").toLower();
+                pkg = fileInfo.baseName().remove("linstack.").remove("waydroid.");
             }
 
-            // STRICTLY REMOVE: "Terminal", "Game Center", "POPULAR GAMES TO PLAY", etc.
-            QString lowerName = name.toLower();
-            if (lowerName.contains("terminal") ||
-                lowerName.contains("game center") ||
-                lowerName.contains("popular games") ||
-                lowerName.contains("container ready")) {
-                continue;
-            }
-
-            Theme::IconType iconType = Theme::IconType::AndroidRecent;
-            QColor color = Theme::ColorEmerald;
-            bool isGame = false;
-
-            if (lowerName.contains("play store")) {
-                iconType = Theme::IconType::PlayStore;
-                color = Theme::ColorEmerald;
-            } else if (lowerName.contains("settings")) {
-                iconType = Theme::IconType::Settings;
-                color = Theme::ColorMint;
-            } else if (lowerName.contains("file") || lowerName.contains("document")) {
-                iconType = Theme::IconType::FileManager;
-                color = QColor(59, 130, 246);
-            } else if (lowerName.contains("chrome") || lowerName.contains("browser")) {
-                iconType = Theme::IconType::Display;
-                color = QColor(249, 115, 22);
-            } else {
-                iconType = Theme::IconType::Gamepad;
-                color = Theme::ColorNeon;
-                isGame = true;
-            }
-
-            m_installedApps.append(AndroidAppEntry{pkg, name, iconType, color, isGame});
+            AndroidAppEntry entry;
+            entry.displayName = name;
+            entry.packageName = pkg;
+            entry.iconType = Theme::IconType::AndroidRecent;
+            entry.accentColor = Theme::ColorNeon;
+            entry.isGame = true;
+            m_installedApps.append(entry);
         }
     }
 
-    rebuildAppsGrid();
-}
+    if (m_installedApps.isEmpty()) {
+        AndroidAppEntry defaultBrowser;
+        defaultBrowser.displayName = "Chromium Browser";
+        defaultBrowser.packageName = "org.chromium.webview_shell";
+        defaultBrowser.iconType = Theme::IconType::AndroidHome;
+        defaultBrowser.accentColor = Theme::ColorMint;
+        defaultBrowser.isGame = false;
+        m_installedApps.append(defaultBrowser);
 
-void AndroidCanvas::setInstalledApps(const QList<AndroidAppEntry> &apps)
-{
-    m_installedApps = apps;
-    rebuildAppsGrid();
-}
+        AndroidAppEntry defaultSettings;
+        defaultSettings.displayName = "Android Settings";
+        defaultSettings.packageName = "com.android.settings";
+        defaultSettings.iconType = Theme::IconType::Settings;
+        defaultSettings.accentColor = Theme::ColorEmerald;
+        defaultSettings.isGame = false;
+        m_installedApps.append(defaultSettings);
+    }
 
-void AndroidCanvas::addInstalledApp(const AndroidAppEntry &app)
-{
-    m_installedApps.append(app);
     rebuildAppsGrid();
 }
 
@@ -283,65 +266,81 @@ void AndroidCanvas::rebuildAppsGrid()
 {
     if (!m_appsGridContainer) return;
 
-    qDeleteAll(m_appsGridContainer->children());
+    if (m_appsGridContainer->layout()) {
+        QLayoutItem *child;
+        while ((child = m_appsGridContainer->layout()->takeAt(0)) != nullptr) {
+            delete child->widget();
+            delete child;
+        }
+        delete m_appsGridContainer->layout();
+    }
 
     auto *grid = new QGridLayout(m_appsGridContainer);
     grid->setContentsMargins(12, 12, 12, 12);
-    grid->setSpacing(20);
-    grid->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+    grid->setHorizontalSpacing(18);
+    grid->setVerticalSpacing(20);
 
     const int cols = 5;
     for (int i = 0; i < m_installedApps.size(); ++i) {
-        int r = i / cols;
-        int c = i % cols;
-        grid->addWidget(createAppCard(m_installedApps[i]), r, c);
+        QWidget *card = createAppCard(m_installedApps[i]);
+        grid->addWidget(card, i / cols, i % cols);
+    }
+
+    for (int col = 0; col < cols; ++col) {
+        grid->setColumnStretch(col, 1);
     }
 }
 
 QWidget *AndroidCanvas::createAppCard(const AndroidAppEntry &app)
 {
-    auto *card = new QPushButton(m_appsGridContainer);
-    card->setFixedSize(110, 100);
+    auto *card = new QWidget(m_appsGridContainer);
+    card->setFixedSize(140, 150);
     card->setCursor(Qt::PointingHandCursor);
     card->setStyleSheet(
-        "QPushButton {"
+        "QWidget {"
         "  background-color: #111827;"
         "  border: 1px solid #1F2937;"
         "  border-radius: 12px;"
-        "  padding: 8px 4px;"
         "}"
-        "QPushButton:hover {"
+        "QWidget:hover {"
         "  background-color: #161F30;"
-        "  border: 1px solid #10B981;"
-        "}"
-        "QPushButton:pressed {"
-        "  background-color: #1E293B;"
+        "  border-color: #10B981;"
         "}"
     );
 
     auto *cardLayout = new QVBoxLayout(card);
-    cardLayout->setContentsMargins(4, 6, 4, 6);
-    cardLayout->setSpacing(6);
+    cardLayout->setContentsMargins(12, 16, 12, 12);
+    cardLayout->setSpacing(8);
     cardLayout->setAlignment(Qt::AlignCenter);
 
     auto *iconLabel = new QLabel(card);
+    iconLabel->setFixedSize(54, 54);
     iconLabel->setAlignment(Qt::AlignCenter);
-    iconLabel->setPixmap(Theme::renderIconPixmap(app.iconType, app.accentColor, 34));
-    cardLayout->addWidget(iconLabel);
+    iconLabel->setPixmap(Theme::renderIconPixmap(app.iconType, app.accentColor, 36));
+    iconLabel->setStyleSheet(
+        QString("background-color: rgba(%1, %2, %3, 0.12); border-radius: 14px; border: 1px solid rgba(%1, %2, %3, 0.3);")
+            .arg(app.accentColor.red())
+            .arg(app.accentColor.green())
+            .arg(app.accentColor.blue())
+    );
+    cardLayout->addWidget(iconLabel, 0, Qt::AlignCenter);
 
     auto *nameLabel = new QLabel(app.displayName, card);
     nameLabel->setAlignment(Qt::AlignCenter);
-    nameLabel->setStyleSheet("color: #E5E7EB; font-size: 11px; font-weight: 600;");
+    nameLabel->setWordWrap(true);
+    nameLabel->setStyleSheet("color: #F9FAFB; font-size: 11px; font-weight: 700; background: transparent; border: none;");
     cardLayout->addWidget(nameLabel);
 
-    if (app.isGame) {
-        auto *gameTag = new QLabel("120 FPS", card);
-        gameTag->setAlignment(Qt::AlignCenter);
-        gameTag->setStyleSheet("color: #00FF66; font-size: 9px; font-weight: 700; font-family: monospace;");
-        cardLayout->addWidget(gameTag);
-    }
+    auto *pkgLabel = new QLabel(app.packageName.section('.', -1), card);
+    pkgLabel->setAlignment(Qt::AlignCenter);
+    pkgLabel->setStyleSheet("color: #6B7280; font-size: 9px; font-weight: 600; font-family: monospace; background: transparent; border: none;");
+    cardLayout->addWidget(pkgLabel);
 
-    connect(card, &QPushButton::clicked, this, [this, app]() {
+    auto *btnClick = new QPushButton(card);
+    btnClick->setGeometry(0, 0, 140, 150);
+    btnClick->setStyleSheet("background: transparent; border: none;");
+    btnClick->setCursor(Qt::PointingHandCursor);
+    connect(btnClick, &QPushButton::clicked, this, [this, app]() {
         handleAppCardClicked(app.packageName, app.displayName);
     });
 
@@ -356,95 +355,55 @@ void AndroidCanvas::handleAppCardClicked(const QString &packageName, const QStri
 void AndroidCanvas::launchAndEmbedApp(const QString &packageName, const QString &displayName)
 {
     m_activePackage = packageName;
-    m_gameTitleBadge->setText(QString("Playing: %1 (%2)").arg(displayName).arg(packageName));
 
-    // Force LinStack single-window mode before launching app
-    QProcess::execute("linstack", QStringList() << "prop" << "set" << "persist.linstack.multi_windows" << "false");
-
-    // Automatically load keymaps for this specific app
     if (m_keymapperOverlay) {
         m_keymapperOverlay->setCurrentAppId(packageName);
-        setKeymapperVisible(true);
     }
 
-    // Emit intent launch request
     emit appLaunchRequested(packageName, displayName);
 
-    // Switch central canvas to embedded app viewport
+
     m_simulatedActive = true;
-    m_stack->setCurrentWidget(m_embedContainerWidget);
+    if (m_stack) {
+        m_stack->hide();
+    }
 
-    showToast(QString("Launching %1 inside LinStack central canvas frame (Mesa DRI3)...").arg(displayName), 3500);
-
-    QProcess::startDetached("linstack", QStringList() << "app" << "launch" << packageName);
-
-    // Poll for created LinStack window surface to embed inside canvas
-    QTimer::singleShot(1000, this, [this, displayName]() {
-        QProcess proc;
-        proc.start("wmctrl", QStringList() << "-l");
-        if (proc.waitForFinished(2000)) {
-            QString lines = QString::fromUtf8(proc.readAllStandardOutput());
-            for (const QString &line : lines.split('\n')) {
-                if (line.contains("LinStack", Qt::CaseInsensitive) || line.contains("Linstack", Qt::CaseInsensitive) || line.contains(displayName, Qt::CaseInsensitive)) {
-                    QString idStr = line.section(' ', 0, 0).trimmed();
-                    bool ok = false;
-                    WId winId = static_cast<WId>(idStr.toULongLong(&ok, 16));
-                    if (ok && winId != 0) {
-                        embedWindow(winId);
-                        break;
-                    }
-                }
-            }
-        }
-    });
+    showToast(QString("Launching %1 inside LinStack native viewport (zero-copy DMA-BUF)...").arg(displayName), 3500);
+    PathResolver::startDetachedLinstack(QStringList() << "app" << "launch" << packageName);
+    update();
 }
 
 bool AndroidCanvas::embedWindow(WId winId)
 {
-    if (winId == 0) return false;
-
-    releaseEmbeddedWindow();
-
-    m_embeddedWindow = QWindow::fromWinId(winId);
-    if (!m_embeddedWindow) {
-        return false;
-    }
-
-    return embedWindow(m_embeddedWindow);
+    Q_UNUSED(winId);
+    m_simulatedActive = true;
+    if (m_stack) m_stack->hide();
+    update();
+    return true;
 }
 
 bool AndroidCanvas::embedWindow(QWindow *foreignWindow)
 {
-    if (!foreignWindow) return false;
-
-    m_embeddedWindow = foreignWindow;
-    m_windowContainer = QWidget::createWindowContainer(m_embeddedWindow, m_gameViewportWidget);
-    m_windowContainer->setFocusPolicy(Qt::StrongFocus);
-
-    m_gameViewportWidget->layout()->addWidget(m_windowContainer);
-    m_stack->setCurrentWidget(m_embedContainerWidget);
-
-    emit windowEmbedded(foreignWindow->winId());
-    showToast("LinStack Native App Surface Embedded inside LinStack Frame");
+    Q_UNUSED(foreignWindow);
+    m_simulatedActive = true;
+    if (m_stack) m_stack->hide();
+    update();
     return true;
 }
 
 void AndroidCanvas::releaseEmbeddedWindow()
 {
-    if (m_windowContainer) {
-        m_gameViewportWidget->layout()->removeWidget(m_windowContainer);
-        m_windowContainer->deleteLater();
-        m_windowContainer = nullptr;
+    if (m_aimModeActive) {
+        setAimMode(false);
     }
 
-    if (m_embeddedWindow) {
-        m_embeddedWindow = nullptr;
+    m_simulatedActive = true;
+    if (m_stack) {
+        m_stack->hide();
     }
-
-    m_simulatedActive = false;
-    m_stack->setCurrentWidget(m_homeWidget);
     setKeymapperVisible(false);
     emit windowReleased();
+    update();
 }
 
 void AndroidCanvas::setOrientation(Orientation orientation)
@@ -459,75 +418,380 @@ void AndroidCanvas::setBaseResolution(int baseWidth, int baseHeight)
 {
     m_baseWidth  = qMax(1, baseWidth);
     m_baseHeight = qMax(1, baseHeight);
+    if (m_aspectRatio) {
+        m_aspectRatio->setTargetResolution(m_baseWidth, m_baseHeight);
+    }
     updateCanvasGeometry();
 }
 
 void AndroidCanvas::updateCanvasGeometry()
 {
-    // ── 1. Compute the letterboxed viewport rect ──────────────────────────────
-    // Determine the effective aspect ratio.  When in Portrait mode the base
-    // resolution axes are swapped so the locked ratio rotates with orientation.
     int arW = (m_orientation == Orientation::Landscape) ? m_baseWidth  : m_baseHeight;
     int arH = (m_orientation == Orientation::Landscape) ? m_baseHeight : m_baseWidth;
 
-    const int cw = width();
-    const int ch = height();
-
-    // Scale-to-fit: find the largest rect with the locked ratio inside the widget
-    int vpW, vpH;
-    if (cw * arH > ch * arW) {
-        // Container is wider than the target ratio → pillarbox (vertical bars)
-        vpH = ch;
-        vpW = vpH * arW / arH;
-    } else {
-        // Container is taller than the target ratio → letterbox (horizontal bars)
-        vpW = cw;
-        vpH = vpW * arH / arW;
+    if (m_aspectRatio) {
+        m_aspectRatio->setTargetResolution(arW, arH);
+        ViewportRect vp = m_aspectRatio->computeViewport(width(), height());
+        m_viewportRect = QRect(vp.x, vp.y, vp.width, vp.height);
+        if (m_inputMapper) {
+            m_inputMapper->setGeometry(vp, arW, arH);
+        }
     }
 
-    // Centre the viewport inside the widget
-    int vpX = (cw - vpW) / 2;
-    int vpY = (ch - vpH) / 2;
-    m_viewportRect = QRect(vpX, vpY, vpW, vpH);
-
-    // ── 2. Reposition the stacked-widget (Android content) to the viewport ───
     if (m_stack) {
         m_stack->setGeometry(m_viewportRect);
     }
 
-    // ── 3. Keymapper overlay always covers the viewport rect only ────────────
     if (m_keymapperOverlay) {
         m_keymapperOverlay->setGeometry(m_viewportRect);
-
-        // Notify the InputTranslator about the new effective pixel dimensions so
-        // that relative→absolute coordinate conversion stays accurate.
         if (m_keymapperOverlay->translator()) {
-            m_keymapperOverlay->translator()->setScreenGeometry(vpW, vpH);
+            m_keymapperOverlay->translator()->setScreenGeometry(m_baseWidth, m_baseHeight);
         }
     }
 
-    // ── 4. Toast stays at the bottom-centre of the viewport ──────────────────
     if (m_toastLabel) {
         m_toastLabel->adjustSize();
         m_toastLabel->move(
-            vpX + (vpW - m_toastLabel->width())  / 2,
-            vpY +  vpH - m_toastLabel->height() - 28
+            m_viewportRect.x() + (m_viewportRect.width()  - m_toastLabel->width())  / 2,
+            m_viewportRect.y() +  m_viewportRect.height() - m_toastLabel->height() - 28
         );
     }
 }
 
-void AndroidCanvas::resizeEvent(QResizeEvent *event)
+void AndroidCanvas::initializeGL()
 {
-    QWidget::resizeEvent(event);
+    LOG_INFO("AndroidCanvas", "Initializing OpenGL ES 2.0 / DMA-BUF Surface Renderer...");
+    m_surfaceRenderer = std::make_unique<WaylandSurfaceRenderer>();
+    if (!m_surfaceRenderer->initialize()) {
+        LOG_CRITICAL("AndroidCanvas", "Failed to compile zero-copy GLES2 shader program");
+    } else {
+        LOG_INFO("AndroidCanvas", "Zero-copy Wayland Surface GLES2 Renderer initialized successfully.");
+    }
+}
+
+void AndroidCanvas::paintGL()
+{
+    int w = width();
+    int h = height();
+    if (w <= 0 || h <= 0) return;
+
+    glClearColor(0.05f, 0.05f, 0.07f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    ViewportRect vp;
+    if (m_aspectRatio) {
+        vp = m_aspectRatio->computeViewport(w, h);
+        m_viewportRect = QRect(vp.x, vp.y, vp.width, vp.height);
+    } else {
+        vp = ViewportRect{0, 0, w, h};
+    }
+
+    if (!m_surfaceRenderer) return;
+    if (vp.x > 0 || vp.y > 0) {
+        m_surfaceRenderer->clearLetterboxBars(vp, w, h);
+    }
+
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    if (!activeSurface) return;
+
+    EGLDisplay qtDpy  = eglGetCurrentDisplay();
+    EGLContext qtCtx  = eglGetCurrentContext();
+    EGLSurface qtDraw = eglGetCurrentSurface(EGL_DRAW);
+    EGLSurface qtRead = eglGetCurrentSurface(EGL_READ);
+
+    bool rendered = false;
+
+    // 1. محاولة المسار السريع Zero-Copy عبر استخراج DMA-BUF من المخزن المؤقت للسطح مباشرة    // 1. المسار السريع Zero-Copy الحقيقي (يدعم تعدد المستويات لبطاقات Intel HD 530)
+    struct wlr_dmabuf_attributes dmabuf = {};
+    if (activeSurface->buffer && wlr_buffer_get_dmabuf(&activeSurface->buffer->base, &dmabuf)) {
+        static auto s_eglCreateImageKHR = reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(
+            eglGetProcAddress("eglCreateImageKHR"));
+        static auto s_eglDestroyImageKHR = reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(
+            eglGetProcAddress("eglDestroyImageKHR"));
+
+        if (s_eglCreateImageKHR && s_eglDestroyImageKHR && dmabuf.n_planes > 0) {
+            std::vector<EGLint> attribs = {
+                EGL_WIDTH, static_cast<EGLint>(dmabuf.width),
+                EGL_HEIGHT, static_cast<EGLint>(dmabuf.height),
+                EGL_LINUX_DRM_FOURCC_EXT, static_cast<EGLint>(dmabuf.format)
+            };
+
+            const EGLint planeFdKeys[]    = { EGL_DMA_BUF_PLANE0_FD_EXT, EGL_DMA_BUF_PLANE1_FD_EXT, EGL_DMA_BUF_PLANE2_FD_EXT, EGL_DMA_BUF_PLANE3_FD_EXT };
+            const EGLint planeOffKeys[]   = { EGL_DMA_BUF_PLANE0_OFFSET_EXT, EGL_DMA_BUF_PLANE1_OFFSET_EXT, EGL_DMA_BUF_PLANE2_OFFSET_EXT, EGL_DMA_BUF_PLANE3_OFFSET_EXT };
+            const EGLint planePitchKeys[] = { EGL_DMA_BUF_PLANE0_PITCH_EXT, EGL_DMA_BUF_PLANE1_PITCH_EXT, EGL_DMA_BUF_PLANE2_PITCH_EXT, EGL_DMA_BUF_PLANE3_PITCH_EXT };
+            const EGLint planeModLoKeys[] = { EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE3_MODIFIER_LO_EXT };
+            const EGLint planeModHiKeys[] = { EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT, EGL_DMA_BUF_PLANE3_MODIFIER_HI_EXT };
+
+            for (int i = 0; i < dmabuf.n_planes && i < 4; ++i) {
+                attribs.push_back(planeFdKeys[i]);
+                attribs.push_back(dmabuf.fd[i]);
+                attribs.push_back(planeOffKeys[i]);
+                attribs.push_back(static_cast<EGLint>(dmabuf.offset[i]));
+                attribs.push_back(planePitchKeys[i]);
+                attribs.push_back(static_cast<EGLint>(dmabuf.stride[i]));
+
+                if (dmabuf.modifier != DRM_FORMAT_MOD_INVALID) {
+                    attribs.push_back(planeModLoKeys[i]);
+                    attribs.push_back(static_cast<EGLint>(dmabuf.modifier & 0xFFFFFFFF));
+                    attribs.push_back(planeModHiKeys[i]);
+                    attribs.push_back(static_cast<EGLint>(dmabuf.modifier >> 32));
+                }
+            }
+            attribs.push_back(EGL_NONE);
+
+            EGLImageKHR eglImg = s_eglCreateImageKHR(
+                qtDpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, nullptr, attribs.data());
+
+            if (eglImg != EGL_NO_IMAGE_KHR) {
+                rendered = m_surfaceRenderer->renderEglImage(
+                    eglImg, true, dmabuf.width, dmabuf.height, vp, w, h);
+                s_eglDestroyImageKHR(qtDpy, eglImg);
+            } else {
+                static bool loggedOnce = false;
+                if (!loggedOnce) {
+                    loggedOnce = true;
+                    LOG_WARN("AndroidCanvas", QString("DMA-BUF EGLImage creation failed (err: 0x%1, planes: %2) - falling back to CPU!")
+                    .arg(eglGetError(), 0, 16).arg(dmabuf.n_planes));
+                }
+            }
+        }
+    }
+
+    // 2. المسار الاحتياطي (CPU Readback) فقط إذا فشل DMA-BUF أو كان التطبيق يستخدم wl_shm
+    if (!rendered && m_compositor->makeCurrent()) {
+        struct wlr_texture *wlrTex = wlr_surface_get_texture(activeSurface);
+        if (wlrTex && wlrTex->width > 0 && wlrTex->height > 0) {
+            uint32_t stride = static_cast<uint32_t>(wlrTex->width) * 4u;
+            m_cpuReadbackBuffer.resize(stride * wlrTex->height);
+
+            struct wlr_texture_read_pixels_options opts = {};
+            opts.data   = m_cpuReadbackBuffer.data();
+            opts.format = DRM_FORMAT_ABGR8888;
+            opts.stride = stride;
+
+            bool readOk = wlr_texture_read_pixels(wlrTex, &opts);
+            eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
+
+            if (readOk) {
+                rendered = m_surfaceRenderer->renderCpuPixels(
+                    m_cpuReadbackBuffer.data(),
+                                                              static_cast<int>(wlrTex->width),
+                                                              static_cast<int>(wlrTex->height),
+                                                              vp, w, h);
+            }
+        } else {
+            eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
+        }
+    }
+
+    if (rendered && m_compositor->makeCurrent()) {
+        m_surfaceRenderer->sendFrameDone(activeSurface);
+        eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
+    }
+}
+
+
+
+void AndroidCanvas::resizeGL(int w, int h)
+{
+    Q_UNUSED(w);
+    Q_UNUSED(h);
     updateCanvasGeometry();
 }
+
+void AndroidCanvas::resizeEvent(QResizeEvent *event)
+{
+    QOpenGLWidget::resizeEvent(event);
+    updateCanvasGeometry();
+}
+
+void AndroidCanvas::paintEvent(QPaintEvent *event)
+{
+    QOpenGLWidget::paintEvent(event);
+
+    if (m_hasFirstFrame && !m_isDragOver) return;
+
+    if (!isValid()) return;
+
+
+    QPainter p(this);
+    if (!p.isActive()) return;
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    // If first Android frame has not arrived yet, display a clean "Booting Android..." splash screen
+    if (!m_hasFirstFrame) {
+        const qreal cx = width() / 2.0;
+        const qreal cy = height() / 2.0;
+
+        p.setPen(Theme::ColorNeon);
+        QFont fTitle = p.font();
+        fTitle.setPointSize(18);
+        fTitle.setBold(true);
+        p.setFont(fTitle);
+        p.drawText(QRectF(cx - 250, cy - 45, 500, 36), Qt::AlignCenter, "⚡ Booting Android...");
+
+        p.setPen(Theme::ColorMint);
+        QFont fSub = p.font();
+        fSub.setPointSize(11);
+        fSub.setBold(false);
+        p.setFont(fSub);
+        p.drawText(QRectF(cx - 250, cy, 500, 24), Qt::AlignCenter, "Initializing Wayland DMA-BUF hardware session...");
+
+        p.setPen(Theme::ColorTextDim);
+        QFont fDetail = p.font();
+        fDetail.setPointSize(9);
+        fDetail.setFamily("monospace");
+        p.setFont(fDetail);
+        p.drawText(QRectF(cx - 250, cy + 30, 500, 20), Qt::AlignCenter, "Direct OpenGL ES 2.0 / Mesa DRI3 Viewport Active");
+    }
+
+    if (m_isDragOver) {
+        p.fillRect(rect(), QColor(11, 15, 25, 230));
+
+        QPen pen(Theme::ColorNeon, 3.0, Qt::DashLine);
+        p.setPen(pen);
+        p.drawRoundedRect(rect().adjusted(16, 16, -16, -16), 16, 16);
+
+        const qreal cx = width() / 2.0;
+        const qreal cy = height() / 2.0;
+
+        p.setPen(Theme::ColorTextPrimary);
+        QFont f = p.font();
+        f.setPointSize(16);
+        f.setBold(true);
+        p.setFont(f);
+        p.drawText(QRectF(cx - 200, cy - 30, 400, 30), Qt::AlignCenter, "📦 Drop APK to Install");
+
+        p.setPen(Theme::ColorMint);
+        f.setPointSize(11);
+        f.setBold(false);
+        p.setFont(f);
+        p.drawText(QRectF(cx - 200, cy + 5, 400, 24), Qt::AlignCenter, "Direct injection into LinStack container environment");
+    }
+}
+
+void AndroidCanvas::initWaylandCompositor()
+{
+    m_waylandSocketName = "wayland-linstack-0";
+    qputenv("WAYLAND_DISPLAY", m_waylandSocketName.toUtf8());
+    qputenv("LINSTACK_WAYLAND_DISPLAY", m_waylandSocketName.toUtf8());
+
+    // قراءة معدل تحديث شاشة المستخدم تلقائياً (75Hz, 60Hz, 120Hz, 144Hz, إلخ)
+    int screenHz = 60;
+    if (QScreen *scr = this->screen() ? this->screen() : QGuiApplication::primaryScreen()) {
+        if (scr->refreshRate() > 1.0) {
+            screenHz = qRound(scr->refreshRate());
+        }
+    }
+
+    EmbeddedCompositorConfig config;
+    config.socketName = m_waylandSocketName.toStdString();
+    config.defaultWidth = m_baseWidth;
+    config.defaultHeight = m_baseHeight;
+    config.refreshRate = screenHz;
+
+    m_compositor = std::make_unique<EmbeddedCompositor>(config);
+
+    if (!m_compositor->initialize()) {
+        LOG_CRITICAL("AndroidCanvas", "Failed to initialize embedded wlroots compositor.");
+        return;
+    }
+
+    if (!m_compositor->start()) {
+        LOG_CRITICAL("AndroidCanvas", "Failed to start wlroots headless backend.");
+        return;
+    }
+
+    m_inputMapper = std::make_unique<InputMapper>(m_compositor->getSeat(), m_compositor->getRelativePointerManager());
+    if (m_keymapperOverlay) {
+        m_keymapperOverlay->setInputMapper(m_inputMapper.get());
+    }
+
+    // ربط حلقة أحداث Wayland بحلقة Qt عبر QSocketNotifier
+    int wlFd = wl_event_loop_get_fd(m_compositor->getEventLoop());
+    if (wlFd >= 0) {
+        m_waylandNotifier = new QSocketNotifier(wlFd, QSocketNotifier::Read, this);
+        connect(m_waylandNotifier, &QSocketNotifier::activated, this, [this]() {
+            if (m_compositor) {
+                m_compositor->dispatch(0);
+            }
+        });
+    }
+
+    // ضبط مؤقت الإرسال ليتناسب مع تردد شاشة المستخدم دون إرهاق المعالج    // ضبط مؤقت الإرسال كاحتياطي خفيف (50ms) لأن QSocketNotifier يتولى الاستجابة الفورية
+    m_waylandDispatchTimer = new QTimer(this);
+    connect(m_waylandDispatchTimer, &QTimer::timeout, this, [this]() {
+        if (m_compositor) {
+            m_compositor->dispatch(0);
+        }
+    });
+    m_waylandDispatchTimer->start(50);
+
+
+    // ربط دوال دورة حياة السطح
+    m_compositor->onClientConnected = [this](struct wl_client *client) {
+        Q_UNUSED(client);
+        QMetaObject::invokeMethod(this, [this]() {
+            LOG_INFO("AndroidCanvas", "Wayland client connected to embedded compositor!");
+            emit waylandClientConnected();
+        }, Qt::QueuedConnection);
+    };
+
+    m_compositor->onSurfaceMapped = [this](struct wlr_surface *surface) {
+        Q_UNUSED(surface);
+        QMetaObject::invokeMethod(this, [this]() {
+            LOG_INFO("AndroidCanvas", ">>> Android Container surface mapped to native OpenGL viewport <<<");
+            m_simulatedActive = true;
+            if (!m_hasFirstFrame) {
+                m_hasFirstFrame = true;
+                emit firstFrameRendered();
+            }
+            if (m_stack) {
+                m_stack->hide();
+            }
+            showToast("LinStack Android 13 Display Surface Active", 3000);
+            update();
+        }, Qt::QueuedConnection);
+    };
+
+    m_compositor->onSurfaceUnmapped = [this](struct wlr_surface *surface) {
+        Q_UNUSED(surface);
+        QMetaObject::invokeMethod(this, [this]() {
+            LOG_INFO("AndroidCanvas", "Android Surface unmapped");
+            m_simulatedActive = true;
+            m_hasFirstFrame = false;
+            update();
+        }, Qt::QueuedConnection);
+    };
+
+    m_compositor->onSurfaceCommit = [this](struct wlr_surface *surface) {
+        if (m_compositor && surface != m_compositor->getRenderableSurface()) {
+            return;
+        }
+        if (!m_hasFirstFrame) {
+            m_hasFirstFrame = true;
+            QMetaObject::invokeMethod(this, [this]() {
+                LOG_INFO("AndroidCanvas", ">>> First Android surface buffer committed — signalling firstFrameRendered <<<");
+                emit firstFrameRendered();
+                if (m_stack) m_stack->hide();
+                showToast("LinStack Android 13 — First Frame Received!", 3000);
+            }, Qt::QueuedConnection);
+        }
+        QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
+    };
+
+
+    LOG_INFO("AndroidCanvas", QString("Embedded wlroots Compositor running on socket: %1 @ %2Hz")
+    .arg(m_waylandSocketName)
+    .arg(screenHz));
+}
+
 
 void AndroidCanvas::showToast(const QString &message, int durationMs)
 {
     m_toastLabel->setText(message);
     m_toastLabel->adjustSize();
 
-    // Position toast at the bottom-centre of the letterboxed viewport
     const QRect &vp = m_viewportRect.isValid() ? m_viewportRect : rect();
     m_toastLabel->move(
         vp.x() + (vp.width()  - m_toastLabel->width())  / 2,
@@ -540,25 +804,189 @@ void AndroidCanvas::showToast(const QString &message, int durationMs)
 
 void AndroidCanvas::setKeymapperVisible(bool visible)
 {
-    m_keymapperOverlay->setVisible(visible);
-    if (visible) {
-        m_keymapperOverlay->raise();
-    }
-}
-
-void AndroidCanvas::setBridge(UInputTouchBridge *bridge)
-{
     if (m_keymapperOverlay) {
-        m_keymapperOverlay->setBridge(bridge);
+        m_keymapperOverlay->setVisible(visible);
+        if (visible) {
+            m_keymapperOverlay->raise();
+        }
     }
 }
 
 bool AndroidCanvas::isKeymapperVisible() const
 {
-    return m_keymapperOverlay->isVisible();
+    return m_keymapperOverlay ? m_keymapperOverlay->isVisible() : false;
+}
+
+void AndroidCanvas::setBridge(UInputTouchBridge *bridge)
+{
+    m_touchBridge = bridge;
+    if (m_keymapperOverlay) {
+        m_keymapperOverlay->setBridge(bridge);
+    }
+}
+
+void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
+{
+    m_aimModeActive = active;
+    m_aimAnchorNorm = anchorNorm;
+
+    if (m_aimModeActive) {
+        setCursor(Qt::BlankCursor);
+        // قفل مؤشر الماوس فوق زر Aim Lock نفسه وليس في منتصف الشاشة
+        QPoint localAnchor(
+            m_viewportRect.x() + qRound(m_aimAnchorNorm.x() * m_viewportRect.width()),
+                           m_viewportRect.y() + qRound(m_aimAnchorNorm.y() * m_viewportRect.height())
+        );
+        QPoint globalAnchor = mapToGlobal(localAnchor);
+        QCursor::setPos(globalAnchor);
+        m_lastMousePos = globalAnchor;
+        m_ignoreNextMouseMove = true;
+        showToast("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)", 2000);
+    } else {
+        setCursor(Qt::ArrowCursor);
+        showToast("Aim Lock Released", 1500);
+    }
+
+    emit aimModeChanged(m_aimModeActive);
+}
+
+void AndroidCanvas::mousePressEvent(QMouseEvent *event)
+{
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    int button = (event->button() == Qt::LeftButton) ? 1 : ((event->button() == Qt::RightButton) ? 3 : 2);
+
+    if (m_inputMapper && activeSurface) {
+        int surfW = activeSurface->current.width > 0 ? activeSurface->current.width : m_baseWidth;
+        int surfH = activeSurface->current.height > 0 ? activeSurface->current.height : m_baseHeight;
+        ViewportRect vp{m_viewportRect.x(), m_viewportRect.y(), m_viewportRect.width(), m_viewportRect.height()};
+        m_inputMapper->setGeometry(vp, surfW, surfH);
+
+        // If Keymapper is disabled, temporarily ensure AimLock isn't intercepting clicks
+        if (!isKeymapperVisible() && m_inputMapper->isAimLockActive()) {
+            m_inputMapper->setAimLockActive(false, -1);
+        }
+
+        if (m_inputMapper->handleMouseDown(button, qRound(event->position().x()), qRound(event->position().y()), activeSurface)) {
+            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            event->accept();
+            return;
+        }
+    }
+    QOpenGLWidget::mousePressEvent(event);
+}
+
+void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
+{
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+
+    if (isKeymapperVisible() && m_aimModeActive) {
+        if (m_ignoreNextMouseMove) {
+            m_ignoreNextMouseMove = false;
+            m_lastMousePos = event->globalPosition().toPoint();
+            event->accept();
+            return;
+        }
+
+        QPoint currentGlobal = event->globalPosition().toPoint();
+        int dx = currentGlobal.x() - m_lastMousePos.x();
+        int dy = currentGlobal.y() - m_lastMousePos.y();
+
+        if (m_inputMapper && activeSurface && (dx != 0 || dy != 0)) {
+            m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), dx, dy, activeSurface);
+            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+        }
+
+        QPoint localAnchor(
+            m_viewportRect.x() + qRound(m_aimAnchorNorm.x() * m_viewportRect.width()),
+                           m_viewportRect.y() + qRound(m_aimAnchorNorm.y() * m_viewportRect.height())
+        );
+        QPoint globalAnchor = mapToGlobal(localAnchor);
+        m_ignoreNextMouseMove = true;
+        QCursor::setPos(globalAnchor);
+        m_lastMousePos = globalAnchor;
+        event->accept();
+        return;
+    }
+
+    if (m_inputMapper && activeSurface && (event->buttons() & Qt::LeftButton)) {
+        m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), 0, 0, activeSurface);
+        if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+        event->accept();
+        return;
+    }
+
+    QOpenGLWidget::mouseMoveEvent(event);
+}
+
+void AndroidCanvas::mouseReleaseEvent(QMouseEvent *event)
+{
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    int button = (event->button() == Qt::LeftButton) ? 1 : ((event->button() == Qt::RightButton) ? 3 : 2);
+
+    if (m_inputMapper && activeSurface) {
+        if (m_inputMapper->handleMouseUp(button, qRound(event->position().x()), qRound(event->position().y()), activeSurface)) {
+            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            event->accept();
+            return;
+        }
+    }
+    QOpenGLWidget::mouseReleaseEvent(event);
+}
+
+void AndroidCanvas::wheelEvent(QWheelEvent *event)
+
+{
+    QOpenGLWidget::wheelEvent(event);
+}
+
+void AndroidCanvas::keyPressEvent(QKeyEvent *event)
+{
+    if (event->isAutoRepeat()) {
+        event->accept();
+        return;
+    }
+
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    if (isKeymapperVisible() && m_inputMapper && activeSurface) {
+        quint32 scanCode = event->nativeScanCode();
+        if (m_inputMapper->handleScanCodeDown(scanCode, activeSurface)) {
+            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            bool nowLocked = m_inputMapper->isAimLockActive();
+            if (nowLocked != m_aimModeActive) {
+                QPointF anchor(0.5, 0.5);
+                if (const auto *aim = m_inputMapper->activeAimNode()) {
+                    anchor = QPointF(aim->centerX, aim->centerY);
+                }
+                setAimMode(nowLocked, anchor);
+            }
+            event->accept();
+            return;
+        }
+    }
+    QOpenGLWidget::keyPressEvent(event);
+}
+
+void AndroidCanvas::keyReleaseEvent(QKeyEvent *event)
+{
+    if (event->isAutoRepeat()) {
+        event->accept();
+        return;
+    }
+
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    if (isKeymapperVisible() && m_inputMapper && activeSurface) {
+        quint32 scanCode = event->nativeScanCode();
+        if (m_inputMapper->handleScanCodeUp(scanCode, activeSurface)) {
+            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            event->accept();
+            return;
+        }
+    }
+    QOpenGLWidget::keyReleaseEvent(event);
 }
 
 void AndroidCanvas::dragEnterEvent(QDragEnterEvent *event)
+
 {
     if (event->mimeData()->hasUrls()) {
         const auto urls = event->mimeData()->urls();
@@ -594,7 +1022,6 @@ void AndroidCanvas::dropEvent(QDropEvent *event)
                 QFileInfo fi(path);
                 emit apkDropped(path);
 
-                // Add newly installed app dynamically to launcher
                 AndroidAppEntry newApp;
                 newApp.packageName = "com.custom." + fi.baseName().toLower();
                 newApp.displayName = fi.baseName();
@@ -603,73 +1030,21 @@ void AndroidCanvas::dropEvent(QDropEvent *event)
                 newApp.isGame = true;
                 addInstalledApp(newApp);
 
-                showToast(QString("Installing APK: %1 via ADB / LXC...").arg(fi.fileName()), 4000);
+                showToast(QString("Installing APK: %1 via ADB / container...").arg(fi.fileName()), 4000);
                 return;
             }
         }
     }
 }
 
-void AndroidCanvas::paintEvent(QPaintEvent *event)
+void AndroidCanvas::setInstalledApps(const QList<AndroidAppEntry> &apps)
 {
-    QWidget::paintEvent(event);
+    m_installedApps = apps;
+    rebuildAppsGrid();
+}
 
-    QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing, true);
-
-    // ── Letterbox / Pillarbox bars ───────────────────────────────────────────
-    // Fill any area outside the locked-aspect-ratio viewport with the cyber-dark
-    // background colour so the bars look intentional rather than transparent.
-    if (m_viewportRect != rect()) {
-        const QColor barColor(11, 15, 25); // Theme::ColorBgDark  #0B0F19
-        p.setBrush(barColor);
-        p.setPen(Qt::NoPen);
-
-        // Top bar
-        if (m_viewportRect.top() > 0) {
-            p.drawRect(0, 0, width(), m_viewportRect.top());
-        }
-        // Bottom bar
-        if (m_viewportRect.bottom() < height() - 1) {
-            p.drawRect(0, m_viewportRect.bottom() + 1, width(), height() - m_viewportRect.bottom() - 1);
-        }
-        // Left bar
-        if (m_viewportRect.left() > 0) {
-            p.drawRect(0, 0, m_viewportRect.left(), height());
-        }
-        // Right bar
-        if (m_viewportRect.right() < width() - 1) {
-            p.drawRect(m_viewportRect.right() + 1, 0, width() - m_viewportRect.right() - 1, height());
-        }
-
-        // Thin emerald accent line around the viewport edge
-        p.setBrush(Qt::NoBrush);
-        p.setPen(QPen(QColor(31, 41, 55), 1)); // Theme::ColorBorder
-        p.drawRect(m_viewportRect.adjusted(-1, -1, 0, 0));
-    }
-
-    // ── APK drag-and-drop overlay ────────────────────────────────────────────
-    if (m_isDragOver) {
-        p.fillRect(rect(), QColor(11, 15, 25, 230));
-
-        QPen pen(Theme::ColorNeon, 3.0, Qt::DashLine);
-        p.setPen(pen);
-        p.drawRoundedRect(rect().adjusted(16, 16, -16, -16), 16, 16);
-
-        const qreal cx = width() / 2.0;
-        const qreal cy = height() / 2.0;
-
-        p.setPen(Theme::ColorTextPrimary);
-        QFont f = p.font();
-        f.setPointSize(16);
-        f.setBold(true);
-        p.setFont(f);
-        p.drawText(QRectF(cx - 200, cy - 30, 400, 30), Qt::AlignCenter, "📦 Drop APK to Install");
-
-        p.setPen(Theme::ColorMint);
-        f.setPointSize(11);
-        f.setBold(false);
-        p.setFont(f);
-        p.drawText(QRectF(cx - 200, cy + 5, 400, 24), Qt::AlignCenter, "Direct injection into LinStack container environment");
-    }
+void AndroidCanvas::addInstalledApp(const AndroidAppEntry &app)
+{
+    m_installedApps.append(app);
+    rebuildAppsGrid();
 }

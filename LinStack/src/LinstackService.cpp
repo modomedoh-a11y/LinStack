@@ -1,16 +1,19 @@
 #include "LinstackService.h"
+#include "PathResolver.h"
+#include "Logger.h"
 
 #include <QDir>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QDateTime>
+#include <QThread>
 
 LinstackService::LinstackService(QObject *parent)
     : QObject(parent)
 {
-    // Default location for linstack-scripts
-    m_scriptsPath = QDir::homePath() + "/.local/share/LinStack/linstack_script";
+    // User data location follows XDG via PathResolver
+    m_scriptsPath = PathResolver::userDataDir() + "/linstack_script";
 
     // Initialize predefined gaming profiles for unlocking high refresh rates
     m_profiles.insert("ROG Phone 5", DeviceProfileInfo{
@@ -63,13 +66,40 @@ LinstackService::LinstackService(QObject *parent)
 
 LinstackService::~LinstackService()
 {
+    // إيقاف جميع المؤقتات لمنع إعادة تشغيل الواجهة أثناء إغلاق البرنامج
+    if (m_adbPollTimer) m_adbPollTimer->stop();
+    if (m_statusPollTimer) m_statusPollTimer->stop();
+    if (m_sessionPollTimer) m_sessionPollTimer->stop();
+    if (m_uiRetryTimer) m_uiRetryTimer->stop();
+
+    // إغلاق عملية الواجهة (show-full-ui) بنظافة
+    if (m_uiProcess && m_uiProcess->state() != QProcess::NotRunning) {
+        m_uiProcess->terminate();
+        if (!m_uiProcess->waitForFinished(1000)) {
+            m_uiProcess->kill();
+            m_uiProcess->waitForFinished(500);
+        }
+    }
+
+    // إغلاق عملية الجلسة (session start) بنظافة
     if (m_sessionProcess && m_sessionProcess->state() != QProcess::NotRunning) {
         m_sessionProcess->terminate();
         if (!m_sessionProcess->waitForFinished(1500)) {
             m_sessionProcess->kill();
+            m_sessionProcess->waitForFinished(500);
+        }
+    }
+
+    // إغلاق أي سكريبت قيد التشغيل
+    if (m_scriptProcess && m_scriptProcess->state() != QProcess::NotRunning) {
+        m_scriptProcess->terminate();
+        if (!m_scriptProcess->waitForFinished(1000)) {
+            m_scriptProcess->kill();
+            m_scriptProcess->waitForFinished(500);
         }
     }
 }
+
 
 KernelDiagnostic LinstackService::runKernelDiagnostics()
 {
@@ -87,8 +117,8 @@ KernelDiagnostic LinstackService::runKernelDiagnostics()
     // 3. Check for systemd
     diag.systemdActive = QFileInfo::exists("/run/systemd/system");
 
-    // 4. Check for installed binaries
-    diag.linstackInstalled = !QStandardPaths::findExecutable("linstack").isEmpty();
+    // 4. Check for installed binaries via portable path resolver
+    diag.linstackInstalled = !PathResolver::resolveLinstackExecutable().isEmpty();
     diag.adbInstalled = !QStandardPaths::findExecutable("adb").isEmpty();
 
     // Evaluate issues and construct remediation instructions
@@ -147,17 +177,6 @@ void LinstackService::startContainerService()
     setContainerState(ContainerState::Starting);
 
     auto *proc = new QProcess(this);
-    QString program;
-    QStringList args;
-
-    if (QFileInfo::exists("/run/systemd/system")) {
-        program = "systemctl";
-        args << "start" << "linstack-container.service";
-    } else {
-        // Fallback for non-systemd or container environments
-        program = "linstack";
-        args << "container" << "start";
-    }
 
     connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this, proc](int exitCode, QProcess::ExitStatus status) {
@@ -183,7 +202,12 @@ void LinstackService::startContainerService()
         proc->deleteLater();
     });
 
-    proc->start(program, args);
+    if (QFileInfo::exists("/run/systemd/system")) {
+        proc->start("systemctl", QStringList() << "start" << "linstack-container.service");
+    } else {
+        PathResolver::configureProcess(proc, QStringList() << "container" << "start");
+        proc->start();
+    }
 }
 
 void LinstackService::stopContainerService()
@@ -192,10 +216,6 @@ void LinstackService::stopContainerService()
     setContainerState(ContainerState::Stopping);
 
     auto *proc = new QProcess(this);
-    QString program = QFileInfo::exists("/run/systemd/system") ? "systemctl" : "linstack";
-    QStringList args = QFileInfo::exists("/run/systemd/system")
-                       ? QStringList{"stop", "linstack-container.service"}
-                       : QStringList{"container", "stop"};
 
     connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this, proc](int exitCode, QProcess::ExitStatus status) {
@@ -206,7 +226,12 @@ void LinstackService::stopContainerService()
         proc->deleteLater();
     });
 
-    proc->start(program, args);
+    if (QFileInfo::exists("/run/systemd/system")) {
+        proc->start("systemctl", QStringList() << "stop" << "linstack-container.service");
+    } else {
+        PathResolver::configureProcess(proc, QStringList() << "container" << "stop");
+        proc->start();
+    }
 }
 
 void LinstackService::restartContainerService()
@@ -216,12 +241,45 @@ void LinstackService::restartContainerService()
     QTimer::singleShot(1500, this, &LinstackService::startContainerService);
 }
 
+bool LinstackService::isSessionRunning() const
+{
+    QProcess proc;
+    PathResolver::configureProcess(&proc, QStringList() << "status");
+    proc.start();
+    if (!proc.waitForFinished(1500)) {
+        proc.kill();
+        proc.waitForFinished(300);
+        return false;
+    }
+    QString output = proc.readAllStandardOutput() + proc.readAllStandardError();
+    return output.contains("RUNNING", Qt::CaseInsensitive) && !output.contains("STOPPED", Qt::CaseInsensitive);
+}
+
+void LinstackService::setHasFirstFrame(bool hasFrame)
+{
+    m_hasFirstFrame = hasFrame;
+    if (m_hasFirstFrame) {
+        if (m_uiRetryTimer) {
+            m_uiRetryTimer->stop();
+        }
+        LOG_INFO("Session", "First Android surface frame committed! Stopping show-full-ui retries.");
+    }
+}
+
 void LinstackService::startSession()
 {
-    if (m_sessionState == SessionState::Active || m_sessionState == SessionState::Starting) {
-        emit logMessage("Session", "Session already running or starting.");
+    if (m_sessionState == SessionState::Starting || m_sessionState == SessionState::Active) {
+        emit logMessage("Session", "LinStack session is already starting or active.");
         return;
     }
+
+    QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
+
+    // Set WAYLAND_DISPLAY and XDG_RUNTIME_DIR in process environment
+    qputenv("WAYLAND_DISPLAY", "wayland-linstack-0");
+    qputenv("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
+    qputenv("XDG_RUNTIME_DIR", runtimeDir.toUtf8());
 
     // Pre-flight check
     KernelDiagnostic diag = runKernelDiagnostics();
@@ -233,10 +291,24 @@ void LinstackService::startSession()
         return;
     }
 
+    // If session is already active or running, immediately trigger show-full-ui without hanging on session start
+    if (isSessionRunning()) {
+        LOG_INFO("Session", "Active LinStack container session detected (RUNNING). Immediately triggering show-full-ui on wayland-linstack-0...");
+        emit logMessage("Session", "Active session running. Triggering show-full-ui immediately...");
+        setSessionState(SessionState::Active);
+        launchFullUi();
+        return;
+    }
+
     emit logMessage("Session", "Spawning LinStack session (linstack session start)...");
+    LOG_INFO("Session", "Spawning LinStack session (linstack session start) on wayland-linstack-0...");
     setSessionState(SessionState::Starting);
 
     if (m_sessionProcess) {
+        if (m_sessionProcess->state() != QProcess::NotRunning) {
+            m_sessionProcess->kill();
+            m_sessionProcess->waitForFinished(500);
+        }
         m_sessionProcess->deleteLater();
     }
 
@@ -250,34 +322,200 @@ void LinstackService::startSession()
     connect(m_sessionProcess, &QProcess::readyReadStandardError,
             this, &LinstackService::handleSessionStderr);
 
-    m_sessionProcess->start("linstack", QStringList() << "session" << "start");
+    PathResolver::configureProcess(m_sessionProcess, QStringList() << "session" << "start");
+
+    // Configure Wayland display for embedded compositor session
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("XDG_RUNTIME_DIR", runtimeDir);
+    env.insert("WAYLAND_DISPLAY", "wayland-linstack-0");
+    env.insert("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
+    m_sessionProcess->setProcessEnvironment(env);
+
+    m_sessionProcess->start();
+
+    // Start poll timer to wait for session RUNNING state before launching show-full-ui
+    if (!m_sessionPollTimer) {
+        m_sessionPollTimer = new QTimer(this);
+        connect(m_sessionPollTimer, &QTimer::timeout, this, &LinstackService::checkSessionStartupStatus);
+    }
+    m_sessionPollCount = 0;
+    m_sessionPollTimer->start(400);
+}
+
+void LinstackService::checkSessionStartupStatus()
+{
+    m_sessionPollCount++;
+    if (isSessionRunning()) {
+        if (m_sessionPollTimer) m_sessionPollTimer->stop();
+        setSessionState(SessionState::Active);
+        emit logMessage("Session", "LinStack session is confirmed RUNNING. Launching UI...");
+        LOG_INFO("Session", "LinStack session is confirmed RUNNING. Launching UI...");
+        launchFullUi();
+    } else if (m_sessionPollCount >= 30) {
+        if (m_sessionPollTimer) m_sessionPollTimer->stop();
+        emit logMessage("Session", "Session status poll timed out after 12s. Attempting show-full-ui fallback...");
+        LOG_WARN("Session", "Session status poll timed out after 12s. Attempting show-full-ui fallback...");
+        launchFullUi();
+    }
+}
+
+void LinstackService::launchFullUi()
+{
+    QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
+
+    if (!m_uiProcess) {
+        m_uiProcess = new QProcess(this);
+        connect(m_uiProcess, &QProcess::readyReadStandardOutput, this, [this]() {
+            const QString out = QString::fromUtf8(m_uiProcess->readAllStandardOutput()).trimmed();
+            if (!out.isEmpty()) {
+                emit logMessage("UI", out);
+                LOG_INFO("UI[STDOUT]", out);
+            }
+        });
+        connect(m_uiProcess, &QProcess::readyReadStandardError, this, [this, runtimeDir]() {
+            const QString err = QString::fromUtf8(m_uiProcess->readAllStandardError()).trimmed();
+            if (!err.isEmpty()) {
+                emit logMessage("UI_ERR", err);
+                LOG_WARN("UI[STDERR]", err);
+
+                // إذا كانت الجلسة معلقة/تعمل مسبقاً، نُجبر الأندرويد على عرض شاشته عبر إطلاق تطبيق النظام
+                if (err.contains("Already tracking a session", Qt::CaseInsensitive)) {
+                    LOG_INFO("UI", "Session already tracked -> waking Android display surface via app launch...");
+                    QProcess *wakeProc = new QProcess(this);
+                    QProcessEnvironment wakeEnv = QProcessEnvironment::systemEnvironment();
+                    wakeEnv.insert("XDG_RUNTIME_DIR", runtimeDir);
+                    wakeEnv.insert("WAYLAND_DISPLAY", "wayland-linstack-0");
+                    wakeEnv.insert("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
+                    wakeProc->setProcessEnvironment(wakeEnv);
+                    PathResolver::configureProcess(wakeProc, QStringList() << "app" << "launch" << "com.android.settings");
+                    connect(wakeProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), wakeProc, &QProcess::deleteLater);
+                    wakeProc->start();
+                }
+            }
+        });
+        connect(m_uiProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this](int code, QProcess::ExitStatus status) {
+            Q_UNUSED(status);
+            emit logMessage("UI", QString("UI process exited (code %1)").arg(code));
+            LOG_INFO("UI", QString("UI process exited (code %1)").arg(code));
+        });
+    }
+
+    if (m_uiProcess->state() != QProcess::NotRunning) {
+        LOG_INFO("UI", "show-full-ui process is already running.");
+    } else {
+        LOG_INFO("UI", "Spawning linstack show-full-ui with WAYLAND_DISPLAY=wayland-linstack-0...");
+        QProcessEnvironment uiEnv = QProcessEnvironment::systemEnvironment();
+        uiEnv.insert("XDG_RUNTIME_DIR", runtimeDir);
+        uiEnv.insert("WAYLAND_DISPLAY", "wayland-linstack-0");
+        uiEnv.insert("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
+        m_uiProcess->setProcessEnvironment(uiEnv);
+        PathResolver::configureProcess(m_uiProcess, QStringList() << "show-full-ui");
+        m_uiProcess->start();
+    }
+
+    // Start 2-second retry timer if not already active and first frame not yet committed
+    if (!m_hasFirstFrame) {
+        if (!m_uiRetryTimer) {
+            m_uiRetryTimer = new QTimer(this);
+            connect(m_uiRetryTimer, &QTimer::timeout, this, &LinstackService::retryFullUi);
+        }
+        if (!m_uiRetryTimer->isActive()) {
+            m_uiRetryTimer->start(2000);
+        }
+    }
+}
+
+void LinstackService::retryFullUi()
+{
+    if (m_hasFirstFrame) {
+        m_uiRetryCount = 0;
+        if (m_uiRetryTimer) m_uiRetryTimer->stop();
+        return;
+    }
+
+    if (m_sessionState != SessionState::Active && !isSessionRunning()) {
+        return;
+    }
+
+    m_uiRetryCount++;
+    if (m_uiRetryCount >= 12) {
+        // الجلسة السابقة مرتبطة بمقبس Wayland قديم مغلق -> نعيد تشغيل الجلسة للارتباط بالمقبس الجديد
+        LOG_WARN("UI", "Stale session detected (no frames after 4 retries). Rebinding session to new Wayland socket...");
+        m_uiRetryCount = 0;
+        if (m_uiRetryTimer) m_uiRetryTimer->stop();
+        stopSession();
+        QTimer::singleShot(1500, this, &LinstackService::startSession);
+        return;
+    }
+
+    if (!m_uiProcess || m_uiProcess->state() == QProcess::NotRunning) {
+        LOG_INFO("UI", "Retrying show-full-ui (waiting for first surface frame)...");
+        launchFullUi();
+    }
 }
 
 void LinstackService::stopSession()
+
 {
     emit logMessage("Session", "Stopping LinStack session...");
+    LOG_INFO("Session", "Stopping LinStack session...");
     setSessionState(SessionState::Stopping);
+
+    if (m_sessionPollTimer) {
+        m_sessionPollTimer->stop();
+    }
+    if (m_uiRetryTimer) {
+        m_uiRetryTimer->stop();
+    }
+    m_hasFirstFrame = false;
+
+    if (m_uiProcess && m_uiProcess->state() != QProcess::NotRunning) {
+        m_uiProcess->terminate();
+        if (!m_uiProcess->waitForFinished(1000)) {
+            m_uiProcess->kill();
+            m_uiProcess->waitForFinished(500);
+        }
+    }
+
+    if (m_sessionProcess && m_sessionProcess->state() != QProcess::NotRunning) {
+        m_sessionProcess->terminate();
+        if (!m_sessionProcess->waitForFinished(1500)) {
+            m_sessionProcess->kill();
+            m_sessionProcess->waitForFinished(500);
+        }
+    }
 
     auto *stopProc = new QProcess(this);
     connect(stopProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this, stopProc]() {
         setSessionState(SessionState::Idle);
         emit logMessage("Session", "LinStack session stopped.");
+        LOG_INFO("Session", "LinStack session stopped.");
         stopProc->deleteLater();
     });
-    stopProc->start("linstack", QStringList() << "session" << "stop");
+    PathResolver::configureProcess(stopProc, QStringList() << "session" << "stop");
+    stopProc->start();
 }
 
 void LinstackService::handleSessionProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     Q_UNUSED(exitStatus);
-    emit logMessage("Session", QString("LinStack session terminated (exit %1).").arg(exitCode));
-    setSessionState(SessionState::Terminated);
+    emit logMessage("Session", QString("LinStack session process exited (code %1).").arg(exitCode));
+    LOG_INFO("Session", QString("LinStack session process exited (code %1).").arg(exitCode));
+    if (exitCode == 0 || isSessionRunning()) {
+        LOG_INFO("Session", "Session process finished normally or session is active -> launching full UI.");
+        setSessionState(SessionState::Active);
+        launchFullUi();
+    } else {
+        setSessionState(SessionState::Terminated);
+    }
 }
 
 void LinstackService::handleSessionProcessError(QProcess::ProcessError error)
 {
     emit logMessage("Session", QString("LinStack process error: %1").arg(error));
+    LOG_WARN("Session", QString("LinStack process error: %1").arg(error));
     setSessionState(SessionState::Failed);
     emit errorOccurred(ServiceError::LinstackSessionFailed,
                        "LinStack session process encountered an execution error.",
@@ -290,9 +528,12 @@ void LinstackService::handleSessionStdout()
     const QString output = QString::fromUtf8(m_sessionProcess->readAllStandardOutput()).trimmed();
     if (!output.isEmpty()) {
         emit logMessage("LinStack [STDOUT]", output);
+        LOG_INFO("Session[STDOUT]", output);
         if (output.contains("Android with user 0 is ready", Qt::CaseInsensitive) ||
-            output.contains("Session started", Qt::CaseInsensitive)) {
+            output.contains("Session started", Qt::CaseInsensitive) ||
+            output.contains("Session is already running", Qt::CaseInsensitive)) {
             setSessionState(SessionState::Active);
+            launchFullUi();
         }
     }
 }
@@ -303,6 +544,13 @@ void LinstackService::handleSessionStderr()
     const QString err = QString::fromUtf8(m_sessionProcess->readAllStandardError()).trimmed();
     if (!err.isEmpty()) {
         emit logMessage("LinStack [STDERR]", err);
+        LOG_WARN("Session[STDERR]", err);
+        if (err.contains("Session is already running", Qt::CaseInsensitive) ||
+            err.contains("Already tracking a session", Qt::CaseInsensitive)) {
+            LOG_INFO("Session", "Session already running reported on stderr -> activating and launching full UI.");
+            setSessionState(SessionState::Active);
+            launchFullUi();
+        }
     }
 }
 
@@ -323,7 +571,8 @@ void LinstackService::refreshStatus()
         }
         statusProc->deleteLater();
     });
-    statusProc->start("linstack", QStringList() << "status");
+    PathResolver::configureProcess(statusProc, QStringList() << "status");
+    statusProc->start();
 }
 
 // =========================================================================
@@ -505,7 +754,7 @@ void LinstackService::applyDeviceProfile(const DeviceProfileInfo &profile)
     };
 
     for (const auto &p : props) {
-        QProcess::execute("linstack", QStringList() << "prop" << "set" << p.key << p.val);
+        PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << p.key << p.val);
     }
 
     emit scriptOperationFinished(QString("Apply Device Profile: %1").arg(profile.displayName),

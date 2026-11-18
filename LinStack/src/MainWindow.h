@@ -26,6 +26,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void changeEvent(QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
 
@@ -35,6 +36,7 @@ private slots:
     void handleFullscreenToggle();
     void handleEcoModeToggle(bool active);
     void handleKeymapperToggle(bool active);
+    void handleKeymapperEdit();
     void handleInstallApk();
     void handleScreenshot();
     void handleRotate();
@@ -46,6 +48,7 @@ private slots:
 
 private:
     void setupUi();
+    QSize calculateNetViewportSize() const;
     void checkEdgeResize(const QPoint &pos);
     Qt::Edges calculateEdges(const QPoint &pos);
 

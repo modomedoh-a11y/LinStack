@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QStyleFactory>
 #include <QPalette>
+#include <QSurfaceFormat>
 #include "MainWindow.h"
 #include "SettingsDialog.h"
 #include "AndroidCanvas.h"
@@ -9,6 +10,7 @@
 
 #include "SelfHealingManager.h"
 #include "Logger.h"
+#include "PathResolver.h"
 #include <QProcess>
 
 int main(int argc, char *argv[])
@@ -17,17 +19,26 @@ int main(int argc, char *argv[])
     Logger::installQtMessageHandler();
     LOG_INFO("Core", "=== LinStack 1.0 (Cyber Emerald Edition) initializing ===");
 
-    // Qt 6 High-DPI configuration
+    // Configure hardware integration for embedded Wayland compositor & Mesa DRI3 DMA-BUF buffer sharing
+    qputenv("QSG_RHI_BACKEND", "opengl");
+    qputenv("QT_WAYLAND_HARDWARE_INTEGRATION", "wayland-egl");
+    qputenv("QT_WAYLAND_SERVER_BUFFER_INTEGRATION", "dmabuf-server");
+    qputenv("QT_WAYLAND_CLIENT_BUFFER_INTEGRATION", "wayland-egl");
+
+    // Qt 6 High-DPI and GLES2 configuration
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+
+    QSurfaceFormat glFormat;
+    glFormat.setRenderableType(QSurfaceFormat::OpenGLES);
+    glFormat.setVersion(2, 0);
+    glFormat.setSwapInterval(1);
+    QSurfaceFormat::setDefaultFormat(glFormat);
 
     QApplication app(argc, argv);
     app.setApplicationName("LinStack");
     app.setApplicationDisplayName("LinStack 1.0");
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("LinStack Project");
-
-    // Force single-window mode
-    QProcess::execute("linstack", QStringList() << "prop" << "set" << "persist.linstack.multi_windows" << "false");
 
     bool isHeadless = false;
     for (int i = 1; i < argc; ++i) {
@@ -37,7 +48,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    // Self-Healing Binder Check (interactive only when not running in headless/screenshot mode)
+    // Fast non-session pre-flight diagnostic check (kernel binder / modules)
+    // Note: session is NOT started here; MainWindow initializes the embedded compositor first
     SelfHealingManager healer;
     if (!isHeadless && !healer.checkHealth()) {
         if (!healer.promptRepair()) {
@@ -108,6 +120,41 @@ int main(int argc, char *argv[])
         if (QString(argv[i]) == "--screenshot-settings" && i + 1 < argc) {
             QString path = argv[i + 1];
             SettingsDialog dlg;
+            dlg.show();
+            app.processEvents();
+            QPixmap pix = dlg.grab();
+            pix.save(path);
+            return 0;
+        }
+        if (QString(argv[i]) == "--screenshot-diagnostics" && i + 1 < argc) {
+            QString path = argv[i + 1];
+            RecoveryDialog dlg;
+            HealthReport report;
+            report.isHealthy = false;
+            report.hasCriticalFailures = true;
+            report.summary = "Subsystem fault detected: Binder IPC interface missing / unreachable.";
+
+            DiagnosticCheckResult binderCheck;
+            binderCheck.id = "kernel_binder";
+            binderCheck.category = DiagnosticCategory::KernelModule;
+            binderCheck.name = "Kernel Binder Interface";
+            binderCheck.status = CheckStatus::Failed;
+            binderCheck.errorCode = "E_BINDER_MISSING";
+            binderCheck.details = "Neither /dev/binder nor /dev/binderfs/binder were found with valid rw permissions.";
+            binderCheck.remediationHint = "Run 'modprobe binder_linux' or allow linStack elevated repair to mount binderfs.";
+            report.checks.append(binderCheck);
+
+            DiagnosticCheckResult serviceCheck;
+            serviceCheck.id = "systemd_service";
+            serviceCheck.category = DiagnosticCategory::ServiceSocket;
+            serviceCheck.name = "LinStack Systemd Container Service";
+            serviceCheck.status = CheckStatus::Warning;
+            serviceCheck.errorCode = "W_SERVICE_INACTIVE";
+            serviceCheck.details = "linstack-container.service unit is currently inactive.";
+            serviceCheck.remediationHint = "Attempt automated service restart via systemctl.";
+            report.checks.append(serviceCheck);
+
+            dlg.setReport(report);
             dlg.show();
             app.processEvents();
             QPixmap pix = dlg.grab();

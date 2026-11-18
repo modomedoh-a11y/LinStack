@@ -1,7 +1,7 @@
 #ifndef ANDROIDCANVAS_H
 #define ANDROIDCANVAS_H
 
-#include <QWidget>
+#include <QOpenGLWidget>
 #include <QStackedWidget>
 #include <QLabel>
 #include <QScrollArea>
@@ -12,11 +12,21 @@
 #include <QDropEvent>
 #include <QMap>
 #include <QRect>
+#include <QPointF>
+#include <QSocketNotifier>
+#include <memory>
+#include <vector>
+#include <cstdint>
 
 #include "Theme.h"
 
 class KeymapperOverlay;
 class UInputTouchBridge;
+class EmbeddedCompositor;
+class WaylandSurfaceRenderer;
+class AspectRatioWindow;
+class InputMapper;
+struct ViewportRect;
 
 struct AndroidAppEntry {
     QString packageName;
@@ -26,7 +36,7 @@ struct AndroidAppEntry {
     bool isGame = false;
 };
 
-class AndroidCanvas : public QWidget
+class AndroidCanvas : public QOpenGLWidget
 {
     Q_OBJECT
 
@@ -39,13 +49,11 @@ public:
     explicit AndroidCanvas(QWidget *parent = nullptr);
     ~AndroidCanvas() override;
 
-    // Window Embedding APIs
     bool embedWindow(WId winId);
     bool embedWindow(QWindow *foreignWindow);
     void releaseEmbeddedWindow();
-    bool isWindowEmbedded() const { return m_embeddedWindow != nullptr || m_simulatedActive; }
+    bool isWindowEmbedded() const { return m_simulatedActive; }
 
-    // Dynamic Installed Apps Management
     void setInstalledApps(const QList<AndroidAppEntry> &apps);
     void addInstalledApp(const AndroidAppEntry &app);
     void refreshInstalledApps();
@@ -53,16 +61,9 @@ public:
     void setOrientation(Orientation orientation);
     Orientation orientation() const { return m_orientation; }
 
-    // ── Aspect Ratio & Letterboxing ──────────────────────────────────────────
-    // Sets the base resolution used to derive the locked aspect ratio.
-    // Letterbox bars are painted with the cyber-dark background colour when the
-    // window aspect does not match (default: 1920 × 1080 → 16:9).
     void setBaseResolution(int baseWidth, int baseHeight);
     int  baseWidth()  const { return m_baseWidth; }
     int  baseHeight() const { return m_baseHeight; }
-
-    // Returns the sub-rect of this widget that holds the scaled Android content
-    // (after letterbox/pillarbox bars are removed).
     QRect viewportRect() const { return m_viewportRect; }
 
     void showToast(const QString &message, int durationMs = 3000);
@@ -73,19 +74,43 @@ public:
 
     QString activeAppPackage() const { return m_activePackage; }
 
+    void initWaylandCompositor();
+    QString waylandSocketName() const { return m_waylandSocketName; }
+    EmbeddedCompositor *compositor() const { return m_compositor.get(); }
+    AspectRatioWindow *aspectRatioWindow() const { return m_aspectRatio.get(); }
+    InputMapper *inputMapper() const { return m_inputMapper.get(); }
+
+    // Aim Lock Mode (anchored at the AimLock node position, no right-click toggle)
+    bool isAimModeActive() const { return m_aimModeActive; }
+    void setAimMode(bool active, QPointF anchorNorm = QPointF(0.5, 0.5));
+
 signals:
     void windowEmbedded(WId winId);
     void windowReleased();
     void appLaunchRequested(const QString &packageName, const QString &displayName);
     void apkDropped(const QString &filePath);
     void searchStoreRequested(const QString &query);
+    void aimModeChanged(bool active);
+    void firstFrameRendered();
+    void waylandClientConnected();
 
 protected:
+    void initializeGL() override;
+    void paintGL() override;
+    void resizeGL(int w, int h) override;
+
     void resizeEvent(QResizeEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
     void dragEnterEvent(QDragEnterEvent *event) override;
     void dragLeaveEvent(QDragLeaveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
-    void paintEvent(QPaintEvent *event) override;
+
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void wheelEvent(QWheelEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
 
 private slots:
     void handleAppCardClicked(const QString &packageName, const QString &displayName);
@@ -98,35 +123,42 @@ private:
     void updateCanvasGeometry();
     void launchAndEmbedApp(const QString &packageName, const QString &displayName);
 
+    std::unique_ptr<EmbeddedCompositor> m_compositor;
+    std::unique_ptr<WaylandSurfaceRenderer> m_surfaceRenderer;
+    std::unique_ptr<AspectRatioWindow> m_aspectRatio;
+    std::unique_ptr<InputMapper> m_inputMapper;
+    QSocketNotifier *m_waylandNotifier = nullptr;
+    QTimer *m_waylandDispatchTimer = nullptr;
+
     QStackedWidget *m_stack = nullptr;
     QWidget *m_homeWidget = nullptr;
     QWidget *m_appsGridContainer = nullptr;
 
-    // Embedded Linstack window container
-    QWidget *m_embedContainerWidget = nullptr;
-    QWidget *m_windowContainer = nullptr;
-    QWindow *m_embeddedWindow = nullptr;
+    // Aim Lock State (anchored at AimLock node position)
+    bool m_aimModeActive = false;
+    bool m_ignoreNextMouseMove = false;
+    QPoint m_lastMousePos;
+    QPointF m_aimAnchorNorm = QPointF(0.5, 0.5);
 
-    // In-canvas game viewport & top bar
-    QWidget *m_gameViewportWidget = nullptr;
-    QLabel *m_gameTitleBadge = nullptr;
-    QLabel *m_gameFpsBadge = nullptr;
-    bool m_simulatedActive = false;
+    bool m_simulatedActive = true;
+    bool m_hasFirstFrame = false;
     QString m_activePackage;
 
     KeymapperOverlay *m_keymapperOverlay = nullptr;
+    UInputTouchBridge *m_touchBridge = nullptr;
+    QString m_waylandSocketName = "wayland-linstack-0";
     QLabel *m_toastLabel = nullptr;
     QTimer *m_toastTimer = nullptr;
 
     bool m_isDragOver = false;
     Orientation m_orientation = Orientation::Landscape;
 
-    // ── Aspect Ratio & Letterboxing state ────────────────────────────────────
-    int   m_baseWidth    = 1920;  // Default base resolution width
-    int   m_baseHeight   = 1080;  // Default base resolution height
-    QRect m_viewportRect;         // Computed letterboxed/pillarboxed content rect
+    int   m_baseWidth    = 1920;
+    int   m_baseHeight   = 1080;
+    QRect m_viewportRect;
 
     QList<AndroidAppEntry> m_installedApps;
+    std::vector<uint8_t> m_cpuReadbackBuffer;
 };
 
 #endif // ANDROIDCANVAS_H

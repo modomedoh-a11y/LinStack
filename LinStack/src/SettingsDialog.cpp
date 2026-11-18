@@ -8,6 +8,9 @@
 #include <QHeaderView>
 #include <QPainter>
 #include <QSize>
+#include <QKeyEvent>
+#include <QKeySequence>
+#include <QSettings>
 
 SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
@@ -262,44 +265,132 @@ QWidget *SettingsDialog::createShortcutsTab()
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
 
-    auto *desc = new QLabel("Hotkey Manager: Customize in-game shortcuts and system controls.", tab);
+    auto *desc = new QLabel("Click any shortcut button below and press your desired key combination (ESC to cancel).", tab);
     desc->setStyleSheet("color: #9CA3AF; font-size: 11px;");
     layout->addWidget(desc);
 
-    m_tableShortcuts = new QTableWidget(7, 3, tab);
-    m_tableShortcuts->setHorizontalHeaderLabels(QStringList() << "Action" << "Default Hotkey" << "Customizable");
+    m_tableShortcuts = new QTableWidget(8, 2, tab);
+    m_tableShortcuts->setHorizontalHeaderLabels(QStringList() << "Action" << "Hotkey (Click to Record)");
     m_tableShortcuts->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
-    m_tableShortcuts->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-    m_tableShortcuts->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_tableShortcuts->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Fixed);
+    m_tableShortcuts->setColumnWidth(1, 210);
     m_tableShortcuts->verticalHeader()->setVisible(false);
+    m_tableShortcuts->verticalHeader()->setDefaultSectionSize(38);
+    m_tableShortcuts->setSelectionMode(QAbstractItemView::NoSelection);
+    m_tableShortcuts->setFocusPolicy(Qt::NoFocus);
     m_tableShortcuts->setStyleSheet(
         "QTableWidget { background-color: #0D121D; border: 1px solid #1F2937; border-radius: 6px; color: #F9FAFB; gridline-color: #1F2937; }"
         "QHeaderView::section { background-color: #161F30; color: #10B981; border: none; padding: 6px; font-weight: 700; }"
     );
 
-    struct ShortcutEntry { QString action; QString hotkey; };
+    struct ShortcutEntry { QString keyId; QString action; QString defaultHotkey; };
     ShortcutEntry entries[] = {
-        {"Toggle Fullscreen", "F11"},
-        {"Keymapper Overlay / Editor", "Ctrl + Shift + K"},
-        {"Lock / Free Mouse Cursor", "Ctrl + Alt"},
-        {"Toggle Eco Mode (1 FPS)", "Ctrl + Shift + E"},
-        {"Take Screenshot", "Ctrl + Shift + S"},
-        {"Volume Up / Down", "Ctrl + Up / Down"},
-        {"Boss Key (Minimize/Hide)", "Ctrl + Shift + H"}
+        {"fullscreen",       "Toggle Fullscreen",          "F11"},
+        {"keymapper_toggle", "Enable / Disable Keymapper", "Ctrl+Shift+M"},
+        {"keymapper",        "Keymapper Editor Mode",      "Ctrl+Shift+K"},
+        {"aim_lock",         "Lock / Free Mouse Cursor",   "Ctrl+Alt"},
+        {"eco_mode",         "Toggle Eco Mode (1 FPS)",    "Ctrl+Shift+E"},
+        {"screenshot",       "Take Screenshot",            "Ctrl+Shift+S"},
+        {"volume",           "Volume Up / Down",           "Ctrl+Up"},
+        {"boss_key",         "Boss Key (Minimize/Hide)",   "Ctrl+Shift+H"}
     };
 
-    for (int i = 0; i < 7; ++i) {
-        auto *itAction = new QTableWidgetItem(entries[i].action);
-        auto *itHotkey = new QTableWidgetItem(entries[i].hotkey);
-        itHotkey->setTextAlignment(Qt::AlignCenter);
-        itHotkey->setForeground(Theme::ColorNeon);
-        auto *itMod = new QTableWidgetItem("Yes");
-        itMod->setTextAlignment(Qt::AlignCenter);
-        itMod->setForeground(Theme::ColorMint);
+    QSettings settings("LinStack", "LinStack");
 
+    // كلاس زر مخصص للاستماع المباشر للكيبورد عند النقر عليه
+    class KeyCaptureButton : public QPushButton {
+    public:
+        KeyCaptureButton(const QString &id, const QString &initialSeq, QWidget *parent = nullptr)
+        : QPushButton(initialSeq, parent), m_id(id), m_savedSeq(initialSeq) {
+            setCursor(Qt::PointingHandCursor);
+            setFocusPolicy(Qt::StrongFocus);
+            applyNormalStyle();
+            connect(this, &QPushButton::clicked, this, &KeyCaptureButton::startListening);
+        }
+
+        QString keyId() const { return m_id; }
+        QString sequence() const { return m_savedSeq; }
+
+    protected:
+        void keyPressEvent(QKeyEvent *e) override {
+            if (!m_listening) {
+                QPushButton::keyPressEvent(e);
+                return;
+            }
+            e->accept();
+            int key = e->key();
+
+            // تجاهل الضغط على مفاتيح التعديل بمفردها (Ctrl, Shift, Alt, Super)
+            if (key == Qt::Key_Control || key == Qt::Key_Shift || key == Qt::Key_Alt ||
+                key == Qt::Key_AltGr || key == Qt::Key_Meta) {
+                return;
+                }
+
+                if (key == Qt::Key_Escape) {
+                    stopListening(m_savedSeq);
+                    return;
+                }
+
+                QKeyCombination combo(e->modifiers(), static_cast<Qt::Key>(key));
+            QString seqStr = QKeySequence(combo).toString(QKeySequence::PortableText);
+            if (!seqStr.isEmpty()) {
+                m_savedSeq = seqStr;
+                QSettings("LinStack", "LinStack").setValue("shortcuts/" + m_id, m_savedSeq);
+            }
+            stopListening(m_savedSeq);
+        }
+
+        void focusOutEvent(QFocusEvent *e) override {
+            if (m_listening) {
+                stopListening(m_savedSeq);
+            }
+            QPushButton::focusOutEvent(e);
+        }
+
+    private:
+        void startListening() {
+            m_listening = true;
+            setText("⌨ Press shortcut keys...");
+            setStyleSheet(
+                "QPushButton { background-color: rgba(0, 255, 102, 0.15); color: #00FF66; "
+                "border: 1px solid #00FF66; border-radius: 5px; font-weight: 700; padding: 4px 10px; }"
+            );
+        }
+
+        void stopListening(const QString &display) {
+            m_listening = false;
+            setText(display);
+            applyNormalStyle();
+            clearFocus();
+        }
+
+        void applyNormalStyle() {
+            setStyleSheet(
+                "QPushButton { background-color: #161F30; color: #00FF66; border: 1px solid #1F2937; "
+                "border-radius: 5px; font-weight: 700; font-family: monospace; padding: 4px 10px; }"
+                "QPushButton:hover { border-color: #10B981; background-color: #1E293B; }"
+            );
+        }
+
+        QString m_id;
+        QString m_savedSeq;
+        bool m_listening = false;
+    };
+
+    for (int i = 0; i < 8; ++i) {
+
+        auto *itAction = new QTableWidgetItem(entries[i].action);
+        itAction->setFlags(itAction->flags() & ~Qt::ItemIsEditable);
         m_tableShortcuts->setItem(i, 0, itAction);
-        m_tableShortcuts->setItem(i, 1, itHotkey);
-        m_tableShortcuts->setItem(i, 2, itMod);
+
+        QString currentSeq = settings.value("shortcuts/" + entries[i].keyId, entries[i].defaultHotkey).toString();
+        auto *captureBtn = new KeyCaptureButton(entries[i].keyId, currentSeq, m_tableShortcuts);
+
+        auto *cellWidget = new QWidget(m_tableShortcuts);
+        auto *cellLayout = new QHBoxLayout(cellWidget);
+        cellLayout->setContentsMargins(6, 3, 6, 3);
+        cellLayout->addWidget(captureBtn);
+        m_tableShortcuts->setCellWidget(i, 1, cellWidget);
     }
 
     layout->addWidget(m_tableShortcuts);

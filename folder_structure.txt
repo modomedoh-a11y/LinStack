@@ -1,0 +1,3042 @@
+.
+├── bundle.py
+├── CMakeFiles
+│   └── CMakeSystem.cmake
+├── folder_structure.txt
+├── .git
+│   ├── COMMIT_EDITMSG
+│   ├── config
+│   ├── description
+│   ├── HEAD
+│   ├── hooks
+│   │   ├── applypatch-msg.sample
+│   │   ├── commit-msg.sample
+│   │   ├── fsmonitor-watchman.sample
+│   │   ├── post-update.sample
+│   │   ├── pre-applypatch.sample
+│   │   ├── pre-commit.sample
+│   │   ├── pre-merge-commit.sample
+│   │   ├── prepare-commit-msg.sample
+│   │   ├── pre-push.sample
+│   │   ├── pre-rebase.sample
+│   │   ├── pre-receive.sample
+│   │   ├── push-to-checkout.sample
+│   │   ├── sendemail-validate.sample
+│   │   └── update.sample
+│   ├── index
+│   ├── info
+│   │   └── exclude
+│   ├── logs
+│   │   ├── HEAD
+│   │   └── refs
+│   │       ├── heads
+│   │       │   └── main
+│   │       └── remotes
+│   │           └── origin
+│   │               └── main
+│   ├── objects
+│   │   ├── 01
+│   │   │   └── de1d3804bb37fcd7e73e90b04a2ff1813d8480
+│   │   ├── 02
+│   │   │   ├── 20427e2b3334935346c4fd5842d27082b317c7
+│   │   │   └── dbfc04a4232c1dd5ada7567380b801261d1084
+│   │   ├── 03
+│   │   │   ├── 0b4875b81c211a792768c2ca630500f95048e3
+│   │   │   └── 2f72acca367c1dcb6b315247fde73f2fa79e77
+│   │   ├── 05
+│   │   │   └── b6d65cf700fcbc47fc84eee8e52e542a0ff85b
+│   │   ├── 06
+│   │   │   ├── 1c0a63d2a298cd44f48a70dec1047264a3c09f
+│   │   │   └── 552e75f748bda30d9e7de4d8b08ac63d976078
+│   │   ├── 07
+│   │   │   ├── c7d55d7ab691777359ad2ba1140d66399909b4
+│   │   │   └── e6378c2c908c25db6e7310f38d57923c4aeb6b
+│   │   ├── 08
+│   │   │   └── a396261831195dbb93605cb60a4028b13ee1b2
+│   │   ├── 09
+│   │   │   ├── 1a9a66a0dd486a8999e61342ae5206a1979213
+│   │   │   └── 7a1e9b450e3a69602868e0dca00923284042b4
+│   │   ├── 0a
+│   │   │   └── 121c0f1904472fdcbf018c60a4584c0161177c
+│   │   ├── 0b
+│   │   │   ├── 29a0f29628a60a22b76edab842350f4e2a0be8
+│   │   │   ├── 312e93ea99c0df8599a68b57dd6730f4e8dadc
+│   │   │   └── fc4c7215df1265f284049d33cc9f85e479d20a
+│   │   ├── 0e
+│   │   │   └── 3ae355c216ba86e507f52dea2cf5c4481ebe48
+│   │   ├── 11
+│   │   │   ├── 2e9401239bed6191904a548fd19ca6694bf819
+│   │   │   └── 9ea79481ac8465549787c92615c2ce7346b209
+│   │   ├── 12
+│   │   │   ├── 8751e520b2d13d88cf78d2fecd30f56def4d11
+│   │   │   └── 9524e88fb0975a283935006185a1dd2abf48e7
+│   │   ├── 13
+│   │   │   ├── 1d1b7250d48c64adaf5b148ae8bb1efe6e8f53
+│   │   │   ├── 248e15260963c914992aca64608d89c7b94e0c
+│   │   │   └── 4b04b29a1a9b3e80e9ac65288cb6b8ddfb772c
+│   │   ├── 15
+│   │   │   └── 658990b0a9e5a92499358bfea8eabb80187243
+│   │   ├── 16
+│   │   │   └── 3a4e8026f72ec8793793404b0507207772eb84
+│   │   ├── 17
+│   │   │   ├── 38f090ee97d691123c634213110a3ab6e7296d
+│   │   │   ├── 974237efd0117f59d4b7d512ebe73e1f54f872
+│   │   │   ├── dae43e9e76d5209d1b7650f12863fea2ae1d92
+│   │   │   └── fe97aa3aaf7f14f425d15ead6d0535b4b05f2c
+│   │   ├── 18
+│   │   │   └── b9b3aae191bd74333ceaa0fc092349c4fbec0f
+│   │   ├── 19
+│   │   │   ├── 1681156b8e08cc79e664d943614e784b29fdd6
+│   │   │   ├── abf6a7aa3116f96f1f984837af20052ff4e000
+│   │   │   └── b03a602dd7d9d27b7df464bf941d8f347b1a84
+│   │   ├── 1a
+│   │   │   ├── 03aa3af2dc820d896439a0c12e30462bd1e168
+│   │   │   ├── 4cf517c44835bcca37d6ec7a7849c539027de9
+│   │   │   ├── b8777512107c19c31203406972dbfa4729e000
+│   │   │   └── c5af902c447c44884ba6fc636f2a9d3beffa47
+│   │   ├── 1b
+│   │   │   ├── 1840286c6608e5fca0dbb7b08aa67f265af9d4
+│   │   │   └── f5ddb2770c622f7905d33f8eae9a8f77123966
+│   │   ├── 1d
+│   │   │   └── a1ecbcc173c9cf9502b6fd933befc63bf7e47d
+│   │   ├── 1f
+│   │   │   └── 59dd4648b7705cc9c21565a76e3a2e06df9ca7
+│   │   ├── 20
+│   │   │   ├── 133ec2d432b4c531a688326796453e9f82767a
+│   │   │   ├── 2bab088032102412c3bf1db58785f069ea172e
+│   │   │   └── 42de85f2e55a6be98c884411815dbdbdacc903
+│   │   ├── 21
+│   │   │   ├── 2bd580d38fb97fb6d133613730707e8fae8184
+│   │   │   └── 3e547b6388e400916d32fdebbe3b983256fb8f
+│   │   ├── 22
+│   │   │   ├── 7eeace8c734f65f196fb0793e1300ebe0a2954
+│   │   │   └── 90883855849afdbf005c99d8aceb2d1ec58ca8
+│   │   ├── 23
+│   │   │   ├── 6ff5b4c94af98d117160bb614410e9a6d1d67b
+│   │   │   └── 948d1788834192e137f79c077922ff0b5daf6b
+│   │   ├── 24
+│   │   │   └── cda1ca9671f05574eef22e4c266816a01ae150
+│   │   ├── 25
+│   │   │   ├── 9009263f8b8fb67fcb95bd9038f70c729211b1
+│   │   │   └── f9445e8b09a5862c1fc328035bdca070dcb831
+│   │   ├── 26
+│   │   │   ├── 4693501fe9a2e6b4415daed8e21036a7b17dba
+│   │   │   ├── 8cba668d33e92f4071d73dd723d19ab5ae108e
+│   │   │   └── 8d7c24ae61f3336f95fb4cdc3869111e116e18
+│   │   ├── 27
+│   │   │   ├── 2bd71a4ddc8b59a6f3c5e5e92389ccbd20733f
+│   │   │   └── 3f50b82f442e3cd4d6ef336d74fed93152ff08
+│   │   ├── 28
+│   │   │   ├── 6f45c1ce04eeff9c249dab4b31a81d2defc736
+│   │   │   └── b35fdbf14c77dd909ea454790543584448f999
+│   │   ├── 29
+│   │   │   ├── b95a515e51db792a1019bc6c3419b6d78ec34c
+│   │   │   └── c416cc7cbb5123eef22c4da330f2b4871ecfa4
+│   │   ├── 2a
+│   │   │   └── 0f795e05be7ae14bc20908d0128ba9762b011a
+│   │   ├── 2b
+│   │   │   ├── 4d2bf0a179cddc1e217bea98f88b0c52b0d6fb
+│   │   │   └── b4163f65bc172e9086d42c2487393ce5b207a7
+│   │   ├── 2e
+│   │   │   └── 5a761e050bc736d4ed3c7775f29d1489cedebb
+│   │   ├── 32
+│   │   │   └── fbf9a60569206df7fc049df10299d7c9129c42
+│   │   ├── 34
+│   │   │   ├── 02a7c4198fa4c4f3b086399f88aa17b63dcf4d
+│   │   │   └── 49705bb2dda60dbbd8391dcfe6a429f44e19ee
+│   │   ├── 35
+│   │   │   └── 4e3099dce37f4f2dc1e2a2d27358480d3baac2
+│   │   ├── 36
+│   │   │   ├── 6528c1643097b4e368c86674169baa7917a000
+│   │   │   └── 9d0970475e772e1bdfed55b40ee125484bfeba
+│   │   ├── 37
+│   │   │   ├── 05f5ea5967461c4d48beae0845c9d102f20736
+│   │   │   ├── 1c6300b775711b286597604379faf0f01c2785
+│   │   │   ├── 731b1fed21dc7b94f288fc94f89f4939c2cffc
+│   │   │   └── e6a51e7325fafc9bd71fa6440843688bb4404f
+│   │   ├── 39
+│   │   │   └── 73a3cec871081d9cc98ae2a1c00a493f7845e6
+│   │   ├── 3a
+│   │   │   ├── d413947f2648ac19c82ead5e6883c50530a914
+│   │   │   └── ed78245ad7ae55f2d02c66b66faa6ca115cde4
+│   │   ├── 3b
+│   │   │   ├── 088bf506c0842b76ec95f4a1f06d12020a800d
+│   │   │   └── f35c7546fc88c790e12012149d39c61470c197
+│   │   ├── 3c
+│   │   │   ├── 032078a4a21c5c51d3c93d91717c1dabbb8cd0
+│   │   │   ├── 2615153586a32489483054784b982ce1704b4b
+│   │   │   └── 8b888b769e335b7d7bb70464b6b669b833a2b9
+│   │   ├── 3d
+│   │   │   └── ccd731726d7faa8b29d8d7dba3b981a53ca497
+│   │   ├── 3e
+│   │   │   └── d7393e58aacc3203fca97f2c78b100ef03476d
+│   │   ├── 40
+│   │   │   ├── 70ae73876950dc60ca745fb8f7cc46681f389f
+│   │   │   └── ce55114a04d7872d8e401434a5265d54cfe494
+│   │   ├── 41
+│   │   │   └── b7eddc61417e64d28cf1e7b5013b532169a0c0
+│   │   ├── 42
+│   │   │   ├── 62862955b55a8a794c8f41ac8e4b0b63bb212a
+│   │   │   └── 6c215c48c2cc4b518c43a03c64aa144234075c
+│   │   ├── 44
+│   │   │   └── 8f1e72671ca6108206ed1077bc332d146da571
+│   │   ├── 45
+│   │   │   ├── 64ce15d597ed27607244bffe7d5cff4554faaa
+│   │   │   ├── 7a6fcbd9802898da300ffecf1be0d5795f681e
+│   │   │   └── 8b7edf44dabd0d90b430daf200c1b439c18932
+│   │   ├── 46
+│   │   │   └── 07ce0844f57f9454ff385f0c9e389a38ee9f9d
+│   │   ├── 48
+│   │   │   └── 298946a6ec38c115a0e11f61ffe75ad1d4f615
+│   │   ├── 4b
+│   │   │   └── 9edf2ad837253814de429e47b0bcea60e739ad
+│   │   ├── 4c
+│   │   │   ├── 47d6fdd7461c6f808e20b72f31f44622de7c99
+│   │   │   └── bc636d2b8a9e08ef4301e5260063d1805c5558
+│   │   ├── 4e
+│   │   │   └── a52de06e97fde4168e56da4ab687d5956ea2bb
+│   │   ├── 50
+│   │   │   ├── 675563224caf008cf4458b732cf448d882dc20
+│   │   │   ├── b0b8efe11a1d6849c7768de1ebb5edd5936932
+│   │   │   └── de9bd17b5ea75c74e326cd54588c338f005abc
+│   │   ├── 51
+│   │   │   ├── 84cc913ff4511c7f4a46bf4d27889a3f14eb4a
+│   │   │   └── f65ffeec37ca2a720e8ae11696659951189669
+│   │   ├── 52
+│   │   │   └── 545235f93aedb208c4b2fca60289b76c1c76f1
+│   │   ├── 54
+│   │   │   └── ee9834b70fd78903f5c9b9d16ffb5c750c0ad9
+│   │   ├── 55
+│   │   │   ├── 34861735a8cc51bead0bdbd90c23a46efe31ec
+│   │   │   ├── 754c66f75aa3c2d4983238991bac61a9bd7e0d
+│   │   │   ├── 8078fddcdd96db3285b42054b0d0ca68bae72f
+│   │   │   └── aef719c37dbfa21fe6721e50d66d3ec60c5d71
+│   │   ├── 56
+│   │   │   └── 8934cbb9f7fd12092be5ebf6eb6b3e2c472152
+│   │   ├── 57
+│   │   │   └── d1032d29b94de03e7c0d1517b46339928c1241
+│   │   ├── 58
+│   │   │   ├── 02d2660b73c93fe5cbe8dd18ddcd43af8bc6ad
+│   │   │   ├── 55c1a8eccbcef5502e5f6699f06663e4ba4660
+│   │   │   └── f92392509548e0a678fb0ad0e0ed282ccc9be0
+│   │   ├── 59
+│   │   │   ├── 007f22e4471cee9724dd25ab50f27197974440
+│   │   │   ├── 9e3c4252c7434bfacf80abb24113dd6604c23a
+│   │   │   ├── ac3f8bff12f5925b7ecfb9d29fd3b64e385639
+│   │   │   └── ecd3aa08e0c7bb418c44cc62867f50c753778c
+│   │   ├── 5d
+│   │   │   └── ecc1fd9fc59e067e5f21b574d378340212951f
+│   │   ├── 5e
+│   │   │   ├── 0a962ddde1a006cf1b7a16a992b8439eb1d1b5
+│   │   │   └── 9cb6e93e744761b386a1ccc04b3d40eea23caa
+│   │   ├── 60
+│   │   │   ├── 563ae0af3afd2b9fce363b0ab93346a4d790fc
+│   │   │   └── 9e31d42b067f097995e1dfaab64adffe5b24f7
+│   │   ├── 61
+│   │   │   └── c786be639caa6097a4122521a6e014ce90eba2
+│   │   ├── 62
+│   │   │   ├── 7798f69baeeac30f9eb02f9d5d7fd08751aeb1
+│   │   │   ├── 8c414f0172b21b8d06cfd4f191fcc0344e34ae
+│   │   │   ├── e2d1e1f99181a9046b4fe5d1f461c6875e2e64
+│   │   │   └── f53112093eb007333ada18e2f352bb1d21e6e9
+│   │   ├── 63
+│   │   │   ├── aa6e8df332d56c42abae6989e4b21b3831bbd9
+│   │   │   └── d133e96e05d855975ea5102d8095bdb5139673
+│   │   ├── 64
+│   │   │   ├── 11a235233fbcb53242d0a22394740ac2a47440
+│   │   │   └── 4fd8eaaa87ca589a4f9a280602866e72baf599
+│   │   ├── 65
+│   │   │   ├── 3aa52af3b0dc9511caf10391830565c40b6108
+│   │   │   └── cd29228920f7821d284ba399a1e9fe42c7dbe7
+│   │   ├── 67
+│   │   │   ├── b0843b864ea178c18cc65bbcaeac0707cbb39a
+│   │   │   └── b2db8b2ab1967e30b0399f0d11c136039b107d
+│   │   ├── 68
+│   │   │   └── f4c3fcd079405b14e27d63458c0babd66a68a1
+│   │   ├── 6a
+│   │   │   └── 10b7f5ecfda9e47ad6db4fa78df676210df4f9
+│   │   ├── 6b
+│   │   │   └── 4032141968d43b04925890fa69f7b4ea52bbaf
+│   │   ├── 6c
+│   │   │   └── 52cb5465921dcd3dc4abdaf64a3a385d063595
+│   │   ├── 6d
+│   │   │   └── f6d27f9321a3f71355e2a7625bdfaf28a3d98f
+│   │   ├── 6e
+│   │   │   └── e9869abc29f2c19f303b08427f3a9e787aa5b6
+│   │   ├── 71
+│   │   │   └── 4f57b593bf12bf69c695e64dcc2088cb9e670a
+│   │   ├── 73
+│   │   │   └── c1a2a1c8e2663c230b6df2cb0080748eec2d0e
+│   │   ├── 74
+│   │   │   └── e82d839c0d5788ae877410e4a9511c1aac6299
+│   │   ├── 75
+│   │   │   ├── 1604fd6b1a297e18d580a265a062d9c6fa040a
+│   │   │   ├── 552b8133602d5aefefee91de8a729097e4da15
+│   │   │   └── c8a6b1f43c275e5dccf610f281e295395d342b
+│   │   ├── 76
+│   │   │   ├── 2ca8a7a4fd996e1c621550fe9a77ff32453a8b
+│   │   │   └── 538f9783cedaa62f0cabc417c1875b4cccf2dd
+│   │   ├── 77
+│   │   │   ├── 2d8c8f631fea9f2f9e183ddd379509722a9f84
+│   │   │   └── 6507e14f03da407d7e0d8bea65c31543eebc43
+│   │   ├── 78
+│   │   │   ├── 2cfb445b79cc2f8b4166532ecfee4e5b5641ee
+│   │   │   ├── 691e9114b6833f2f72415fe789c3c363de9404
+│   │   │   └── 94cb7c56c31eb26fd5cb933bf3cd266d553e70
+│   │   ├── 79
+│   │   │   └── 83479c68ef53cb7ee2ae284f711d2ab030ce9f
+│   │   ├── 7a
+│   │   │   ├── 47400cb9b73c5a63585ee2ba03baf888ad4a20
+│   │   │   └── 68a050d26bbdebe850192f2a764bac970d02b2
+│   │   ├── 7c
+│   │   │   └── b116312b1e9217d2478e413c8de36e3dde4251
+│   │   ├── 7d
+│   │   │   ├── 298f813341ce52bbc6e0fda97def7c9b818baf
+│   │   │   ├── 53dd99e649c49f747b8b77904254211192502f
+│   │   │   └── 7374a54a9505aaa0dfb26aa57a9dbbd17aa986
+│   │   ├── 7e
+│   │   │   ├── 40e9bb97030019521c1811c6c24d5c738dc719
+│   │   │   └── e5f5464e77f10c93d15efebce912241f92dcd0
+│   │   ├── 7f
+│   │   │   └── 52ea9d0348f13f799be948031d963b2ab8fdc0
+│   │   ├── 80
+│   │   │   └── bb4be44f33b80c7bc8d07d8c85bf96c574b45f
+│   │   ├── 82
+│   │   │   └── ee34f8980bd373fcfb80e4db83debaa113101d
+│   │   ├── 83
+│   │   │   ├── b80ff2acee2c048254875dc28f6b41e04b928e
+│   │   │   └── bb5ee4184a2aef3f43ac0aca5182936977d325
+│   │   ├── 85
+│   │   │   └── 8c014cd184a1568582786d29c6775a72d79056
+│   │   ├── 86
+│   │   │   ├── c65e9e395015e4124cf141dba154d83ec0219d
+│   │   │   └── e0267137d00a1910cd8a7571b370fc417cbfde
+│   │   ├── 87
+│   │   │   ├── 0ac6339784be9990d042f6e9d50d41b07ef628
+│   │   │   └── 609a144f51a36eab007d362144bfbaa0f03c2c
+│   │   ├── 88
+│   │   │   └── 59357ad4f7c27c2724eefa8407976900821f4d
+│   │   ├── 89
+│   │   │   └── ae9db8f88b823b6a7eabf55e203658739da122
+│   │   ├── 8a
+│   │   │   └── 41f0ab9d224a3aaa31e2de7532239cb7dd85a0
+│   │   ├── 8b
+│   │   │   ├── 137891791fe96927ad78e64b0aad7bded08bdc
+│   │   │   └── 85aac5528bcfe169eefaf5e28b8283283c3ae6
+│   │   ├── 8c
+│   │   │   └── 32e01635c17e25637ae0ffb633fe9fdd3e5627
+│   │   ├── 8d
+│   │   │   ├── 06a746204a6b3836ba5eb851e6480dd60e623f
+│   │   │   ├── 48015cf4575b5302dad3fb1943c8af9062688d
+│   │   │   └── 66d7e75ecec9ead3017bcb465d5aefef803c48
+│   │   ├── 8f
+│   │   │   ├── 4543a582dbd47f9a7e6eaabd12282fbecf54c6
+│   │   │   └── af565eaab1e4bcac8e39b038ed4da28a207b42
+│   │   ├── 90
+│   │   │   ├── 6fd1798ab50de3fe8dc620717f864dc16cea75
+│   │   │   └── aa8c433d674e3faf1330dcd59620ad19491443
+│   │   ├── 91
+│   │   │   └── 8d24fbc346e11659820edb171868c20f9ec3d7
+│   │   ├── 92
+│   │   │   ├── 68042f2887d067bf75341cc183222066ec86e9
+│   │   │   ├── c16a83baa859f6628c934339a5babc87e142c3
+│   │   │   └── c4ef5aaa0bbcd79eeb08cb2be7a7f52a0efbe1
+│   │   ├── 93
+│   │   │   ├── 0c7081dfe311eb162223b9697b078ea4295bac
+│   │   │   ├── 0c7af9c698a6a65d3c8c4326ad8700daa7640a
+│   │   │   ├── 26fe371988770ea3594de77de43526aae07369
+│   │   │   └── db5622714a098f1a9ed95dc0620d9ce8f0d640
+│   │   ├── 95
+│   │   │   └── 8828050e5a11f12f51cae4462ac31acd58f9a6
+│   │   ├── 96
+│   │   │   ├── 30f540cd97d44a3b49c3c3c640b10e7d3f6993
+│   │   │   ├── b9d4e5c59306b318cca2a7d07c5cf159dd7680
+│   │   │   ├── c1dfb549ec56e40055197cefb6d5e07777de29
+│   │   │   └── e244bd2a6312114f414a34513ee4c975c4247f
+│   │   ├── 97
+│   │   │   └── f528ebf84359dad7a02668c26570d1578a93ea
+│   │   ├── 98
+│   │   │   ├── 93e58403c5a2b436a914d1440450b151be9525
+│   │   │   ├── ad1e06b675ebc30d13516334b7f589a5617a62
+│   │   │   └── fd8d0a3bb55bf5edf3f9c46a819564edb412a5
+│   │   ├── 99
+│   │   │   ├── 48e04fe67e3fe2f2ee6793345d604d9ebdbc79
+│   │   │   ├── a9dbd2a0e857f62fe8f7162529dec095a90ee1
+│   │   │   └── df6ad31e3c56a85f10e9d79e9d47083d877254
+│   │   ├── 9a
+│   │   │   ├── 208635502866b5b24ae050576fde51453661fc
+│   │   │   ├── bc5fd9c15a5045670802ea076d17af64c5061a
+│   │   │   └── e472b27a079b0e76013015d70f0c83a7366ed5
+│   │   ├── 9b
+│   │   │   ├── 679222a52b5d58418807cf34fb1ee2daa929fc
+│   │   │   └── e05b4c4c8f6948e33f91b448ac01038cf26a71
+│   │   ├── 9e
+│   │   │   └── 07ecf1a0636ea25718aa105fbfb972dd906d86
+│   │   ├── a0
+│   │   │   └── 21b895edd3749d0e3ad2099a82196bc3e71328
+│   │   ├── a3
+│   │   │   └── 28d930aa5a8d6c82311e9ec5159aae2ca55179
+│   │   ├── a7
+│   │   │   └── 4a834ce60a6fb0baa04e61d4429dd8b39cbb3f
+│   │   ├── ab
+│   │   │   └── f3520ec9ef97913acb4c0121f16b3c1f54ca5f
+│   │   ├── ac
+│   │   │   ├── 06e26b65864c84e53a90c46b955f366ca409c2
+│   │   │   └── 34cff563d289a8f84a4d6d2d225db1f42cb1c1
+│   │   ├── ad
+│   │   │   ├── 514760123bdd96e6e7f02554575bad25caf467
+│   │   │   └── ecdad3331ccdfd41ac3295d14240d0b6d9d560
+│   │   ├── ae
+│   │   │   ├── 1d5c5c2314920ad807523273351f762b7f5a1b
+│   │   │   ├── 5e3241b7816543c25e7977be44f6f6040cc5eb
+│   │   │   ├── a12759ab643e1cabb34260c5ee4db35a552f3e
+│   │   │   └── df76ddf7b2ee5badcf66f94f95ceed85ace320
+│   │   ├── af
+│   │   │   └── ca091335c699209d3ac90860c6fc23a4c6399e
+│   │   ├── b0
+│   │   │   ├── 51ba663550d39c538ce2fa2d2955aedfdaa748
+│   │   │   ├── 72148c6a9fe2d2834219091a5e2b7e816cab77
+│   │   │   ├── 98425622f29df282a7b5e47279ec32d03c5743
+│   │   │   └── bab03644f2bf329d7335b6d9a0fdd5247dd003
+│   │   ├── b1
+│   │   │   ├── a542bfde58f88cd4f5d1e6a58a254b642de3ec
+│   │   │   ├── bd38b62a0800a4f6a80c34e21c5acffae52c7e
+│   │   │   └── f31a5d9c71630040a5a11427892e93e6cdf5b5
+│   │   ├── b3
+│   │   │   ├── 1bf4a31895faf9c5ea926db908af1187de4f0a
+│   │   │   ├── 3cbe9ab704e977b559d07c7d90d2d98dece136
+│   │   │   └── 5f567c2b995ac6939f38bb02d9c14ef707dde9
+│   │   ├── b4
+│   │   │   └── 70533ebe66d83c65ee3d806a050e32663a14f3
+│   │   ├── b5
+│   │   │   └── 7b4710caec344ceac1ee3088b0e4afe9f7fb36
+│   │   ├── b6
+│   │   │   └── 108d1acff4d8b675eb3db0cbf32738d10771fb
+│   │   ├── b7
+│   │   │   ├── ade0cbc6d3056d34881d9c98e36b204cda98b0
+│   │   │   └── eb42cb4befc0bf9b78e30d5e0028f72ff02af7
+│   │   ├── b8
+│   │   │   └── 10ce5d3bef375d0cbbd48d0a9f7d2c9d84ba26
+│   │   ├── b9
+│   │   │   └── 7c3f130257ad9a47ff141080df51e35d3c412b
+│   │   ├── ba
+│   │   │   └── 51a21dc41b4d98ed384c69368b3fab8946d8b4
+│   │   ├── bb
+│   │   │   ├── 15e726a2cb9d14999538b276f88832f1ee7fe4
+│   │   │   ├── 2a4633e21447e65fbcc3b083f1ce3a748f0f2d
+│   │   │   ├── f9902f59d1f8ccaccdae4552d1c0764eb46606
+│   │   │   └── fcd1a85ae82de3baae4e24a1018621d49a6de1
+│   │   ├── bc
+│   │   │   ├── 6e7f82dea242d0497a3d64bbaa940958b99dae
+│   │   │   └── e66c8666004929d273aa508c8079ead798cd44
+│   │   ├── be
+│   │   │   ├── 6d5742ddc4123e1fc3d56cab7ff508b7b3c6f6
+│   │   │   └── a2036ed3c4faec4bed286d00fe76f2597218aa
+│   │   ├── c0
+│   │   │   └── 36733bdc259a5c6dd84d831a01bce351c12118
+│   │   ├── c1
+│   │   │   ├── 27f2b2d6eba878d7f6eed0d12f6bcbf75ff8d6
+│   │   │   └── d84720f5a43611456180362ab377aa0d349819
+│   │   ├── c3
+│   │   │   ├── 319ab68ab69c03d74b90d8d9ae12015687dbe4
+│   │   │   └── a04b9ca460ed2e4838171bf4ff88815a5151a7
+│   │   ├── c4
+│   │   │   └── a51d85ac58b8613064b81f759614d781aa9b9a
+│   │   ├── c5
+│   │   │   ├── 004c45b873866803f292d90323d8c10cbb7bab
+│   │   │   ├── 3da72f0be833208e7fcff488d646cd680a78e9
+│   │   │   ├── 72f6d3ac8111f0a9316b6389292d252f324899
+│   │   │   ├── 7775b1fca64636d3a7bf816378899c962cb76d
+│   │   │   └── c94cb1826d9f8c1fb619d6e82ef976d0f8b5d4
+│   │   ├── c6
+│   │   │   └── 0854916978341af7b32095eaa1d8125286b6b8
+│   │   ├── c7
+│   │   │   └── a9d363ca160dae1b189f3df84bda0256b6b284
+│   │   ├── c8
+│   │   │   ├── 4b47a399279cf96d8b000d805dfb4b3d51b431
+│   │   │   ├── 986601bb02a0225cd25a7279b2076c78a275cf
+│   │   │   └── e0cc7355117ceda0ec2bbe0038a294bbf4def0
+│   │   ├── c9
+│   │   │   ├── b00ef5d591847835a030d086770ea44df72f3d
+│   │   │   ├── c5c5a82307aa989c5b955993c090900b1da852
+│   │   │   └── e50b3b9bb92a0edbc26794e083483bf7803ef3
+│   │   ├── cc
+│   │   │   ├── 55025b5041bb7079b65b965be8f4e96a42d030
+│   │   │   ├── 5d570c642c38914578661c96dccbf692baaef5
+│   │   │   └── e07584ee48611d7e704f81011e57d544f2803b
+│   │   ├── cd
+│   │   │   └── 16728dcf69725082f8c0ceb1a741160dc4fd64
+│   │   ├── ce
+│   │   │   └── f25319606dc90bdcc51da45982579c38772d9b
+│   │   ├── cf
+│   │   │   └── f5a46c384f1bc20092924611594939f5c7ee2b
+│   │   ├── d0
+│   │   │   └── 01bc8de029a947577e02b3d23436acef26364c
+│   │   ├── d1
+│   │   │   └── f07c199fcd91384a387a5d0c3aff8aad7de6b1
+│   │   ├── d3
+│   │   │   ├── 58f60cb2c343cb693553e29f5a69ad1f7a0bc6
+│   │   │   ├── 8afb67cf88c2f4ff33bdb23f9b3a72e623a672
+│   │   │   └── c77388ac5b8d64f679bb8ffcf8a62be4b7a6dc
+│   │   ├── d4
+│   │   │   └── dad605f6924cdfd270210aa1ff111045674320
+│   │   ├── d6
+│   │   │   ├── 773df698d3fe0a4dbfd9a27af3f69482e7d1bf
+│   │   │   └── afbe56ea92ef523b1c5ca9b06030a98a7e9e91
+│   │   ├── d7
+│   │   │   └── 997ebad9f5d9a9dddf6435288e75c6881ccf1c
+│   │   ├── d8
+│   │   │   └── 7daa5b8d3cef9a07666b0a51a3e7e67241d55f
+│   │   ├── d9
+│   │   │   ├── 06bc8170ba0dca58b6f26ccf84285021bd943a
+│   │   │   └── 7ba9833c08c9a33b251e16aeac6fb983a5a032
+│   │   ├── da
+│   │   │   ├── 285f6e316abe608f15deb33059f55656e07b9a
+│   │   │   └── 5dd84c3948ffa82a0e90c8750ed35d0dfac504
+│   │   ├── db
+│   │   │   ├── 39eba0b8149535b7893a32e3d83055c75e8cc7
+│   │   │   └── e6db5915217788aea2f71762bc24f2144d787b
+│   │   ├── dc
+│   │   │   └── 7f9a2289e510c450b9f12dc7232a8a42a985f6
+│   │   ├── dd
+│   │   │   └── 8ed7878b51517bb7e0722b1807f0fd2eda53b4
+│   │   ├── de
+│   │   │   ├── 023505c78a0e30851264dd31e6ecab58cb53f1
+│   │   │   ├── c3e6b59cfd9dc3026281c9bdc4722214319424
+│   │   │   └── f73d7cd2fae7ef26854b73e2a174f6266a56d1
+│   │   ├── e0
+│   │   │   ├── 6a0f88ecf273cfa0d63b8929330c07a5f7d659
+│   │   │   └── 798671387a9859b7217d384cb6e29b9ac4a3d6
+│   │   ├── e1
+│   │   │   └── 2eaef5d6a08a76cf99ae630d1bb36823bbed1b
+│   │   ├── e2
+│   │   │   └── 7a81cacfcf57dbc8fa189e77749a44d78f3551
+│   │   ├── e3
+│   │   │   ├── 874ac0fa17f1ba1668353f51b4576a29de6d1a
+│   │   │   └── c65c75e3dc5e3223d104513e856e5c104876bd
+│   │   ├── e5
+│   │   │   └── 0279ea23462a4d8edf94b31e8e3f46ac61f4eb
+│   │   ├── e6
+│   │   │   ├── 585043086f542ecf1870895ddfbfeca215d91c
+│   │   │   └── 9de29bb2d1d6434b8b29ae775ad8c2e48c5391
+│   │   ├── e8
+│   │   │   ├── 0a72a7c81d273cbaf0cc11158a7cf8fcb627e0
+│   │   │   └── c2e8c391d632d65c54724e95539d9346ed6185
+│   │   ├── e9
+│   │   │   └── ac2912087708c0723b09609d97ecc3b6adfeba
+│   │   ├── ea
+│   │   │   └── bf209932629ea164057639e39bfe5eece213d1
+│   │   ├── ec
+│   │   │   ├── 159ffb60ac72e1ad8f2e5b2c26dd4274b0440c
+│   │   │   ├── 6a9704a13acf2a9774bea8d080fc8df0e3d919
+│   │   │   ├── ce69985b769d770d7162a42c0233d410de1284
+│   │   │   └── fb123d6ff14f2c56790ba7b8d28fcb89781248
+│   │   ├── ed
+│   │   │   ├── 53e8b94d18a5eaa332995a0a9a4b17c2c3b168
+│   │   │   ├── 6ddd0f32f5b8b137011ac97aa401dcfce3ec7b
+│   │   │   ├── 72a91f7c94beda0279c3f6ad93ea77046fa063
+│   │   │   └── c05d62f809328972933554b57943becc4e874e
+│   │   ├── ee
+│   │   │   ├── 2ce22f94718f4a4fecef912b37fe9af68affae
+│   │   │   └── 8c92406a7e224568d9877feee559850a3ca649
+│   │   ├── ef
+│   │   │   ├── 83d87d1201b1742c871c5f8e6eb329081460c6
+│   │   │   └── c57355da83093172a6ae1af87ab4bcb083389f
+│   │   ├── f0
+│   │   │   ├── 860ebf79a9563881fa074921eec49db313294e
+│   │   │   └── f03cdee8fb284108e78fa01cd56cf8f79c9c50
+│   │   ├── f2
+│   │   │   └── 88702d2fa16d3cdf0035b15a9fcbc552cd88e7
+│   │   ├── f4
+│   │   │   ├── 2244b799891dbabcacc395adc7713a05110bc4
+│   │   │   └── d3d11da19ada18dd5f6d60fe26fef064269b7d
+│   │   ├── f5
+│   │   │   ├── 32556c37493145752295eb4d2cef0c993111a3
+│   │   │   ├── 7f75acd3accb9b4ab4c92fe9fd8fbf9d3e05ad
+│   │   │   └── ddded04025b9d1327ed6dc20558e388d33eab4
+│   │   ├── f7
+│   │   │   └── 6f2b77354e15e1845605de6a6266c69c389a05
+│   │   ├── f8
+│   │   │   ├── a2bc19be1bdd5d52ab5f5e13d4ff9b05527a57
+│   │   │   ├── dc3519349e34f7249b0c7ed977e3701497c3ee
+│   │   │   └── f5b5774cfe5238f763799759c6f153e6d0a69a
+│   │   ├── f9
+│   │   │   ├── 44b3f1eb192d5b2f7ffc717fe47b27b72642bc
+│   │   │   └── d3950c5ffdf0e786cee1593d492a06272349fb
+│   │   ├── fa
+│   │   │   └── 60bc0f8187c0f2815abaeb78c8857765a90d54
+│   │   ├── fb
+│   │   │   ├── 3a082d9c01df3b441bee4449a0e29ddc6279bd
+│   │   │   └── c9f03209479050804ce8c79fcc49cd9d770792
+│   │   ├── fc
+│   │   │   └── 18b7a068f474aeee2c001e39f2ecdbb899255a
+│   │   ├── fd
+│   │   │   └── 44138675015f52c3935ee8ef014fc1fa0f0712
+│   │   ├── fe
+│   │   │   └── a66042d74e54935fb456b29d1b1960bc1e0af4
+│   │   ├── info
+│   │   └── pack
+│   │       ├── pack-9c1b7863390358e3c57322dab381c4e8cea4ff5f.idx
+│   │       └── pack-9c1b7863390358e3c57322dab381c4e8cea4ff5f.pack
+│   └── refs
+│       ├── heads
+│       │   └── main
+│       ├── remotes
+│       │   └── origin
+│       │       └── main
+│       └── tags
+├── .gitignore
+├── LICENSE
+├── LinStack
+│   ├── build
+│   │   ├── CMakeCache.txt
+│   │   ├── CMakeFiles
+│   │   │   ├── 4.3.0
+│   │   │   │   ├── CMakeCCompiler.cmake
+│   │   │   │   ├── CMakeCXXCompiler.cmake
+│   │   │   │   ├── CMakeDetermineCompilerABI_C.bin
+│   │   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
+│   │   │   │   ├── CMakeSystem.cmake
+│   │   │   │   ├── CompilerIdC
+│   │   │   │   │   ├── a.out
+│   │   │   │   │   ├── CMakeCCompilerId.c
+│   │   │   │   │   └── tmp
+│   │   │   │   └── CompilerIdCXX
+│   │   │   │       ├── a.out
+│   │   │   │       ├── CMakeCXXCompilerId.cpp
+│   │   │   │       └── tmp
+│   │   │   ├── cmake.check_cache
+│   │   │   ├── CMakeConfigureLog.yaml
+│   │   │   ├── CMakeDirectoryInformation.cmake
+│   │   │   ├── CMakeRuleHashes.txt
+│   │   │   ├── CMakeScratch
+│   │   │   ├── InstallScripts.json
+│   │   │   ├── LinStack_autogen.dir
+│   │   │   │   ├── AutogenInfo.json
+│   │   │   │   ├── AutogenUsed.txt
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.internal
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   ├── ParseCache.txt
+│   │   │   │   └── progress.make
+│   │   │   ├── LinStack_autogen_timestamp_deps.dir
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   └── progress.make
+│   │   │   ├── LinStack.dir
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.internal
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   ├── depend.make
+│   │   │   │   ├── flags.make
+│   │   │   │   ├── link.txt
+│   │   │   │   ├── LinStack_autogen
+│   │   │   │   │   ├── mocs_compilation.cpp.o
+│   │   │   │   │   └── mocs_compilation.cpp.o.d
+│   │   │   │   ├── progress.make
+│   │   │   │   └── src
+│   │   │   │       ├── AndroidCanvas.cpp.o.d
+│   │   │   │       ├── LinStackCompositor.cpp.o
+│   │   │   │       └── LinStackCompositor.cpp.o.d
+│   │   │   ├── Makefile2
+│   │   │   ├── Makefile.cmake
+│   │   │   ├── pkgRedirects
+│   │   │   ├── Progress
+│   │   │   │   ├── 1
+│   │   │   │   ├── 11
+│   │   │   │   ├── 18
+│   │   │   │   ├── 19
+│   │   │   │   ├── 20
+│   │   │   │   ├── 21
+│   │   │   │   ├── 22
+│   │   │   │   ├── 23
+│   │   │   │   ├── 24
+│   │   │   │   ├── 25
+│   │   │   │   ├── 26
+│   │   │   │   ├── 27
+│   │   │   │   ├── 28
+│   │   │   │   ├── 29
+│   │   │   │   ├── 30
+│   │   │   │   ├── 31
+│   │   │   │   └── count.txt
+│   │   │   ├── progress.marks
+│   │   │   ├── TargetDirectories.txt
+│   │   │   ├── wlroots_engine_lib_autogen.dir
+│   │   │   │   ├── AutogenInfo.json
+│   │   │   │   ├── AutogenUsed.txt
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.internal
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   ├── ParseCache.txt
+│   │   │   │   └── progress.make
+│   │   │   ├── wlroots_engine_lib_autogen_timestamp_deps.dir
+│   │   │   │   ├── build.make
+│   │   │   │   ├── cmake_clean.cmake
+│   │   │   │   ├── compiler_depend.make
+│   │   │   │   ├── compiler_depend.ts
+│   │   │   │   ├── DependInfo.cmake
+│   │   │   │   └── progress.make
+│   │   │   └── wlroots_engine_lib.dir
+│   │   │       ├── build.make
+│   │   │       ├── cmake_clean.cmake
+│   │   │       ├── cmake_clean_target.cmake
+│   │   │       ├── compiler_depend.internal
+│   │   │       ├── compiler_depend.make
+│   │   │       ├── compiler_depend.ts
+│   │   │       ├── DependInfo.cmake
+│   │   │       ├── depend.make
+│   │   │       ├── flags.make
+│   │   │       ├── home
+│   │   │       │   └── muhammad
+│   │   │       │       └── Downloads
+│   │   │       │           └── LinStack
+│   │   │       │               └── wlroots_engine
+│   │   │       │                   └── src
+│   │   │       │                       ├── AspectRatioWindow.cpp.o
+│   │   │       │                       ├── AspectRatioWindow.cpp.o.d
+│   │   │       │                       ├── EmbeddedCompositor.cpp.o
+│   │   │       │                       ├── EmbeddedCompositor.cpp.o.d
+│   │   │       │                       ├── InputMapper.cpp.o
+│   │   │       │                       ├── InputMapper.cpp.o.d
+│   │   │       │                       ├── WaylandSurfaceRenderer.cpp.o
+│   │   │       │                       └── WaylandSurfaceRenderer.cpp.o.d
+│   │   │       ├── link.txt
+│   │   │       ├── progress.make
+│   │   │       ├── protocols
+│   │   │       │   ├── linux-dmabuf-v1-protocol.c.o
+│   │   │       │   ├── linux-dmabuf-v1-protocol.c.o.d
+│   │   │       │   ├── xdg-shell-protocol.c.o
+│   │   │       │   └── xdg-shell-protocol.c.o.d
+│   │   │       └── wlroots_engine_lib_autogen
+│   │   │           ├── mocs_compilation.cpp.o
+│   │   │           └── mocs_compilation.cpp.o.d
+│   │   ├── cmake_install.cmake
+│   │   ├── install_manifest.txt
+│   │   ├── keymap_default.json
+│   │   ├── libwlroots_engine_lib.a
+│   │   ├── LinStack_autogen
+│   │   │   ├── deps
+│   │   │   ├── include
+│   │   │   ├── moc_predefs.h
+│   │   │   ├── mocs_compilation.cpp
+│   │   │   ├── timestamp
+│   │   │   └── UVLADIE3JM
+│   │   │       ├── moc_AndroidCanvas.cpp
+│   │   │       ├── moc_AndroidCanvas.cpp.d
+│   │   │       ├── moc_DiagnosticsEngine.cpp
+│   │   │       ├── moc_DiagnosticsEngine.cpp.d
+│   │   │       ├── moc_InputTranslator.cpp
+│   │   │       ├── moc_InputTranslator.cpp.d
+│   │   │       ├── moc_KeymapperOverlay.cpp
+│   │   │       ├── moc_KeymapperOverlay.cpp.d
+│   │   │       ├── moc_LinstackService.cpp
+│   │   │       ├── moc_LinstackService.cpp.d
+│   │   │       ├── moc_Logger.cpp
+│   │   │       ├── moc_Logger.cpp.d
+│   │   │       ├── moc_MainWindow.cpp
+│   │   │       ├── moc_MainWindow.cpp.d
+│   │   │       ├── moc_SelfHealingManager.cpp
+│   │   │       ├── moc_SelfHealingManager.cpp.d
+│   │   │       ├── moc_SettingsDialog.cpp
+│   │   │       ├── moc_SettingsDialog.cpp.d
+│   │   │       ├── moc_SideToolBar.cpp
+│   │   │       ├── moc_SideToolBar.cpp.d
+│   │   │       ├── moc_TitleBar.cpp
+│   │   │       ├── moc_TitleBar.cpp.d
+│   │   │       ├── moc_UInputTouchBridge.cpp
+│   │   │       └── moc_UInputTouchBridge.cpp.d
+│   │   ├── Makefile
+│   │   ├── protocols
+│   │   │   ├── linux-dmabuf-v1-protocol.c
+│   │   │   ├── linux-dmabuf-v1-protocol.h
+│   │   │   ├── xdg-shell-protocol.c
+│   │   │   └── xdg-shell-protocol.h
+│   │   ├── .qt
+│   │   │   ├── QtDeploySupport.cmake
+│   │   │   └── QtDeployTargets.cmake
+│   │   └── wlroots_engine_lib_autogen
+│   │       ├── deps
+│   │       ├── include
+│   │       ├── moc_predefs.h
+│   │       ├── mocs_compilation.cpp
+│   │       └── timestamp
+│   ├── CMakeLists.txt
+│   ├── LinStack_core
+│   │   ├── .abstruse.yml
+│   │   ├── data
+│   │   │   ├── AppIcon.png
+│   │   │   ├── configs
+│   │   │   │   ├── apparmor_profiles
+│   │   │   │   │   ├── adbd
+│   │   │   │   │   ├── android_app
+│   │   │   │   │   └── lxc-linstack
+│   │   │   │   ├── config_1
+│   │   │   │   ├── config_3
+│   │   │   │   ├── config_4
+│   │   │   │   ├── config_base
+│   │   │   │   └── linstack.seccomp
+│   │   │   ├── id.linstack.linstack.metainfo.xml
+│   │   │   ├── linstack.app.install.desktop
+│   │   │   ├── Linstack.desktop
+│   │   │   ├── linstack.directory
+│   │   │   ├── linstack.market.desktop
+│   │   │   ├── linstack.menu
+│   │   │   └── scripts
+│   │   │       ├── linstack-net.sh
+│   │   │       └── linstack-post-stop.sh
+│   │   ├── dbus
+│   │   │   ├── id.linstack.Container.conf
+│   │   │   ├── id.linstack.Container.policy
+│   │   │   └── id.linstack.Container.service
+│   │   ├── debian
+│   │   │   ├── changelog
+│   │   │   ├── compat
+│   │   │   ├── control
+│   │   │   ├── copyright
+│   │   │   ├── linstack.postinst
+│   │   │   ├── rules
+│   │   │   └── source
+│   │   │       └── format
+│   │   ├── FUNDING.yml
+│   │   ├── .gitignore
+│   │   ├── LICENSE
+│   │   ├── linstack.py
+│   │   ├── Makefile
+│   │   ├── pyproject.toml
+│   │   ├── rebrand.py
+│   │   ├── systemd
+│   │   │   └── linstack-container.service
+│   │   └── tools
+│   │       ├── actions
+│   │       │   ├── app_manager.py
+│   │       │   ├── bugreport.py
+│   │       │   ├── container_manager.py
+│   │       │   ├── initializer.py
+│   │       │   ├── __init__.py
+│   │       │   ├── prop.py
+│   │       │   ├── __pycache__
+│   │       │   │   ├── app_manager.cpython-314.pyc
+│   │       │   │   ├── app_manager.cpython-315.pyc
+│   │       │   │   ├── bugreport.cpython-314.pyc
+│   │       │   │   ├── bugreport.cpython-315.pyc
+│   │       │   │   ├── container_manager.cpython-314.pyc
+│   │       │   │   ├── container_manager.cpython-315.pyc
+│   │       │   │   ├── __init__.cpython-314.pyc
+│   │       │   │   ├── __init__.cpython-315.pyc
+│   │       │   │   ├── initializer.cpython-314.pyc
+│   │       │   │   ├── initializer.cpython-315.pyc
+│   │       │   │   ├── prop.cpython-314.pyc
+│   │       │   │   ├── prop.cpython-315.pyc
+│   │       │   │   ├── session_manager.cpython-314.pyc
+│   │       │   │   ├── session_manager.cpython-315.pyc
+│   │       │   │   ├── status.cpython-314.pyc
+│   │       │   │   ├── status.cpython-315.pyc
+│   │       │   │   ├── upgrader.cpython-314.pyc
+│   │       │   │   └── upgrader.cpython-315.pyc
+│   │       │   ├── session_manager.py
+│   │       │   ├── status.py
+│   │       │   └── upgrader.py
+│   │       ├── config
+│   │       │   ├── __init__.py
+│   │       │   ├── load.py
+│   │       │   ├── __pycache__
+│   │       │   │   ├── __init__.cpython-314.pyc
+│   │       │   │   ├── __init__.cpython-315.pyc
+│   │       │   │   ├── load.cpython-314.pyc
+│   │       │   │   ├── load.cpython-315.pyc
+│   │       │   │   ├── save.cpython-314.pyc
+│   │       │   │   └── save.cpython-315.pyc
+│   │       │   └── save.py
+│   │       ├── helpers
+│   │       │   ├── arch.py
+│   │       │   ├── arguments.py
+│   │       │   ├── drivers.py
+│   │       │   ├── gpu.py
+│   │       │   ├── http.py
+│   │       │   ├── images.py
+│   │       │   ├── __init__.py
+│   │       │   ├── ipc.py
+│   │       │   ├── logging.py
+│   │       │   ├── lxc.py
+│   │       │   ├── mount.py
+│   │       │   ├── net.py
+│   │       │   ├── props.py
+│   │       │   ├── protocol.py
+│   │       │   ├── __pycache__
+│   │       │   │   ├── arch.cpython-314.pyc
+│   │       │   │   ├── arch.cpython-315.pyc
+│   │       │   │   ├── arguments.cpython-314.pyc
+│   │       │   │   ├── arguments.cpython-315.pyc
+│   │       │   │   ├── drivers.cpython-314.pyc
+│   │       │   │   ├── drivers.cpython-315.pyc
+│   │       │   │   ├── gpu.cpython-314.pyc
+│   │       │   │   ├── gpu.cpython-315.pyc
+│   │       │   │   ├── http.cpython-314.pyc
+│   │       │   │   ├── http.cpython-315.pyc
+│   │       │   │   ├── images.cpython-314.pyc
+│   │       │   │   ├── images.cpython-315.pyc
+│   │       │   │   ├── __init__.cpython-314.pyc
+│   │       │   │   ├── __init__.cpython-315.pyc
+│   │       │   │   ├── ipc.cpython-314.pyc
+│   │       │   │   ├── ipc.cpython-315.pyc
+│   │       │   │   ├── logging.cpython-314.pyc
+│   │       │   │   ├── logging.cpython-315.pyc
+│   │       │   │   ├── lxc.cpython-314.pyc
+│   │       │   │   ├── lxc.cpython-315.pyc
+│   │       │   │   ├── mount.cpython-314.pyc
+│   │       │   │   ├── mount.cpython-315.pyc
+│   │       │   │   ├── net.cpython-314.pyc
+│   │       │   │   ├── net.cpython-315.pyc
+│   │       │   │   ├── props.cpython-314.pyc
+│   │       │   │   ├── props.cpython-315.pyc
+│   │       │   │   ├── protocol.cpython-314.pyc
+│   │       │   │   ├── protocol.cpython-315.pyc
+│   │       │   │   ├── run_core.cpython-314.pyc
+│   │       │   │   ├── run_core.cpython-315.pyc
+│   │       │   │   ├── run.cpython-314.pyc
+│   │       │   │   ├── run.cpython-315.pyc
+│   │       │   │   ├── version.cpython-314.pyc
+│   │       │   │   └── version.cpython-315.pyc
+│   │       │   ├── run_core.py
+│   │       │   ├── run.py
+│   │       │   └── version.py
+│   │       ├── __init__.py
+│   │       ├── interfaces
+│   │       │   ├── IClipboard.py
+│   │       │   ├── IHardware.py
+│   │       │   ├── INotificationCallback.py
+│   │       │   ├── INotifications.py
+│   │       │   ├── IPlatform.py
+│   │       │   ├── IStatusBarService.py
+│   │       │   ├── IUserMonitor.py
+│   │       │   └── __pycache__
+│   │       │       ├── IClipboard.cpython-314.pyc
+│   │       │       ├── IClipboard.cpython-315.pyc
+│   │       │       ├── IHardware.cpython-314.pyc
+│   │       │       ├── IHardware.cpython-315.pyc
+│   │       │       ├── INotificationCallback.cpython-314.pyc
+│   │       │       ├── INotificationCallback.cpython-315.pyc
+│   │       │       ├── INotifications.cpython-314.pyc
+│   │       │       ├── INotifications.cpython-315.pyc
+│   │       │       ├── IPlatform.cpython-314.pyc
+│   │       │       ├── IPlatform.cpython-315.pyc
+│   │       │       ├── IStatusBarService.cpython-314.pyc
+│   │       │       ├── IStatusBarService.cpython-315.pyc
+│   │       │       ├── IUserMonitor.cpython-314.pyc
+│   │       │       └── IUserMonitor.cpython-315.pyc
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-314.pyc
+│   │       │   └── __init__.cpython-315.pyc
+│   │       └── services
+│   │           ├── clipboard_manager.py
+│   │           ├── hardware_manager.py
+│   │           ├── __init__.py
+│   │           ├── notification_manager.py
+│   │           ├── __pycache__
+│   │           │   ├── clipboard_manager.cpython-314.pyc
+│   │           │   ├── clipboard_manager.cpython-315.pyc
+│   │           │   ├── hardware_manager.cpython-314.pyc
+│   │           │   ├── hardware_manager.cpython-315.pyc
+│   │           │   ├── __init__.cpython-314.pyc
+│   │           │   ├── __init__.cpython-315.pyc
+│   │           │   ├── notification_manager.cpython-314.pyc
+│   │           │   ├── notification_manager.cpython-315.pyc
+│   │           │   ├── user_manager.cpython-314.pyc
+│   │           │   └── user_manager.cpython-315.pyc
+│   │           └── user_manager.py
+│   ├── resources
+│   │   ├── system.img
+│   │   └── vendor.img
+│   └── src
+│       ├── AndroidCanvas.cpp
+│       ├── AndroidCanvas.h
+│       ├── CMakeLists.txt
+│       ├── DiagnosticsEngine.cpp
+│       ├── DiagnosticsEngine.h
+│       ├── InputTranslator.cpp
+│       ├── InputTranslator.h
+│       ├── KeymapperOverlay.cpp
+│       ├── KeymapperOverlay.h
+│       ├── LinStackCompositor.cpp
+│       ├── LinStackCompositor.h
+│       ├── LinstackService.cpp
+│       ├── LinstackService.h
+│       ├── Logger.cpp
+│       ├── Logger.h
+│       ├── main.cpp
+│       ├── MainWindow.cpp
+│       ├── MainWindow.h
+│       ├── PathResolver.cpp
+│       ├── PathResolver.h
+│       ├── ScriptEngine.cpp
+│       ├── ScriptEngine.h
+│       ├── SelfHealingManager.cpp
+│       ├── SelfHealingManager.h
+│       ├── SettingsDialog.cpp
+│       ├── SettingsDialog.h
+│       ├── SideToolBar.cpp
+│       ├── SideToolBar.h
+│       ├── Theme.cpp
+│       ├── Theme.h
+│       ├── TitleBar.cpp
+│       ├── TitleBar.h
+│       ├── UInputTouchBridge.cpp
+│       └── UInputTouchBridge.h
+├── rebrand.py
+├── structure.sh
+├── waydroid_script
+│   ├── assets
+│   │   ├── 1.png
+│   │   ├── 2.png
+│   │   ├── 3.png
+│   │   ├── 4.png
+│   │   ├── 5.png
+│   │   ├── 6.png
+│   │   ├── 7.png
+│   │   ├── 8.png
+│   │   ├── 9.png
+│   │   └── img
+│   │       └── README
+│   │           ├── image-20230430013103883.png
+│   │           ├── image-20230430013119763.png
+│   │           └── image-20230430013148814.png
+│   ├── bin
+│   │   ├── arm64-v8a
+│   │   │   └── resetprop
+│   │   ├── armeabi-v7a
+│   │   │   └── resetprop
+│   │   ├── x86
+│   │   │   └── resetprop
+│   │   └── x86_64
+│   │       └── resetprop
+│   ├── default.nix
+│   ├── flake.lock
+│   ├── flake.nix
+│   ├── .gitignore
+│   ├── LICENSE
+│   ├── main.py
+│   ├── package.nix
+│   ├── README.md
+│   ├── rebrand.py
+│   ├── requirements.txt
+│   ├── stuff
+│   │   ├── android_id.py
+│   │   ├── fdroidpriv.py
+│   │   ├── gapps.py
+│   │   ├── general.py
+│   │   ├── hidestatusbar.py
+│   │   ├── houdini.py
+│   │   ├── magisk.py
+│   │   ├── microg.py
+│   │   ├── mitm.py
+│   │   ├── ndk.py
+│   │   ├── nodataperm.py
+│   │   ├── __pycache__
+│   │   │   ├── android_id.cpython-314.pyc
+│   │   │   ├── fdroidpriv.cpython-314.pyc
+│   │   │   ├── gapps.cpython-314.pyc
+│   │   │   ├── general.cpython-314.pyc
+│   │   │   ├── hidestatusbar.cpython-314.pyc
+│   │   │   ├── houdini.cpython-314.pyc
+│   │   │   ├── magisk.cpython-314.pyc
+│   │   │   ├── microg.cpython-314.pyc
+│   │   │   ├── mitm.cpython-314.pyc
+│   │   │   ├── ndk.cpython-314.pyc
+│   │   │   ├── nodataperm.cpython-314.pyc
+│   │   │   ├── smartdock.cpython-314.pyc
+│   │   │   └── widevine.cpython-314.pyc
+│   │   ├── smartdock.py
+│   │   └── widevine.py
+│   ├── tools
+│   │   ├── container.py
+│   │   ├── helper.py
+│   │   ├── images.py
+│   │   ├── logger.py
+│   │   └── __pycache__
+│   │       ├── container.cpython-314.pyc
+│   │       ├── helper.cpython-314.pyc
+│   │       ├── images.cpython-314.pyc
+│   │       └── logger.cpython-314.pyc
+│   └── venv
+│       ├── bin
+│       │   ├── activate
+│       │   ├── activate.csh
+│       │   ├── activate.fish
+│       │   ├── Activate.ps1
+│       │   ├── idna
+│       │   ├── normalizer
+│       │   ├── pip
+│       │   ├── pip3
+│       │   ├── pip3.14
+│       │   ├── python -> python3
+│       │   ├── python3 -> /usr/bin/python3
+│       │   ├── python3.14 -> python3
+│       │   ├── tqdm
+│       │   └── 𝜋thon -> python3
+│       ├── .gitignore
+│       ├── include
+│       ├── lib
+│       │   └── python3.14
+│       │       └── site-packages
+│       │           ├── certifi
+│       │           │   ├── cacert.pem
+│       │           │   ├── core.py
+│       │           │   ├── __init__.py
+│       │           │   ├── __main__.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── core.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   └── __main__.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   └── tests
+│       │           │       ├── __init__.py
+│       │           │       ├── __pycache__
+│       │           │       │   ├── __init__.cpython-314.pyc
+│       │           │       │   └── test_certify.cpython-314.pyc
+│       │           │       └── test_certify.py
+│       │           ├── certifi-2026.7.22.dist-info
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   └── LICENSE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── top_level.txt
+│       │           │   └── WHEEL
+│       │           ├── charset_normalizer
+│       │           │   ├── api.py
+│       │           │   ├── cd.cpython-314-x86_64-linux-gnu.so
+│       │           │   ├── cd.py
+│       │           │   ├── cli
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __main__.py
+│       │           │   │   └── __pycache__
+│       │           │   │       ├── __init__.cpython-314.pyc
+│       │           │   │       └── __main__.cpython-314.pyc
+│       │           │   ├── constant.py
+│       │           │   ├── __init__.py
+│       │           │   ├── legacy.py
+│       │           │   ├── __main__.py
+│       │           │   ├── md.cpython-314-x86_64-linux-gnu.so
+│       │           │   ├── md.py
+│       │           │   ├── models.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── api.cpython-314.pyc
+│       │           │   │   ├── cd.cpython-314.pyc
+│       │           │   │   ├── constant.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── legacy.cpython-314.pyc
+│       │           │   │   ├── __main__.cpython-314.pyc
+│       │           │   │   ├── md.cpython-314.pyc
+│       │           │   │   ├── models.cpython-314.pyc
+│       │           │   │   ├── utils.cpython-314.pyc
+│       │           │   │   └── version.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   ├── utils.py
+│       │           │   └── version.py
+│       │           ├── charset_normalizer-3.5.1.dist-info
+│       │           │   ├── entry_points.txt
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   └── LICENSE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── top_level.txt
+│       │           │   └── WHEEL
+│       │           ├── idna
+│       │           │   ├── cli.py
+│       │           │   ├── codec.py
+│       │           │   ├── compat.py
+│       │           │   ├── core.py
+│       │           │   ├── idnadata.py
+│       │           │   ├── __init__.py
+│       │           │   ├── intranges.py
+│       │           │   ├── __main__.py
+│       │           │   ├── package_data.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── cli.cpython-314.pyc
+│       │           │   │   ├── codec.cpython-314.pyc
+│       │           │   │   ├── compat.cpython-314.pyc
+│       │           │   │   ├── core.cpython-314.pyc
+│       │           │   │   ├── idnadata.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── intranges.cpython-314.pyc
+│       │           │   │   ├── __main__.cpython-314.pyc
+│       │           │   │   ├── package_data.cpython-314.pyc
+│       │           │   │   └── uts46data.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   └── uts46data.py
+│       │           ├── idna-3.19.dist-info
+│       │           │   ├── entry_points.txt
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   └── LICENSE.md
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   └── WHEEL
+│       │           ├── InquirerPy
+│       │           │   ├── base
+│       │           │   │   ├── complex.py
+│       │           │   │   ├── control.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── list.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── complex.cpython-314.pyc
+│       │           │   │   │   ├── control.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── list.cpython-314.pyc
+│       │           │   │   │   └── simple.cpython-314.pyc
+│       │           │   │   └── simple.py
+│       │           │   ├── containers
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── instruction.py
+│       │           │   │   ├── message.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── instruction.cpython-314.pyc
+│       │           │   │   │   ├── message.cpython-314.pyc
+│       │           │   │   │   ├── spinner.cpython-314.pyc
+│       │           │   │   │   └── validation.cpython-314.pyc
+│       │           │   │   ├── spinner.py
+│       │           │   │   └── validation.py
+│       │           │   ├── enum.py
+│       │           │   ├── exceptions.py
+│       │           │   ├── __init__.py
+│       │           │   ├── inquirer.py
+│       │           │   ├── prompts
+│       │           │   │   ├── checkbox.py
+│       │           │   │   ├── confirm.py
+│       │           │   │   ├── expand.py
+│       │           │   │   ├── filepath.py
+│       │           │   │   ├── fuzzy.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── input.py
+│       │           │   │   ├── list.py
+│       │           │   │   ├── number.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── checkbox.cpython-314.pyc
+│       │           │   │   │   ├── confirm.cpython-314.pyc
+│       │           │   │   │   ├── expand.cpython-314.pyc
+│       │           │   │   │   ├── filepath.cpython-314.pyc
+│       │           │   │   │   ├── fuzzy.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── input.cpython-314.pyc
+│       │           │   │   │   ├── list.cpython-314.pyc
+│       │           │   │   │   ├── number.cpython-314.pyc
+│       │           │   │   │   ├── rawlist.cpython-314.pyc
+│       │           │   │   │   └── secret.cpython-314.pyc
+│       │           │   │   ├── rawlist.py
+│       │           │   │   └── secret.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── enum.cpython-314.pyc
+│       │           │   │   ├── exceptions.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── inquirer.cpython-314.pyc
+│       │           │   │   ├── resolver.cpython-314.pyc
+│       │           │   │   ├── separator.cpython-314.pyc
+│       │           │   │   ├── utils.cpython-314.pyc
+│       │           │   │   └── validator.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   ├── resolver.py
+│       │           │   ├── separator.py
+│       │           │   ├── utils.py
+│       │           │   └── validator.py
+│       │           ├── inquirerpy-0.3.4.dist-info
+│       │           │   ├── INSTALLER
+│       │           │   ├── LICENSE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── REQUESTED
+│       │           │   └── WHEEL
+│       │           ├── pfzy
+│       │           │   ├── __init__.py
+│       │           │   ├── match.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── match.cpython-314.pyc
+│       │           │   │   ├── score.cpython-314.pyc
+│       │           │   │   └── types.cpython-314.pyc
+│       │           │   ├── score.py
+│       │           │   └── types.py
+│       │           ├── pfzy-0.3.4.dist-info
+│       │           │   ├── INSTALLER
+│       │           │   ├── LICENSE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   └── WHEEL
+│       │           ├── pip
+│       │           │   ├── __init__.py
+│       │           │   ├── _internal
+│       │           │   │   ├── build_env.py
+│       │           │   │   ├── cache.py
+│       │           │   │   ├── cli
+│       │           │   │   │   ├── autocompletion.py
+│       │           │   │   │   ├── base_command.py
+│       │           │   │   │   ├── cmdoptions.py
+│       │           │   │   │   ├── command_context.py
+│       │           │   │   │   ├── index_command.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── main_parser.py
+│       │           │   │   │   ├── main.py
+│       │           │   │   │   ├── parser.py
+│       │           │   │   │   ├── progress_bars.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── autocompletion.cpython-314.pyc
+│       │           │   │   │   │   ├── base_command.cpython-314.pyc
+│       │           │   │   │   │   ├── cmdoptions.cpython-314.pyc
+│       │           │   │   │   │   ├── command_context.cpython-314.pyc
+│       │           │   │   │   │   ├── index_command.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── main.cpython-314.pyc
+│       │           │   │   │   │   ├── main_parser.cpython-314.pyc
+│       │           │   │   │   │   ├── parser.cpython-314.pyc
+│       │           │   │   │   │   ├── progress_bars.cpython-314.pyc
+│       │           │   │   │   │   ├── req_command.cpython-314.pyc
+│       │           │   │   │   │   ├── spinners.cpython-314.pyc
+│       │           │   │   │   │   └── status_codes.cpython-314.pyc
+│       │           │   │   │   ├── req_command.py
+│       │           │   │   │   ├── spinners.py
+│       │           │   │   │   └── status_codes.py
+│       │           │   │   ├── commands
+│       │           │   │   │   ├── cache.py
+│       │           │   │   │   ├── check.py
+│       │           │   │   │   ├── completion.py
+│       │           │   │   │   ├── configuration.py
+│       │           │   │   │   ├── debug.py
+│       │           │   │   │   ├── download.py
+│       │           │   │   │   ├── freeze.py
+│       │           │   │   │   ├── hash.py
+│       │           │   │   │   ├── help.py
+│       │           │   │   │   ├── index.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── inspect.py
+│       │           │   │   │   ├── install.py
+│       │           │   │   │   ├── list.py
+│       │           │   │   │   ├── lock.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── cache.cpython-314.pyc
+│       │           │   │   │   │   ├── check.cpython-314.pyc
+│       │           │   │   │   │   ├── completion.cpython-314.pyc
+│       │           │   │   │   │   ├── configuration.cpython-314.pyc
+│       │           │   │   │   │   ├── debug.cpython-314.pyc
+│       │           │   │   │   │   ├── download.cpython-314.pyc
+│       │           │   │   │   │   ├── freeze.cpython-314.pyc
+│       │           │   │   │   │   ├── hash.cpython-314.pyc
+│       │           │   │   │   │   ├── help.cpython-314.pyc
+│       │           │   │   │   │   ├── index.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── inspect.cpython-314.pyc
+│       │           │   │   │   │   ├── install.cpython-314.pyc
+│       │           │   │   │   │   ├── list.cpython-314.pyc
+│       │           │   │   │   │   ├── lock.cpython-314.pyc
+│       │           │   │   │   │   ├── search.cpython-314.pyc
+│       │           │   │   │   │   ├── show.cpython-314.pyc
+│       │           │   │   │   │   ├── uninstall.cpython-314.pyc
+│       │           │   │   │   │   └── wheel.cpython-314.pyc
+│       │           │   │   │   ├── search.py
+│       │           │   │   │   ├── show.py
+│       │           │   │   │   ├── uninstall.py
+│       │           │   │   │   └── wheel.py
+│       │           │   │   ├── configuration.py
+│       │           │   │   ├── distributions
+│       │           │   │   │   ├── base.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── installed.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── installed.cpython-314.pyc
+│       │           │   │   │   │   ├── sdist.cpython-314.pyc
+│       │           │   │   │   │   └── wheel.cpython-314.pyc
+│       │           │   │   │   ├── sdist.py
+│       │           │   │   │   └── wheel.py
+│       │           │   │   ├── exceptions.py
+│       │           │   │   ├── index
+│       │           │   │   │   ├── collector.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── package_finder.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── collector.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── package_finder.cpython-314.pyc
+│       │           │   │   │   │   └── sources.cpython-314.pyc
+│       │           │   │   │   └── sources.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── locations
+│       │           │   │   │   ├── base.py
+│       │           │   │   │   ├── _distutils.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   │   ├── _distutils.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   └── _sysconfig.cpython-314.pyc
+│       │           │   │   │   └── _sysconfig.py
+│       │           │   │   ├── main.py
+│       │           │   │   ├── metadata
+│       │           │   │   │   ├── base.py
+│       │           │   │   │   ├── importlib
+│       │           │   │   │   │   ├── _compat.py
+│       │           │   │   │   │   ├── _dists.py
+│       │           │   │   │   │   ├── _envs.py
+│       │           │   │   │   │   ├── __init__.py
+│       │           │   │   │   │   └── __pycache__
+│       │           │   │   │   │       ├── _compat.cpython-314.pyc
+│       │           │   │   │   │       ├── _dists.cpython-314.pyc
+│       │           │   │   │   │       ├── _envs.cpython-314.pyc
+│       │           │   │   │   │       └── __init__.cpython-314.pyc
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── _json.py
+│       │           │   │   │   ├── pkg_resources.py
+│       │           │   │   │   └── __pycache__
+│       │           │   │   │       ├── base.cpython-314.pyc
+│       │           │   │   │       ├── __init__.cpython-314.pyc
+│       │           │   │   │       ├── _json.cpython-314.pyc
+│       │           │   │   │       └── pkg_resources.cpython-314.pyc
+│       │           │   │   ├── models
+│       │           │   │   │   ├── candidate.py
+│       │           │   │   │   ├── direct_url.py
+│       │           │   │   │   ├── format_control.py
+│       │           │   │   │   ├── index.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── installation_report.py
+│       │           │   │   │   ├── link.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── candidate.cpython-314.pyc
+│       │           │   │   │   │   ├── direct_url.cpython-314.pyc
+│       │           │   │   │   │   ├── format_control.cpython-314.pyc
+│       │           │   │   │   │   ├── index.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── installation_report.cpython-314.pyc
+│       │           │   │   │   │   ├── link.cpython-314.pyc
+│       │           │   │   │   │   ├── release_control.cpython-314.pyc
+│       │           │   │   │   │   ├── scheme.cpython-314.pyc
+│       │           │   │   │   │   ├── search_scope.cpython-314.pyc
+│       │           │   │   │   │   ├── selection_prefs.cpython-314.pyc
+│       │           │   │   │   │   ├── target_python.cpython-314.pyc
+│       │           │   │   │   │   └── wheel.cpython-314.pyc
+│       │           │   │   │   ├── release_control.py
+│       │           │   │   │   ├── scheme.py
+│       │           │   │   │   ├── search_scope.py
+│       │           │   │   │   ├── selection_prefs.py
+│       │           │   │   │   ├── target_python.py
+│       │           │   │   │   └── wheel.py
+│       │           │   │   ├── network
+│       │           │   │   │   ├── auth.py
+│       │           │   │   │   ├── cache.py
+│       │           │   │   │   ├── download.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── lazy_wheel.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── auth.cpython-314.pyc
+│       │           │   │   │   │   ├── cache.cpython-314.pyc
+│       │           │   │   │   │   ├── download.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── lazy_wheel.cpython-314.pyc
+│       │           │   │   │   │   ├── session.cpython-314.pyc
+│       │           │   │   │   │   ├── utils.cpython-314.pyc
+│       │           │   │   │   │   └── xmlrpc.cpython-314.pyc
+│       │           │   │   │   ├── session.py
+│       │           │   │   │   ├── utils.py
+│       │           │   │   │   └── xmlrpc.py
+│       │           │   │   ├── operations
+│       │           │   │   │   ├── build
+│       │           │   │   │   │   ├── build_tracker.py
+│       │           │   │   │   │   ├── __init__.py
+│       │           │   │   │   │   ├── metadata_editable.py
+│       │           │   │   │   │   ├── metadata.py
+│       │           │   │   │   │   ├── __pycache__
+│       │           │   │   │   │   │   ├── build_tracker.cpython-314.pyc
+│       │           │   │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   │   ├── metadata.cpython-314.pyc
+│       │           │   │   │   │   │   ├── metadata_editable.cpython-314.pyc
+│       │           │   │   │   │   │   ├── wheel.cpython-314.pyc
+│       │           │   │   │   │   │   └── wheel_editable.cpython-314.pyc
+│       │           │   │   │   │   ├── wheel_editable.py
+│       │           │   │   │   │   └── wheel.py
+│       │           │   │   │   ├── check.py
+│       │           │   │   │   ├── freeze.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── install
+│       │           │   │   │   │   ├── __init__.py
+│       │           │   │   │   │   ├── __pycache__
+│       │           │   │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   │   └── wheel.cpython-314.pyc
+│       │           │   │   │   │   └── wheel.py
+│       │           │   │   │   ├── prepare.py
+│       │           │   │   │   └── __pycache__
+│       │           │   │   │       ├── check.cpython-314.pyc
+│       │           │   │   │       ├── freeze.cpython-314.pyc
+│       │           │   │   │       ├── __init__.cpython-314.pyc
+│       │           │   │   │       └── prepare.cpython-314.pyc
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── build_env.cpython-314.pyc
+│       │           │   │   │   ├── cache.cpython-314.pyc
+│       │           │   │   │   ├── configuration.cpython-314.pyc
+│       │           │   │   │   ├── exceptions.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── main.cpython-314.pyc
+│       │           │   │   │   ├── pyproject.cpython-314.pyc
+│       │           │   │   │   ├── self_outdated_check.cpython-314.pyc
+│       │           │   │   │   └── wheel_builder.cpython-314.pyc
+│       │           │   │   ├── pyproject.py
+│       │           │   │   ├── req
+│       │           │   │   │   ├── constructors.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── pep723.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── constructors.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── pep723.cpython-314.pyc
+│       │           │   │   │   │   ├── req_dependency_group.cpython-314.pyc
+│       │           │   │   │   │   ├── req_file.cpython-314.pyc
+│       │           │   │   │   │   ├── req_install.cpython-314.pyc
+│       │           │   │   │   │   ├── req_set.cpython-314.pyc
+│       │           │   │   │   │   └── req_uninstall.cpython-314.pyc
+│       │           │   │   │   ├── req_dependency_group.py
+│       │           │   │   │   ├── req_file.py
+│       │           │   │   │   ├── req_install.py
+│       │           │   │   │   ├── req_set.py
+│       │           │   │   │   └── req_uninstall.py
+│       │           │   │   ├── resolution
+│       │           │   │   │   ├── base.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── legacy
+│       │           │   │   │   │   ├── __init__.py
+│       │           │   │   │   │   ├── __pycache__
+│       │           │   │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   │   └── resolver.cpython-314.pyc
+│       │           │   │   │   │   └── resolver.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   │   └── __init__.cpython-314.pyc
+│       │           │   │   │   └── resolvelib
+│       │           │   │   │       ├── base.py
+│       │           │   │   │       ├── candidates.py
+│       │           │   │   │       ├── factory.py
+│       │           │   │   │       ├── found_candidates.py
+│       │           │   │   │       ├── __init__.py
+│       │           │   │   │       ├── provider.py
+│       │           │   │   │       ├── __pycache__
+│       │           │   │   │       │   ├── base.cpython-314.pyc
+│       │           │   │   │       │   ├── candidates.cpython-314.pyc
+│       │           │   │   │       │   ├── factory.cpython-314.pyc
+│       │           │   │   │       │   ├── found_candidates.cpython-314.pyc
+│       │           │   │   │       │   ├── __init__.cpython-314.pyc
+│       │           │   │   │       │   ├── provider.cpython-314.pyc
+│       │           │   │   │       │   ├── reporter.cpython-314.pyc
+│       │           │   │   │       │   ├── requirements.cpython-314.pyc
+│       │           │   │   │       │   └── resolver.cpython-314.pyc
+│       │           │   │   │       ├── reporter.py
+│       │           │   │   │       ├── requirements.py
+│       │           │   │   │       └── resolver.py
+│       │           │   │   ├── self_outdated_check.py
+│       │           │   │   ├── utils
+│       │           │   │   │   ├── appdirs.py
+│       │           │   │   │   ├── compatibility_tags.py
+│       │           │   │   │   ├── compat.py
+│       │           │   │   │   ├── datetime.py
+│       │           │   │   │   ├── deprecation.py
+│       │           │   │   │   ├── direct_url_helpers.py
+│       │           │   │   │   ├── egg_link.py
+│       │           │   │   │   ├── entrypoints.py
+│       │           │   │   │   ├── filesystem.py
+│       │           │   │   │   ├── filetypes.py
+│       │           │   │   │   ├── glibc.py
+│       │           │   │   │   ├── hashes.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── _jaraco_text.py
+│       │           │   │   │   ├── logging.py
+│       │           │   │   │   ├── _log.py
+│       │           │   │   │   ├── misc.py
+│       │           │   │   │   ├── packaging.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── appdirs.cpython-314.pyc
+│       │           │   │   │   │   ├── compat.cpython-314.pyc
+│       │           │   │   │   │   ├── compatibility_tags.cpython-314.pyc
+│       │           │   │   │   │   ├── datetime.cpython-314.pyc
+│       │           │   │   │   │   ├── deprecation.cpython-314.pyc
+│       │           │   │   │   │   ├── direct_url_helpers.cpython-314.pyc
+│       │           │   │   │   │   ├── egg_link.cpython-314.pyc
+│       │           │   │   │   │   ├── entrypoints.cpython-314.pyc
+│       │           │   │   │   │   ├── filesystem.cpython-314.pyc
+│       │           │   │   │   │   ├── filetypes.cpython-314.pyc
+│       │           │   │   │   │   ├── glibc.cpython-314.pyc
+│       │           │   │   │   │   ├── hashes.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── _jaraco_text.cpython-314.pyc
+│       │           │   │   │   │   ├── _log.cpython-314.pyc
+│       │           │   │   │   │   ├── logging.cpython-314.pyc
+│       │           │   │   │   │   ├── misc.cpython-314.pyc
+│       │           │   │   │   │   ├── packaging.cpython-314.pyc
+│       │           │   │   │   │   ├── pylock.cpython-314.pyc
+│       │           │   │   │   │   ├── retry.cpython-314.pyc
+│       │           │   │   │   │   ├── subprocess.cpython-314.pyc
+│       │           │   │   │   │   ├── temp_dir.cpython-314.pyc
+│       │           │   │   │   │   ├── unpacking.cpython-314.pyc
+│       │           │   │   │   │   ├── urls.cpython-314.pyc
+│       │           │   │   │   │   ├── virtualenv.cpython-314.pyc
+│       │           │   │   │   │   └── wheel.cpython-314.pyc
+│       │           │   │   │   ├── pylock.py
+│       │           │   │   │   ├── retry.py
+│       │           │   │   │   ├── subprocess.py
+│       │           │   │   │   ├── temp_dir.py
+│       │           │   │   │   ├── unpacking.py
+│       │           │   │   │   ├── urls.py
+│       │           │   │   │   ├── virtualenv.py
+│       │           │   │   │   └── wheel.py
+│       │           │   │   ├── vcs
+│       │           │   │   │   ├── bazaar.py
+│       │           │   │   │   ├── git.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── mercurial.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── bazaar.cpython-314.pyc
+│       │           │   │   │   │   ├── git.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── mercurial.cpython-314.pyc
+│       │           │   │   │   │   ├── subversion.cpython-314.pyc
+│       │           │   │   │   │   └── versioncontrol.cpython-314.pyc
+│       │           │   │   │   ├── subversion.py
+│       │           │   │   │   └── versioncontrol.py
+│       │           │   │   └── wheel_builder.py
+│       │           │   ├── __main__.py
+│       │           │   ├── __pip-runner__.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── __main__.cpython-314.pyc
+│       │           │   │   └── __pip-runner__.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   └── _vendor
+│       │           │       ├── cachecontrol
+│       │           │       │   ├── adapter.py
+│       │           │       │   ├── cache.py
+│       │           │       │   ├── caches
+│       │           │       │   │   ├── file_cache.py
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── file_cache.cpython-314.pyc
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   └── redis_cache.cpython-314.pyc
+│       │           │       │   │   └── redis_cache.py
+│       │           │       │   ├── _cmd.py
+│       │           │       │   ├── controller.py
+│       │           │       │   ├── filewrapper.py
+│       │           │       │   ├── heuristics.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE.txt
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── adapter.cpython-314.pyc
+│       │           │       │   │   ├── cache.cpython-314.pyc
+│       │           │       │   │   ├── _cmd.cpython-314.pyc
+│       │           │       │   │   ├── controller.cpython-314.pyc
+│       │           │       │   │   ├── filewrapper.cpython-314.pyc
+│       │           │       │   │   ├── heuristics.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── serialize.cpython-314.pyc
+│       │           │       │   │   └── wrapper.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── serialize.py
+│       │           │       │   └── wrapper.py
+│       │           │       ├── certifi
+│       │           │       │   ├── core.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── __main__.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── core.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   └── __main__.cpython-314.pyc
+│       │           │       │   └── py.typed
+│       │           │       ├── dependency_groups
+│       │           │       │   ├── _implementation.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE.txt
+│       │           │       │   ├── _lint_dependency_groups.py
+│       │           │       │   ├── __main__.py
+│       │           │       │   ├── _pip_wrapper.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── _implementation.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── _lint_dependency_groups.cpython-314.pyc
+│       │           │       │   │   ├── __main__.cpython-314.pyc
+│       │           │       │   │   ├── _pip_wrapper.cpython-314.pyc
+│       │           │       │   │   └── _toml_compat.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   └── _toml_compat.py
+│       │           │       ├── distlib
+│       │           │       │   ├── compat.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE.txt
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── compat.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── resources.cpython-314.pyc
+│       │           │       │   │   ├── scripts.cpython-314.pyc
+│       │           │       │   │   └── util.cpython-314.pyc
+│       │           │       │   ├── resources.py
+│       │           │       │   ├── scripts.py
+│       │           │       │   └── util.py
+│       │           │       ├── distlib.pyi
+│       │           │       ├── distro
+│       │           │       │   ├── distro.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── __main__.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── distro.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   └── __main__.cpython-314.pyc
+│       │           │       │   └── py.typed
+│       │           │       ├── idna
+│       │           │       │   ├── codec.py
+│       │           │       │   ├── compat.py
+│       │           │       │   ├── core.py
+│       │           │       │   ├── idnadata.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── intranges.py
+│       │           │       │   ├── LICENSE.md
+│       │           │       │   ├── package_data.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── codec.cpython-314.pyc
+│       │           │       │   │   ├── compat.cpython-314.pyc
+│       │           │       │   │   ├── core.cpython-314.pyc
+│       │           │       │   │   ├── idnadata.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── intranges.cpython-314.pyc
+│       │           │       │   │   ├── package_data.cpython-314.pyc
+│       │           │       │   │   └── uts46data.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   └── uts46data.py
+│       │           │       ├── __init__.py
+│       │           │       ├── msgpack
+│       │           │       │   ├── COPYING
+│       │           │       │   ├── exceptions.py
+│       │           │       │   ├── ext.py
+│       │           │       │   ├── fallback.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   └── __pycache__
+│       │           │       │       ├── exceptions.cpython-314.pyc
+│       │           │       │       ├── ext.cpython-314.pyc
+│       │           │       │       ├── fallback.cpython-314.pyc
+│       │           │       │       └── __init__.cpython-314.pyc
+│       │           │       ├── msgpack.pyi
+│       │           │       ├── packaging
+│       │           │       │   ├── _elffile.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── LICENSE.APACHE
+│       │           │       │   ├── LICENSE.BSD
+│       │           │       │   ├── licenses
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   └── _spdx.cpython-314.pyc
+│       │           │       │   │   └── _spdx.py
+│       │           │       │   ├── _manylinux.py
+│       │           │       │   ├── markers.py
+│       │           │       │   ├── metadata.py
+│       │           │       │   ├── _musllinux.py
+│       │           │       │   ├── _parser.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── _elffile.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── _manylinux.cpython-314.pyc
+│       │           │       │   │   ├── markers.cpython-314.pyc
+│       │           │       │   │   ├── metadata.cpython-314.pyc
+│       │           │       │   │   ├── _musllinux.cpython-314.pyc
+│       │           │       │   │   ├── _parser.cpython-314.pyc
+│       │           │       │   │   ├── pylock.cpython-314.pyc
+│       │           │       │   │   ├── requirements.cpython-314.pyc
+│       │           │       │   │   ├── specifiers.cpython-314.pyc
+│       │           │       │   │   ├── _structures.cpython-314.pyc
+│       │           │       │   │   ├── tags.cpython-314.pyc
+│       │           │       │   │   ├── _tokenizer.cpython-314.pyc
+│       │           │       │   │   ├── utils.cpython-314.pyc
+│       │           │       │   │   └── version.cpython-314.pyc
+│       │           │       │   ├── pylock.py
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── requirements.py
+│       │           │       │   ├── specifiers.py
+│       │           │       │   ├── _structures.py
+│       │           │       │   ├── tags.py
+│       │           │       │   ├── _tokenizer.py
+│       │           │       │   ├── utils.py
+│       │           │       │   └── version.py
+│       │           │       ├── pkg_resources
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   └── __pycache__
+│       │           │       │       └── __init__.cpython-314.pyc
+│       │           │       ├── pkg_resources.pyi
+│       │           │       ├── platformdirs
+│       │           │       │   ├── android.py
+│       │           │       │   ├── api.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── macos.py
+│       │           │       │   ├── __main__.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── android.cpython-314.pyc
+│       │           │       │   │   ├── api.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── macos.cpython-314.pyc
+│       │           │       │   │   ├── __main__.cpython-314.pyc
+│       │           │       │   │   ├── unix.cpython-314.pyc
+│       │           │       │   │   ├── version.cpython-314.pyc
+│       │           │       │   │   └── windows.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── unix.py
+│       │           │       │   ├── version.py
+│       │           │       │   └── windows.py
+│       │           │       ├── __pycache__
+│       │           │       │   └── __init__.cpython-314.pyc
+│       │           │       ├── pygments
+│       │           │       │   ├── console.py
+│       │           │       │   ├── filter.py
+│       │           │       │   ├── filters
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   └── __pycache__
+│       │           │       │   │       └── __init__.cpython-314.pyc
+│       │           │       │   ├── formatter.py
+│       │           │       │   ├── formatters
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── _mapping.py
+│       │           │       │   │   └── __pycache__
+│       │           │       │   │       ├── __init__.cpython-314.pyc
+│       │           │       │   │       └── _mapping.cpython-314.pyc
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── lexer.py
+│       │           │       │   ├── lexers
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── _mapping.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   ├── _mapping.cpython-314.pyc
+│       │           │       │   │   │   └── python.cpython-314.pyc
+│       │           │       │   │   └── python.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── __main__.py
+│       │           │       │   ├── modeline.py
+│       │           │       │   ├── plugin.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── console.cpython-314.pyc
+│       │           │       │   │   ├── filter.cpython-314.pyc
+│       │           │       │   │   ├── formatter.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── lexer.cpython-314.pyc
+│       │           │       │   │   ├── __main__.cpython-314.pyc
+│       │           │       │   │   ├── modeline.cpython-314.pyc
+│       │           │       │   │   ├── plugin.cpython-314.pyc
+│       │           │       │   │   ├── regexopt.cpython-314.pyc
+│       │           │       │   │   ├── scanner.cpython-314.pyc
+│       │           │       │   │   ├── sphinxext.cpython-314.pyc
+│       │           │       │   │   ├── style.cpython-314.pyc
+│       │           │       │   │   ├── token.cpython-314.pyc
+│       │           │       │   │   ├── unistring.cpython-314.pyc
+│       │           │       │   │   └── util.cpython-314.pyc
+│       │           │       │   ├── regexopt.py
+│       │           │       │   ├── scanner.py
+│       │           │       │   ├── sphinxext.py
+│       │           │       │   ├── style.py
+│       │           │       │   ├── styles
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── _mapping.py
+│       │           │       │   │   └── __pycache__
+│       │           │       │   │       ├── __init__.cpython-314.pyc
+│       │           │       │   │       └── _mapping.cpython-314.pyc
+│       │           │       │   ├── token.py
+│       │           │       │   ├── unistring.py
+│       │           │       │   └── util.py
+│       │           │       ├── pygments.pyi
+│       │           │       ├── pyproject_hooks
+│       │           │       │   ├── _impl.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── _in_process
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── _in_process.py
+│       │           │       │   │   └── __pycache__
+│       │           │       │   │       ├── __init__.cpython-314.pyc
+│       │           │       │   │       └── _in_process.cpython-314.pyc
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── _impl.cpython-314.pyc
+│       │           │       │   │   └── __init__.cpython-314.pyc
+│       │           │       │   └── py.typed
+│       │           │       ├── README.rst
+│       │           │       ├── requests
+│       │           │       │   ├── adapters.py
+│       │           │       │   ├── api.py
+│       │           │       │   ├── auth.py
+│       │           │       │   ├── certs.py
+│       │           │       │   ├── compat.py
+│       │           │       │   ├── cookies.py
+│       │           │       │   ├── exceptions.py
+│       │           │       │   ├── help.py
+│       │           │       │   ├── hooks.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── _internal_utils.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── models.py
+│       │           │       │   ├── packages.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── adapters.cpython-314.pyc
+│       │           │       │   │   ├── api.cpython-314.pyc
+│       │           │       │   │   ├── auth.cpython-314.pyc
+│       │           │       │   │   ├── certs.cpython-314.pyc
+│       │           │       │   │   ├── compat.cpython-314.pyc
+│       │           │       │   │   ├── cookies.cpython-314.pyc
+│       │           │       │   │   ├── exceptions.cpython-314.pyc
+│       │           │       │   │   ├── help.cpython-314.pyc
+│       │           │       │   │   ├── hooks.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── _internal_utils.cpython-314.pyc
+│       │           │       │   │   ├── models.cpython-314.pyc
+│       │           │       │   │   ├── packages.cpython-314.pyc
+│       │           │       │   │   ├── sessions.cpython-314.pyc
+│       │           │       │   │   ├── status_codes.cpython-314.pyc
+│       │           │       │   │   ├── structures.cpython-314.pyc
+│       │           │       │   │   ├── utils.cpython-314.pyc
+│       │           │       │   │   └── __version__.cpython-314.pyc
+│       │           │       │   ├── sessions.py
+│       │           │       │   ├── status_codes.py
+│       │           │       │   ├── structures.py
+│       │           │       │   ├── utils.py
+│       │           │       │   └── __version__.py
+│       │           │       ├── requests.pyi
+│       │           │       ├── resolvelib
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── providers.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── providers.cpython-314.pyc
+│       │           │       │   │   ├── reporters.cpython-314.pyc
+│       │           │       │   │   └── structs.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── reporters.py
+│       │           │       │   ├── resolvers
+│       │           │       │   │   ├── abstract.py
+│       │           │       │   │   ├── criterion.py
+│       │           │       │   │   ├── exceptions.py
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── abstract.cpython-314.pyc
+│       │           │       │   │   │   ├── criterion.cpython-314.pyc
+│       │           │       │   │   │   ├── exceptions.cpython-314.pyc
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   └── resolution.cpython-314.pyc
+│       │           │       │   │   └── resolution.py
+│       │           │       │   └── structs.py
+│       │           │       ├── rich
+│       │           │       │   ├── abc.py
+│       │           │       │   ├── align.py
+│       │           │       │   ├── ansi.py
+│       │           │       │   ├── bar.py
+│       │           │       │   ├── box.py
+│       │           │       │   ├── cells.py
+│       │           │       │   ├── _cell_widths.py
+│       │           │       │   ├── color.py
+│       │           │       │   ├── color_triplet.py
+│       │           │       │   ├── columns.py
+│       │           │       │   ├── console.py
+│       │           │       │   ├── constrain.py
+│       │           │       │   ├── containers.py
+│       │           │       │   ├── control.py
+│       │           │       │   ├── default_styles.py
+│       │           │       │   ├── diagnose.py
+│       │           │       │   ├── _emoji_codes.py
+│       │           │       │   ├── emoji.py
+│       │           │       │   ├── _emoji_replace.py
+│       │           │       │   ├── errors.py
+│       │           │       │   ├── _export_format.py
+│       │           │       │   ├── _extension.py
+│       │           │       │   ├── _fileno.py
+│       │           │       │   ├── file_proxy.py
+│       │           │       │   ├── filesize.py
+│       │           │       │   ├── highlighter.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── _inspect.py
+│       │           │       │   ├── json.py
+│       │           │       │   ├── jupyter.py
+│       │           │       │   ├── layout.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── live.py
+│       │           │       │   ├── live_render.py
+│       │           │       │   ├── logging.py
+│       │           │       │   ├── _log_render.py
+│       │           │       │   ├── _loop.py
+│       │           │       │   ├── __main__.py
+│       │           │       │   ├── markup.py
+│       │           │       │   ├── measure.py
+│       │           │       │   ├── _null_file.py
+│       │           │       │   ├── padding.py
+│       │           │       │   ├── pager.py
+│       │           │       │   ├── palette.py
+│       │           │       │   ├── _palettes.py
+│       │           │       │   ├── panel.py
+│       │           │       │   ├── _pick.py
+│       │           │       │   ├── pretty.py
+│       │           │       │   ├── progress_bar.py
+│       │           │       │   ├── progress.py
+│       │           │       │   ├── prompt.py
+│       │           │       │   ├── protocol.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── abc.cpython-314.pyc
+│       │           │       │   │   ├── align.cpython-314.pyc
+│       │           │       │   │   ├── ansi.cpython-314.pyc
+│       │           │       │   │   ├── bar.cpython-314.pyc
+│       │           │       │   │   ├── box.cpython-314.pyc
+│       │           │       │   │   ├── cells.cpython-314.pyc
+│       │           │       │   │   ├── _cell_widths.cpython-314.pyc
+│       │           │       │   │   ├── color.cpython-314.pyc
+│       │           │       │   │   ├── color_triplet.cpython-314.pyc
+│       │           │       │   │   ├── columns.cpython-314.pyc
+│       │           │       │   │   ├── console.cpython-314.pyc
+│       │           │       │   │   ├── constrain.cpython-314.pyc
+│       │           │       │   │   ├── containers.cpython-314.pyc
+│       │           │       │   │   ├── control.cpython-314.pyc
+│       │           │       │   │   ├── default_styles.cpython-314.pyc
+│       │           │       │   │   ├── diagnose.cpython-314.pyc
+│       │           │       │   │   ├── _emoji_codes.cpython-314.pyc
+│       │           │       │   │   ├── emoji.cpython-314.pyc
+│       │           │       │   │   ├── _emoji_replace.cpython-314.pyc
+│       │           │       │   │   ├── errors.cpython-314.pyc
+│       │           │       │   │   ├── _export_format.cpython-314.pyc
+│       │           │       │   │   ├── _extension.cpython-314.pyc
+│       │           │       │   │   ├── _fileno.cpython-314.pyc
+│       │           │       │   │   ├── file_proxy.cpython-314.pyc
+│       │           │       │   │   ├── filesize.cpython-314.pyc
+│       │           │       │   │   ├── highlighter.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── _inspect.cpython-314.pyc
+│       │           │       │   │   ├── json.cpython-314.pyc
+│       │           │       │   │   ├── jupyter.cpython-314.pyc
+│       │           │       │   │   ├── layout.cpython-314.pyc
+│       │           │       │   │   ├── live.cpython-314.pyc
+│       │           │       │   │   ├── live_render.cpython-314.pyc
+│       │           │       │   │   ├── logging.cpython-314.pyc
+│       │           │       │   │   ├── _log_render.cpython-314.pyc
+│       │           │       │   │   ├── _loop.cpython-314.pyc
+│       │           │       │   │   ├── __main__.cpython-314.pyc
+│       │           │       │   │   ├── markup.cpython-314.pyc
+│       │           │       │   │   ├── measure.cpython-314.pyc
+│       │           │       │   │   ├── _null_file.cpython-314.pyc
+│       │           │       │   │   ├── padding.cpython-314.pyc
+│       │           │       │   │   ├── pager.cpython-314.pyc
+│       │           │       │   │   ├── palette.cpython-314.pyc
+│       │           │       │   │   ├── _palettes.cpython-314.pyc
+│       │           │       │   │   ├── panel.cpython-314.pyc
+│       │           │       │   │   ├── _pick.cpython-314.pyc
+│       │           │       │   │   ├── pretty.cpython-314.pyc
+│       │           │       │   │   ├── progress_bar.cpython-314.pyc
+│       │           │       │   │   ├── progress.cpython-314.pyc
+│       │           │       │   │   ├── prompt.cpython-314.pyc
+│       │           │       │   │   ├── protocol.cpython-314.pyc
+│       │           │       │   │   ├── _ratio.cpython-314.pyc
+│       │           │       │   │   ├── region.cpython-314.pyc
+│       │           │       │   │   ├── repr.cpython-314.pyc
+│       │           │       │   │   ├── rule.cpython-314.pyc
+│       │           │       │   │   ├── scope.cpython-314.pyc
+│       │           │       │   │   ├── screen.cpython-314.pyc
+│       │           │       │   │   ├── segment.cpython-314.pyc
+│       │           │       │   │   ├── spinner.cpython-314.pyc
+│       │           │       │   │   ├── _spinners.cpython-314.pyc
+│       │           │       │   │   ├── _stack.cpython-314.pyc
+│       │           │       │   │   ├── status.cpython-314.pyc
+│       │           │       │   │   ├── style.cpython-314.pyc
+│       │           │       │   │   ├── styled.cpython-314.pyc
+│       │           │       │   │   ├── syntax.cpython-314.pyc
+│       │           │       │   │   ├── table.cpython-314.pyc
+│       │           │       │   │   ├── terminal_theme.cpython-314.pyc
+│       │           │       │   │   ├── text.cpython-314.pyc
+│       │           │       │   │   ├── theme.cpython-314.pyc
+│       │           │       │   │   ├── themes.cpython-314.pyc
+│       │           │       │   │   ├── _timer.cpython-314.pyc
+│       │           │       │   │   ├── traceback.cpython-314.pyc
+│       │           │       │   │   ├── tree.cpython-314.pyc
+│       │           │       │   │   ├── _win32_console.cpython-314.pyc
+│       │           │       │   │   ├── _windows.cpython-314.pyc
+│       │           │       │   │   ├── _windows_renderer.cpython-314.pyc
+│       │           │       │   │   └── _wrap.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── _ratio.py
+│       │           │       │   ├── region.py
+│       │           │       │   ├── repr.py
+│       │           │       │   ├── rule.py
+│       │           │       │   ├── scope.py
+│       │           │       │   ├── screen.py
+│       │           │       │   ├── segment.py
+│       │           │       │   ├── spinner.py
+│       │           │       │   ├── _spinners.py
+│       │           │       │   ├── _stack.py
+│       │           │       │   ├── status.py
+│       │           │       │   ├── styled.py
+│       │           │       │   ├── style.py
+│       │           │       │   ├── syntax.py
+│       │           │       │   ├── table.py
+│       │           │       │   ├── terminal_theme.py
+│       │           │       │   ├── text.py
+│       │           │       │   ├── theme.py
+│       │           │       │   ├── themes.py
+│       │           │       │   ├── _timer.py
+│       │           │       │   ├── traceback.py
+│       │           │       │   ├── tree.py
+│       │           │       │   ├── _win32_console.py
+│       │           │       │   ├── _windows.py
+│       │           │       │   ├── _windows_renderer.py
+│       │           │       │   └── _wrap.py
+│       │           │       ├── tomli
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── _parser.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── _parser.cpython-314.pyc
+│       │           │       │   │   ├── _re.cpython-314.pyc
+│       │           │       │   │   └── _types.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── _re.py
+│       │           │       │   └── _types.py
+│       │           │       ├── tomli_w
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   └── _writer.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   └── _writer.py
+│       │           │       ├── truststore
+│       │           │       │   ├── _api.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE
+│       │           │       │   ├── _macos.py
+│       │           │       │   ├── _openssl.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── _api.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── _macos.cpython-314.pyc
+│       │           │       │   │   ├── _openssl.cpython-314.pyc
+│       │           │       │   │   ├── _ssl_constants.cpython-314.pyc
+│       │           │       │   │   └── _windows.cpython-314.pyc
+│       │           │       │   ├── py.typed
+│       │           │       │   ├── _ssl_constants.py
+│       │           │       │   └── _windows.py
+│       │           │       ├── urllib3
+│       │           │       │   ├── _collections.py
+│       │           │       │   ├── connectionpool.py
+│       │           │       │   ├── connection.py
+│       │           │       │   ├── contrib
+│       │           │       │   │   ├── _appengine_environ.py
+│       │           │       │   │   ├── appengine.py
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── ntlmpool.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── appengine.cpython-314.pyc
+│       │           │       │   │   │   ├── _appengine_environ.cpython-314.pyc
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   ├── ntlmpool.cpython-314.pyc
+│       │           │       │   │   │   ├── pyopenssl.cpython-314.pyc
+│       │           │       │   │   │   ├── securetransport.cpython-314.pyc
+│       │           │       │   │   │   └── socks.cpython-314.pyc
+│       │           │       │   │   ├── pyopenssl.py
+│       │           │       │   │   ├── _securetransport
+│       │           │       │   │   │   ├── bindings.py
+│       │           │       │   │   │   ├── __init__.py
+│       │           │       │   │   │   ├── low_level.py
+│       │           │       │   │   │   └── __pycache__
+│       │           │       │   │   │       ├── bindings.cpython-314.pyc
+│       │           │       │   │   │       ├── __init__.cpython-314.pyc
+│       │           │       │   │   │       └── low_level.cpython-314.pyc
+│       │           │       │   │   ├── securetransport.py
+│       │           │       │   │   └── socks.py
+│       │           │       │   ├── exceptions.py
+│       │           │       │   ├── fields.py
+│       │           │       │   ├── filepost.py
+│       │           │       │   ├── __init__.py
+│       │           │       │   ├── LICENSE.txt
+│       │           │       │   ├── packages
+│       │           │       │   │   ├── backports
+│       │           │       │   │   │   ├── __init__.py
+│       │           │       │   │   │   ├── makefile.py
+│       │           │       │   │   │   ├── __pycache__
+│       │           │       │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   │   ├── makefile.cpython-314.pyc
+│       │           │       │   │   │   │   └── weakref_finalize.cpython-314.pyc
+│       │           │       │   │   │   └── weakref_finalize.py
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   └── six.cpython-314.pyc
+│       │           │       │   │   └── six.py
+│       │           │       │   ├── poolmanager.py
+│       │           │       │   ├── __pycache__
+│       │           │       │   │   ├── _collections.cpython-314.pyc
+│       │           │       │   │   ├── connection.cpython-314.pyc
+│       │           │       │   │   ├── connectionpool.cpython-314.pyc
+│       │           │       │   │   ├── exceptions.cpython-314.pyc
+│       │           │       │   │   ├── fields.cpython-314.pyc
+│       │           │       │   │   ├── filepost.cpython-314.pyc
+│       │           │       │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   ├── poolmanager.cpython-314.pyc
+│       │           │       │   │   ├── request.cpython-314.pyc
+│       │           │       │   │   ├── response.cpython-314.pyc
+│       │           │       │   │   └── _version.cpython-314.pyc
+│       │           │       │   ├── request.py
+│       │           │       │   ├── response.py
+│       │           │       │   ├── util
+│       │           │       │   │   ├── connection.py
+│       │           │       │   │   ├── __init__.py
+│       │           │       │   │   ├── proxy.py
+│       │           │       │   │   ├── __pycache__
+│       │           │       │   │   │   ├── connection.cpython-314.pyc
+│       │           │       │   │   │   ├── __init__.cpython-314.pyc
+│       │           │       │   │   │   ├── proxy.cpython-314.pyc
+│       │           │       │   │   │   ├── queue.cpython-314.pyc
+│       │           │       │   │   │   ├── request.cpython-314.pyc
+│       │           │       │   │   │   ├── response.cpython-314.pyc
+│       │           │       │   │   │   ├── retry.cpython-314.pyc
+│       │           │       │   │   │   ├── ssl_.cpython-314.pyc
+│       │           │       │   │   │   ├── ssl_match_hostname.cpython-314.pyc
+│       │           │       │   │   │   ├── ssltransport.cpython-314.pyc
+│       │           │       │   │   │   ├── timeout.cpython-314.pyc
+│       │           │       │   │   │   ├── url.cpython-314.pyc
+│       │           │       │   │   │   └── wait.cpython-314.pyc
+│       │           │       │   │   ├── queue.py
+│       │           │       │   │   ├── request.py
+│       │           │       │   │   ├── response.py
+│       │           │       │   │   ├── retry.py
+│       │           │       │   │   ├── ssl_match_hostname.py
+│       │           │       │   │   ├── ssl_.py
+│       │           │       │   │   ├── ssltransport.py
+│       │           │       │   │   ├── timeout.py
+│       │           │       │   │   ├── url.py
+│       │           │       │   │   └── wait.py
+│       │           │       │   └── _version.py
+│       │           │       ├── urllib3.pyi
+│       │           │       └── vendor.txt
+│       │           ├── pip-26.0.1.dist-info
+│       │           │   ├── entry_points.txt
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   ├── AUTHORS.txt
+│       │           │   │   ├── LICENSE.txt
+│       │           │   │   └── src
+│       │           │   │       └── pip
+│       │           │   │           └── _vendor
+│       │           │   │               ├── cachecontrol
+│       │           │   │               │   └── LICENSE.txt
+│       │           │   │               ├── certifi
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── dependency_groups
+│       │           │   │               │   └── LICENSE.txt
+│       │           │   │               ├── distlib
+│       │           │   │               │   └── LICENSE.txt
+│       │           │   │               ├── distro
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── idna
+│       │           │   │               │   └── LICENSE.md
+│       │           │   │               ├── msgpack
+│       │           │   │               │   └── COPYING
+│       │           │   │               ├── packaging
+│       │           │   │               │   ├── LICENSE
+│       │           │   │               │   ├── LICENSE.APACHE
+│       │           │   │               │   └── LICENSE.BSD
+│       │           │   │               ├── pkg_resources
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── platformdirs
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── pygments
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── pyproject_hooks
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── requests
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── resolvelib
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── rich
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── tomli
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── tomli_w
+│       │           │   │               │   └── LICENSE
+│       │           │   │               ├── truststore
+│       │           │   │               │   └── LICENSE
+│       │           │   │               └── urllib3
+│       │           │   │                   └── LICENSE.txt
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── REQUESTED
+│       │           │   ├── sboms
+│       │           │   │   └── rpm.cdx.json
+│       │           │   └── WHEEL
+│       │           ├── prompt_toolkit
+│       │           │   ├── application
+│       │           │   │   ├── application.py
+│       │           │   │   ├── current.py
+│       │           │   │   ├── dummy.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── application.cpython-314.pyc
+│       │           │   │   │   ├── current.cpython-314.pyc
+│       │           │   │   │   ├── dummy.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   └── run_in_terminal.cpython-314.pyc
+│       │           │   │   └── run_in_terminal.py
+│       │           │   ├── auto_suggest.py
+│       │           │   ├── buffer.py
+│       │           │   ├── cache.py
+│       │           │   ├── clipboard
+│       │           │   │   ├── base.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── in_memory.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── in_memory.cpython-314.pyc
+│       │           │   │   │   └── pyperclip.cpython-314.pyc
+│       │           │   │   └── pyperclip.py
+│       │           │   ├── completion
+│       │           │   │   ├── base.py
+│       │           │   │   ├── deduplicate.py
+│       │           │   │   ├── filesystem.py
+│       │           │   │   ├── fuzzy_completer.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── nested.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── deduplicate.cpython-314.pyc
+│       │           │   │   │   ├── filesystem.cpython-314.pyc
+│       │           │   │   │   ├── fuzzy_completer.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── nested.cpython-314.pyc
+│       │           │   │   │   └── word_completer.cpython-314.pyc
+│       │           │   │   └── word_completer.py
+│       │           │   ├── contrib
+│       │           │   │   ├── completers
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   └── system.cpython-314.pyc
+│       │           │   │   │   └── system.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   └── __init__.cpython-314.pyc
+│       │           │   │   ├── regular_languages
+│       │           │   │   │   ├── compiler.py
+│       │           │   │   │   ├── completion.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── lexer.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── compiler.cpython-314.pyc
+│       │           │   │   │   │   ├── completion.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── lexer.cpython-314.pyc
+│       │           │   │   │   │   ├── regex_parser.cpython-314.pyc
+│       │           │   │   │   │   └── validation.cpython-314.pyc
+│       │           │   │   │   ├── regex_parser.py
+│       │           │   │   │   └── validation.py
+│       │           │   │   ├── ssh
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   └── server.cpython-314.pyc
+│       │           │   │   │   └── server.py
+│       │           │   │   └── telnet
+│       │           │   │       ├── __init__.py
+│       │           │   │       ├── log.py
+│       │           │   │       ├── protocol.py
+│       │           │   │       ├── __pycache__
+│       │           │   │       │   ├── __init__.cpython-314.pyc
+│       │           │   │       │   ├── log.cpython-314.pyc
+│       │           │   │       │   ├── protocol.cpython-314.pyc
+│       │           │   │       │   └── server.cpython-314.pyc
+│       │           │   │       └── server.py
+│       │           │   ├── cursor_shapes.py
+│       │           │   ├── data_structures.py
+│       │           │   ├── document.py
+│       │           │   ├── enums.py
+│       │           │   ├── eventloop
+│       │           │   │   ├── async_generator.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── inputhook.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── async_generator.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── inputhook.cpython-314.pyc
+│       │           │   │   │   ├── utils.cpython-314.pyc
+│       │           │   │   │   └── win32.cpython-314.pyc
+│       │           │   │   ├── utils.py
+│       │           │   │   └── win32.py
+│       │           │   ├── filters
+│       │           │   │   ├── app.py
+│       │           │   │   ├── base.py
+│       │           │   │   ├── cli.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── app.cpython-314.pyc
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── cli.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   └── utils.cpython-314.pyc
+│       │           │   │   └── utils.py
+│       │           │   ├── formatted_text
+│       │           │   │   ├── ansi.py
+│       │           │   │   ├── base.py
+│       │           │   │   ├── html.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── ansi.cpython-314.pyc
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── html.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── pygments.cpython-314.pyc
+│       │           │   │   │   └── utils.cpython-314.pyc
+│       │           │   │   ├── pygments.py
+│       │           │   │   └── utils.py
+│       │           │   ├── history.py
+│       │           │   ├── __init__.py
+│       │           │   ├── input
+│       │           │   │   ├── ansi_escape_sequences.py
+│       │           │   │   ├── base.py
+│       │           │   │   ├── defaults.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── posix_pipe.py
+│       │           │   │   ├── posix_utils.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── ansi_escape_sequences.cpython-314.pyc
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── defaults.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── posix_pipe.cpython-314.pyc
+│       │           │   │   │   ├── posix_utils.cpython-314.pyc
+│       │           │   │   │   ├── typeahead.cpython-314.pyc
+│       │           │   │   │   ├── vt100.cpython-314.pyc
+│       │           │   │   │   ├── vt100_parser.cpython-314.pyc
+│       │           │   │   │   ├── win32.cpython-314.pyc
+│       │           │   │   │   └── win32_pipe.cpython-314.pyc
+│       │           │   │   ├── typeahead.py
+│       │           │   │   ├── vt100_parser.py
+│       │           │   │   ├── vt100.py
+│       │           │   │   ├── win32_pipe.py
+│       │           │   │   └── win32.py
+│       │           │   ├── key_binding
+│       │           │   │   ├── bindings
+│       │           │   │   │   ├── auto_suggest.py
+│       │           │   │   │   ├── basic.py
+│       │           │   │   │   ├── completion.py
+│       │           │   │   │   ├── cpr.py
+│       │           │   │   │   ├── emacs.py
+│       │           │   │   │   ├── focus.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── mouse.py
+│       │           │   │   │   ├── named_commands.py
+│       │           │   │   │   ├── open_in_editor.py
+│       │           │   │   │   ├── page_navigation.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── auto_suggest.cpython-314.pyc
+│       │           │   │   │   │   ├── basic.cpython-314.pyc
+│       │           │   │   │   │   ├── completion.cpython-314.pyc
+│       │           │   │   │   │   ├── cpr.cpython-314.pyc
+│       │           │   │   │   │   ├── emacs.cpython-314.pyc
+│       │           │   │   │   │   ├── focus.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── mouse.cpython-314.pyc
+│       │           │   │   │   │   ├── named_commands.cpython-314.pyc
+│       │           │   │   │   │   ├── open_in_editor.cpython-314.pyc
+│       │           │   │   │   │   ├── page_navigation.cpython-314.pyc
+│       │           │   │   │   │   ├── scroll.cpython-314.pyc
+│       │           │   │   │   │   ├── search.cpython-314.pyc
+│       │           │   │   │   │   └── vi.cpython-314.pyc
+│       │           │   │   │   ├── scroll.py
+│       │           │   │   │   ├── search.py
+│       │           │   │   │   └── vi.py
+│       │           │   │   ├── defaults.py
+│       │           │   │   ├── digraphs.py
+│       │           │   │   ├── emacs_state.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── key_bindings.py
+│       │           │   │   ├── key_processor.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── defaults.cpython-314.pyc
+│       │           │   │   │   ├── digraphs.cpython-314.pyc
+│       │           │   │   │   ├── emacs_state.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── key_bindings.cpython-314.pyc
+│       │           │   │   │   ├── key_processor.cpython-314.pyc
+│       │           │   │   │   └── vi_state.cpython-314.pyc
+│       │           │   │   └── vi_state.py
+│       │           │   ├── keys.py
+│       │           │   ├── layout
+│       │           │   │   ├── containers.py
+│       │           │   │   ├── controls.py
+│       │           │   │   ├── dimension.py
+│       │           │   │   ├── dummy.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── layout.py
+│       │           │   │   ├── margins.py
+│       │           │   │   ├── menus.py
+│       │           │   │   ├── mouse_handlers.py
+│       │           │   │   ├── processors.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── containers.cpython-314.pyc
+│       │           │   │   │   ├── controls.cpython-314.pyc
+│       │           │   │   │   ├── dimension.cpython-314.pyc
+│       │           │   │   │   ├── dummy.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── layout.cpython-314.pyc
+│       │           │   │   │   ├── margins.cpython-314.pyc
+│       │           │   │   │   ├── menus.cpython-314.pyc
+│       │           │   │   │   ├── mouse_handlers.cpython-314.pyc
+│       │           │   │   │   ├── processors.cpython-314.pyc
+│       │           │   │   │   ├── screen.cpython-314.pyc
+│       │           │   │   │   ├── scrollable_pane.cpython-314.pyc
+│       │           │   │   │   └── utils.cpython-314.pyc
+│       │           │   │   ├── screen.py
+│       │           │   │   ├── scrollable_pane.py
+│       │           │   │   └── utils.py
+│       │           │   ├── lexers
+│       │           │   │   ├── base.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   └── pygments.cpython-314.pyc
+│       │           │   │   └── pygments.py
+│       │           │   ├── log.py
+│       │           │   ├── mouse_events.py
+│       │           │   ├── output
+│       │           │   │   ├── base.py
+│       │           │   │   ├── color_depth.py
+│       │           │   │   ├── conemu.py
+│       │           │   │   ├── defaults.py
+│       │           │   │   ├── flush_stdout.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── plain_text.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── color_depth.cpython-314.pyc
+│       │           │   │   │   ├── conemu.cpython-314.pyc
+│       │           │   │   │   ├── defaults.cpython-314.pyc
+│       │           │   │   │   ├── flush_stdout.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── plain_text.cpython-314.pyc
+│       │           │   │   │   ├── vt100.cpython-314.pyc
+│       │           │   │   │   ├── win32.cpython-314.pyc
+│       │           │   │   │   └── windows10.cpython-314.pyc
+│       │           │   │   ├── vt100.py
+│       │           │   │   ├── win32.py
+│       │           │   │   └── windows10.py
+│       │           │   ├── patch_stdout.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── auto_suggest.cpython-314.pyc
+│       │           │   │   ├── buffer.cpython-314.pyc
+│       │           │   │   ├── cache.cpython-314.pyc
+│       │           │   │   ├── cursor_shapes.cpython-314.pyc
+│       │           │   │   ├── data_structures.cpython-314.pyc
+│       │           │   │   ├── document.cpython-314.pyc
+│       │           │   │   ├── enums.cpython-314.pyc
+│       │           │   │   ├── history.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── keys.cpython-314.pyc
+│       │           │   │   ├── log.cpython-314.pyc
+│       │           │   │   ├── mouse_events.cpython-314.pyc
+│       │           │   │   ├── patch_stdout.cpython-314.pyc
+│       │           │   │   ├── renderer.cpython-314.pyc
+│       │           │   │   ├── search.cpython-314.pyc
+│       │           │   │   ├── selection.cpython-314.pyc
+│       │           │   │   ├── token.cpython-314.pyc
+│       │           │   │   ├── utils.cpython-314.pyc
+│       │           │   │   ├── validation.cpython-314.pyc
+│       │           │   │   └── win32_types.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   ├── renderer.py
+│       │           │   ├── search.py
+│       │           │   ├── selection.py
+│       │           │   ├── shortcuts
+│       │           │   │   ├── choice_input.py
+│       │           │   │   ├── dialogs.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── progress_bar
+│       │           │   │   │   ├── base.py
+│       │           │   │   │   ├── formatters.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   └── __pycache__
+│       │           │   │   │       ├── base.cpython-314.pyc
+│       │           │   │   │       ├── formatters.cpython-314.pyc
+│       │           │   │   │       └── __init__.cpython-314.pyc
+│       │           │   │   ├── prompt.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── choice_input.cpython-314.pyc
+│       │           │   │   │   ├── dialogs.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── prompt.cpython-314.pyc
+│       │           │   │   │   └── utils.cpython-314.pyc
+│       │           │   │   └── utils.py
+│       │           │   ├── styles
+│       │           │   │   ├── base.py
+│       │           │   │   ├── defaults.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── named_colors.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── defaults.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── named_colors.cpython-314.pyc
+│       │           │   │   │   ├── pygments.cpython-314.pyc
+│       │           │   │   │   ├── style.cpython-314.pyc
+│       │           │   │   │   └── style_transformation.cpython-314.pyc
+│       │           │   │   ├── pygments.py
+│       │           │   │   ├── style.py
+│       │           │   │   └── style_transformation.py
+│       │           │   ├── token.py
+│       │           │   ├── utils.py
+│       │           │   ├── validation.py
+│       │           │   ├── widgets
+│       │           │   │   ├── base.py
+│       │           │   │   ├── dialogs.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── menus.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── base.cpython-314.pyc
+│       │           │   │   │   ├── dialogs.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── menus.cpython-314.pyc
+│       │           │   │   │   └── toolbars.cpython-314.pyc
+│       │           │   │   └── toolbars.py
+│       │           │   └── win32_types.py
+│       │           ├── prompt_toolkit-3.0.53.dist-info
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   ├── AUTHORS.rst
+│       │           │   │   └── LICENSE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── top_level.txt
+│       │           │   └── WHEEL
+│       │           ├── requests
+│       │           │   ├── adapters.py
+│       │           │   ├── api.py
+│       │           │   ├── auth.py
+│       │           │   ├── certs.py
+│       │           │   ├── compat.py
+│       │           │   ├── cookies.py
+│       │           │   ├── exceptions.py
+│       │           │   ├── help.py
+│       │           │   ├── hooks.py
+│       │           │   ├── __init__.py
+│       │           │   ├── _internal_utils.py
+│       │           │   ├── models.py
+│       │           │   ├── packages.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── adapters.cpython-314.pyc
+│       │           │   │   ├── api.cpython-314.pyc
+│       │           │   │   ├── auth.cpython-314.pyc
+│       │           │   │   ├── certs.cpython-314.pyc
+│       │           │   │   ├── compat.cpython-314.pyc
+│       │           │   │   ├── cookies.cpython-314.pyc
+│       │           │   │   ├── exceptions.cpython-314.pyc
+│       │           │   │   ├── help.cpython-314.pyc
+│       │           │   │   ├── hooks.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── _internal_utils.cpython-314.pyc
+│       │           │   │   ├── models.cpython-314.pyc
+│       │           │   │   ├── packages.cpython-314.pyc
+│       │           │   │   ├── sessions.cpython-314.pyc
+│       │           │   │   ├── status_codes.cpython-314.pyc
+│       │           │   │   ├── structures.cpython-314.pyc
+│       │           │   │   ├── _types.cpython-314.pyc
+│       │           │   │   ├── utils.cpython-314.pyc
+│       │           │   │   └── __version__.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   ├── sessions.py
+│       │           │   ├── status_codes.py
+│       │           │   ├── structures.py
+│       │           │   ├── _types.py
+│       │           │   ├── utils.py
+│       │           │   └── __version__.py
+│       │           ├── requests-2.34.2.dist-info
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   ├── LICENSE
+│       │           │   │   └── NOTICE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── REQUESTED
+│       │           │   ├── top_level.txt
+│       │           │   └── WHEEL
+│       │           ├── tqdm
+│       │           │   ├── asyncio.py
+│       │           │   ├── autonotebook.py
+│       │           │   ├── auto.py
+│       │           │   ├── cli.py
+│       │           │   ├── completion.sh
+│       │           │   ├── contrib
+│       │           │   │   ├── bells.py
+│       │           │   │   ├── concurrent.py
+│       │           │   │   ├── discord.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── itertools.py
+│       │           │   │   ├── logging.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── bells.cpython-314.pyc
+│       │           │   │   │   ├── concurrent.cpython-314.pyc
+│       │           │   │   │   ├── discord.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── itertools.cpython-314.pyc
+│       │           │   │   │   ├── logging.cpython-314.pyc
+│       │           │   │   │   ├── slack.cpython-314.pyc
+│       │           │   │   │   ├── telegram.cpython-314.pyc
+│       │           │   │   │   └── utils_worker.cpython-314.pyc
+│       │           │   │   ├── slack.py
+│       │           │   │   ├── telegram.py
+│       │           │   │   └── utils_worker.py
+│       │           │   ├── dask.py
+│       │           │   ├── gui.py
+│       │           │   ├── __init__.py
+│       │           │   ├── keras.py
+│       │           │   ├── __main__.py
+│       │           │   ├── _main.py
+│       │           │   ├── _monitor.py
+│       │           │   ├── notebook.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── asyncio.cpython-314.pyc
+│       │           │   │   ├── auto.cpython-314.pyc
+│       │           │   │   ├── autonotebook.cpython-314.pyc
+│       │           │   │   ├── cli.cpython-314.pyc
+│       │           │   │   ├── dask.cpython-314.pyc
+│       │           │   │   ├── gui.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── keras.cpython-314.pyc
+│       │           │   │   ├── __main__.cpython-314.pyc
+│       │           │   │   ├── _main.cpython-314.pyc
+│       │           │   │   ├── _monitor.cpython-314.pyc
+│       │           │   │   ├── notebook.cpython-314.pyc
+│       │           │   │   ├── rich.cpython-314.pyc
+│       │           │   │   ├── std.cpython-314.pyc
+│       │           │   │   ├── tk.cpython-314.pyc
+│       │           │   │   ├── _tqdm.cpython-314.pyc
+│       │           │   │   ├── _tqdm_gui.cpython-314.pyc
+│       │           │   │   ├── _tqdm_notebook.cpython-314.pyc
+│       │           │   │   ├── _tqdm_pandas.cpython-314.pyc
+│       │           │   │   ├── _utils.cpython-314.pyc
+│       │           │   │   ├── utils.cpython-314.pyc
+│       │           │   │   └── version.cpython-314.pyc
+│       │           │   ├── rich.py
+│       │           │   ├── std.py
+│       │           │   ├── tk.py
+│       │           │   ├── tqdm.1
+│       │           │   ├── _tqdm_gui.py
+│       │           │   ├── _tqdm_notebook.py
+│       │           │   ├── _tqdm_pandas.py
+│       │           │   ├── _tqdm.py
+│       │           │   ├── _utils.py
+│       │           │   ├── utils.py
+│       │           │   └── version.py
+│       │           ├── tqdm-4.70.0.dist-info
+│       │           │   ├── entry_points.txt
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   └── LICENCE
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   ├── REQUESTED
+│       │           │   ├── top_level.txt
+│       │           │   └── WHEEL
+│       │           ├── urllib3
+│       │           │   ├── _base_connection.py
+│       │           │   ├── _collections.py
+│       │           │   ├── connectionpool.py
+│       │           │   ├── connection.py
+│       │           │   ├── contrib
+│       │           │   │   ├── emscripten
+│       │           │   │   │   ├── connection.py
+│       │           │   │   │   ├── emscripten_fetch_worker.js
+│       │           │   │   │   ├── fetch.py
+│       │           │   │   │   ├── __init__.py
+│       │           │   │   │   ├── __pycache__
+│       │           │   │   │   │   ├── connection.cpython-314.pyc
+│       │           │   │   │   │   ├── fetch.cpython-314.pyc
+│       │           │   │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   │   ├── request.cpython-314.pyc
+│       │           │   │   │   │   └── response.cpython-314.pyc
+│       │           │   │   │   ├── request.py
+│       │           │   │   │   └── response.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── pyopenssl.cpython-314.pyc
+│       │           │   │   │   └── socks.cpython-314.pyc
+│       │           │   │   ├── pyopenssl.py
+│       │           │   │   └── socks.py
+│       │           │   ├── exceptions.py
+│       │           │   ├── fields.py
+│       │           │   ├── filepost.py
+│       │           │   ├── http2
+│       │           │   │   ├── connection.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── probe.py
+│       │           │   │   └── __pycache__
+│       │           │   │       ├── connection.cpython-314.pyc
+│       │           │   │       ├── __init__.cpython-314.pyc
+│       │           │   │       └── probe.cpython-314.pyc
+│       │           │   ├── __init__.py
+│       │           │   ├── poolmanager.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── _base_connection.cpython-314.pyc
+│       │           │   │   ├── _collections.cpython-314.pyc
+│       │           │   │   ├── connection.cpython-314.pyc
+│       │           │   │   ├── connectionpool.cpython-314.pyc
+│       │           │   │   ├── exceptions.cpython-314.pyc
+│       │           │   │   ├── fields.cpython-314.pyc
+│       │           │   │   ├── filepost.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── poolmanager.cpython-314.pyc
+│       │           │   │   ├── _request_methods.cpython-314.pyc
+│       │           │   │   ├── response.cpython-314.pyc
+│       │           │   │   └── _version.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   ├── _request_methods.py
+│       │           │   ├── response.py
+│       │           │   ├── util
+│       │           │   │   ├── connection.py
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── proxy.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── connection.cpython-314.pyc
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── proxy.cpython-314.pyc
+│       │           │   │   │   ├── request.cpython-314.pyc
+│       │           │   │   │   ├── response.cpython-314.pyc
+│       │           │   │   │   ├── retry.cpython-314.pyc
+│       │           │   │   │   ├── ssl_.cpython-314.pyc
+│       │           │   │   │   ├── ssl_match_hostname.cpython-314.pyc
+│       │           │   │   │   ├── ssltransport.cpython-314.pyc
+│       │           │   │   │   ├── timeout.cpython-314.pyc
+│       │           │   │   │   ├── url.cpython-314.pyc
+│       │           │   │   │   ├── util.cpython-314.pyc
+│       │           │   │   │   └── wait.cpython-314.pyc
+│       │           │   │   ├── request.py
+│       │           │   │   ├── response.py
+│       │           │   │   ├── retry.py
+│       │           │   │   ├── ssl_match_hostname.py
+│       │           │   │   ├── ssl_.py
+│       │           │   │   ├── ssltransport.py
+│       │           │   │   ├── timeout.py
+│       │           │   │   ├── url.py
+│       │           │   │   ├── util.py
+│       │           │   │   └── wait.py
+│       │           │   └── _version.py
+│       │           ├── urllib3-2.7.0.dist-info
+│       │           │   ├── INSTALLER
+│       │           │   ├── licenses
+│       │           │   │   └── LICENSE.txt
+│       │           │   ├── METADATA
+│       │           │   ├── RECORD
+│       │           │   └── WHEEL
+│       │           ├── wcwidth
+│       │           │   ├── align.py
+│       │           │   ├── bisearch.py
+│       │           │   ├── _clip.py
+│       │           │   ├── _constants.py
+│       │           │   ├── control_codes.py
+│       │           │   ├── escape_sequences.py
+│       │           │   ├── grapheme.py
+│       │           │   ├── hyperlink.py
+│       │           │   ├── __init__.py
+│       │           │   ├── __pycache__
+│       │           │   │   ├── align.cpython-314.pyc
+│       │           │   │   ├── bisearch.cpython-314.pyc
+│       │           │   │   ├── _clip.cpython-314.pyc
+│       │           │   │   ├── _constants.cpython-314.pyc
+│       │           │   │   ├── control_codes.cpython-314.pyc
+│       │           │   │   ├── escape_sequences.cpython-314.pyc
+│       │           │   │   ├── grapheme.cpython-314.pyc
+│       │           │   │   ├── hyperlink.cpython-314.pyc
+│       │           │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   ├── sgr_state.cpython-314.pyc
+│       │           │   │   ├── table_ambiguous.cpython-314.pyc
+│       │           │   │   ├── table_grapheme.cpython-314.pyc
+│       │           │   │   ├── table_mc.cpython-314.pyc
+│       │           │   │   ├── table_overrides.cpython-314.pyc
+│       │           │   │   ├── table_term_programs.cpython-314.pyc
+│       │           │   │   ├── table_vs15.cpython-314.pyc
+│       │           │   │   ├── table_vs16.cpython-314.pyc
+│       │           │   │   ├── table_wide.cpython-314.pyc
+│       │           │   │   ├── table_zero.cpython-314.pyc
+│       │           │   │   ├── text_sizing.cpython-314.pyc
+│       │           │   │   ├── textwrap.cpython-314.pyc
+│       │           │   │   ├── unicode_versions.cpython-314.pyc
+│       │           │   │   ├── _wcswidth.cpython-314.pyc
+│       │           │   │   ├── _wcwidth.cpython-314.pyc
+│       │           │   │   ├── wcwidth.cpython-314.pyc
+│       │           │   │   └── _width.cpython-314.pyc
+│       │           │   ├── py.typed
+│       │           │   ├── sgr_state.py
+│       │           │   ├── table_ambiguous.py
+│       │           │   ├── table_grapheme_overrides
+│       │           │   │   ├── __init__.py
+│       │           │   │   ├── _known_27e0693f.py
+│       │           │   │   ├── _known_3d4826b8.py
+│       │           │   │   ├── _known_45d92e98.py
+│       │           │   │   ├── _known_4cdf59ce.py
+│       │           │   │   ├── _known_50bf0759.py
+│       │           │   │   ├── _known_529fbb4a.py
+│       │           │   │   ├── _known_5bfac390.py
+│       │           │   │   ├── _known_813fee16.py
+│       │           │   │   ├── _known_8589765c.py
+│       │           │   │   ├── _known_8f94b404.py
+│       │           │   │   ├── _known_970dbe10.py
+│       │           │   │   ├── _known_c0a2cdbf.py
+│       │           │   │   ├── _known_c2157f7e.py
+│       │           │   │   ├── _known_c3db41c0.py
+│       │           │   │   ├── _known_da9ceb0a.py
+│       │           │   │   ├── _known_e08bd75e.py
+│       │           │   │   ├── _known_e22030f3.py
+│       │           │   │   ├── _known_fcc05a0f.py
+│       │           │   │   ├── _known_fd9d4c44.py
+│       │           │   │   ├── __pycache__
+│       │           │   │   │   ├── __init__.cpython-314.pyc
+│       │           │   │   │   ├── _known_27e0693f.cpython-314.pyc
+│       │           │   │   │   ├── _known_3d4826b8.cpython-314.pyc
+│       │           │   │   │   ├── _known_45d92e98.cpython-314.pyc
+│       │           │   │   │   ├── _known_4cdf59ce.cpython-314.pyc
+│       │           │   │   │   ├── _known_50bf0759.cpython-314.pyc
+│       │           │   │   │   ├── _known_529fbb4a.cpython-314.pyc
+│       │           │   │   │   ├── _known_5bfac390.cpython-314.pyc
+│       │           │   │   │   ├── _known_813fee16.cpython-314.pyc
+│       │           │   │   │   ├── _known_8589765c.cpython-314.pyc
+│       │           │   │   │   ├── _known_8f94b404.cpython-314.pyc
+│       │           │   │   │   ├── _known_970dbe10.cpython-314.pyc
+│       │           │   │   │   ├── _known_c0a2cdbf.cpython-314.pyc
+│       │           │   │   │   ├── _known_c2157f7e.cpython-314.pyc
+│       │           │   │   │   ├── _known_c3db41c0.cpython-314.pyc
+│       │           │   │   │   ├── _known_da9ceb0a.cpython-314.pyc
+│       │           │   │   │   ├── _known_e08bd75e.cpython-314.pyc
+│       │           │   │   │   ├── _known_e22030f3.cpython-314.pyc
+│       │           │   │   │   ├── _known_fcc05a0f.cpython-314.pyc
+│       │           │   │   │   ├── _known_fd9d4c44.cpython-314.pyc
+│       │           │   │   │   └── _registry.cpython-314.pyc
+│       │           │   │   └── _registry.py
+│       │           │   ├── table_grapheme.py
+│       │           │   ├── table_mc.py
+│       │           │   ├── table_overrides.py
+│       │           │   ├── table_term_programs.py
+│       │           │   ├── table_vs15.py
+│       │           │   ├── table_vs16.py
+│       │           │   ├── table_wide.py
+│       │           │   ├── table_zero.py
+│       │           │   ├── text_sizing.py
+│       │           │   ├── textwrap.py
+│       │           │   ├── textwrap.py,cover
+│       │           │   ├── unicode_versions.py
+│       │           │   ├── _wcswidth.py
+│       │           │   ├── _wcwidth.py
+│       │           │   ├── wcwidth.py
+│       │           │   └── _width.py
+│       │           └── wcwidth-0.8.3.dist-info
+│       │               ├── INSTALLER
+│       │               ├── licenses
+│       │               │   └── LICENSE
+│       │               ├── METADATA
+│       │               ├── RECORD
+│       │               └── WHEEL
+│       ├── lib64 -> lib
+│       └── pyvenv.cfg
+└── wlroots_engine
+    ├── build
+    │   ├── CMakeCache.txt
+    │   ├── CMakeFiles
+    │   │   ├── 4.3.0
+    │   │   │   ├── CMakeCCompiler.cmake
+    │   │   │   ├── CMakeCXXCompiler.cmake
+    │   │   │   ├── CMakeDetermineCompilerABI_C.bin
+    │   │   │   ├── CMakeDetermineCompilerABI_CXX.bin
+    │   │   │   ├── CMakeSystem.cmake
+    │   │   │   ├── CompilerIdC
+    │   │   │   │   ├── a.out
+    │   │   │   │   ├── CMakeCCompilerId.c
+    │   │   │   │   └── tmp
+    │   │   │   └── CompilerIdCXX
+    │   │   │       ├── a.out
+    │   │   │       ├── CMakeCXXCompilerId.cpp
+    │   │   │       └── tmp
+    │   │   ├── cmake.check_cache
+    │   │   ├── CMakeConfigureLog.yaml
+    │   │   ├── CMakeDirectoryInformation.cmake
+    │   │   ├── CMakeRuleHashes.txt
+    │   │   ├── CMakeScratch
+    │   │   ├── InstallScripts.json
+    │   │   ├── linstack_wlroots_compositor.dir
+    │   │   │   ├── build.make
+    │   │   │   ├── cmake_clean.cmake
+    │   │   │   ├── compiler_depend.internal
+    │   │   │   ├── compiler_depend.make
+    │   │   │   ├── compiler_depend.ts
+    │   │   │   ├── DependInfo.cmake
+    │   │   │   ├── depend.make
+    │   │   │   ├── flags.make
+    │   │   │   ├── link.d
+    │   │   │   ├── link.txt
+    │   │   │   ├── progress.make
+    │   │   │   ├── protocols
+    │   │   │   │   ├── linux-dmabuf-v1-protocol.c.o
+    │   │   │   │   ├── linux-dmabuf-v1-protocol.c.o.d
+    │   │   │   │   ├── xdg-shell-protocol.c.o
+    │   │   │   │   └── xdg-shell-protocol.c.o.d
+    │   │   │   └── src
+    │   │   │       ├── AspectRatioWindow.cpp.o
+    │   │   │       ├── AspectRatioWindow.cpp.o.d
+    │   │   │       ├── EmbeddedCompositor.cpp.o
+    │   │   │       ├── EmbeddedCompositor.cpp.o.d
+    │   │   │       ├── InputMapper.cpp.o
+    │   │   │       ├── InputMapper.cpp.o.d
+    │   │   │       ├── main.cpp.o
+    │   │   │       ├── main.cpp.o.d
+    │   │   │       ├── WaylandSurfaceRenderer.cpp.o
+    │   │   │       └── WaylandSurfaceRenderer.cpp.o.d
+    │   │   ├── Makefile2
+    │   │   ├── Makefile.cmake
+    │   │   ├── pkgRedirects
+    │   │   ├── progress.marks
+    │   │   └── TargetDirectories.txt
+    │   ├── cmake_install.cmake
+    │   ├── compile_commands.json
+    │   ├── keymap_default.json
+    │   ├── linstack_wlroots_compositor
+    │   ├── Makefile
+    │   └── protocols
+    │       ├── linux-dmabuf-v1-protocol.c
+    │       ├── linux-dmabuf-v1-protocol.h
+    │       ├── xdg-shell-protocol.c
+    │       └── xdg-shell-protocol.h
+    ├── CMakeLists.txt
+    ├── include
+    │   ├── AspectRatioWindow.h
+    │   ├── EmbeddedCompositor.cpp
+    │   ├── EmbeddedCompositor.h
+    │   ├── InputMapper.h
+    │   ├── nlohmann
+    │   │   └── json.hpp
+    │   ├── WaylandSurfaceRenderer.h
+    │   └── wlroots_compat.h
+    ├── keymap_default.json
+    └── src
+        ├── AspectRatioWindow.cpp
+        ├── EmbeddedCompositor.cpp
+        ├── InputMapper.cpp
+        ├── main.cpp
+        └── WaylandSurfaceRenderer.cpp
+
+536 directories, 2504 files

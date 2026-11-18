@@ -9,6 +9,8 @@
 #include "SelfHealingManager.h"
 #include "Logger.h"
 #include "Theme.h"
+#include "AspectRatioWindow.h"
+#include "PathResolver.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -22,6 +24,7 @@
 #include <QPainter>
 #include <QWindow>
 #include <QApplication>
+#include <QSettings>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -36,7 +39,25 @@ MainWindow::MainWindow(QWidget *parent)
     setupUi();
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    if (m_service) {
+        delete m_service;
+        m_service = nullptr;
+    }
+}
+
+QSize MainWindow::calculateNetViewportSize() const
+{
+    int topBarHeight = m_titleBar ? m_titleBar->height() : 48;
+    int sideBarWidth = m_sideToolBar ? m_sideToolBar->width() : 46;
+    // Account for central container border (1px on left/right/top/bottom)
+    int netW = width() - sideBarWidth - 2;
+    int netH = height() - topBarHeight - 2;
+    if (netW <= 0) netW = 1280;
+    if (netH <= 0) netH = 720;
+    return QSize(netW, netH);
+}
 
 void MainWindow::setupUi()
 {
@@ -94,7 +115,9 @@ void MainWindow::setupUi()
         m_canvas->showToast("🔉 Volume Down (70%)");
     });
     connect(m_sideToolBar, &SideToolBar::keymapperToggled, this, &MainWindow::handleKeymapperToggle);
+    connect(m_sideToolBar, &SideToolBar::keymapperEditRequested, this, &MainWindow::handleKeymapperEdit);
     connect(m_sideToolBar, &SideToolBar::macroClicked, this, [this]() {
+
         m_canvas->showToast("⏺ Macro Automation: Recording gameplay action sequence...");
     });
     connect(m_sideToolBar, &SideToolBar::rotateClicked, this, &MainWindow::handleRotate);
@@ -110,24 +133,38 @@ void MainWindow::setupUi()
     });
     connect(m_sideToolBar, &SideToolBar::settingsClicked, this, &MainWindow::handleSettings);
 
-    // Android navigation buttons
+    // Android navigation buttons - sending native Android events directly into the container session
     connect(m_sideToolBar, &SideToolBar::androidBackClicked, this, [this]() {
-        m_canvas->showToast("◁ Android Back Key");
+        PathResolver::startDetachedLinstack(QStringList() << "shell" << "input" << "keyevent" << "4");
+        m_canvas->showToast("◁ Android Back");
     });
     connect(m_sideToolBar, &SideToolBar::androidHomeClicked, this, [this]() {
-        if (m_canvas->isWindowEmbedded()) {
-            m_canvas->releaseEmbeddedWindow();
-        }
+        PathResolver::startDetachedLinstack(QStringList() << "shell" << "input" << "keyevent" << "3");
         m_canvas->showToast("◯ Android Home");
     });
     connect(m_sideToolBar, &SideToolBar::androidRecentsClicked, this, [this]() {
-        m_canvas->showToast("▢ Android Recent Tasks");
+        PathResolver::startDetachedLinstack(QStringList() << "shell" << "input" << "keyevent" << "187");
+        m_canvas->showToast("▢ Android Recents");
     });
 
     // APK dropped directly onto canvas
     connect(m_canvas, &AndroidCanvas::apkDropped, this, [this](const QString &path) {
         if (m_service) {
             m_service->installApk(path);
+        }
+    });
+
+    connect(m_canvas, &AndroidCanvas::firstFrameRendered, this, [this]() {
+        m_titleBar->setEngineStatus("Session Active (120 FPS)", true);
+        if (m_service) {
+            m_service->setHasFirstFrame(true);
+        }
+    });
+
+    connect(m_canvas, &AndroidCanvas::waylandClientConnected, this, [this]() {
+        LOG_INFO("MainWindow", "Wayland client connected to embedded compositor -> triggering launchFullUi()");
+        if (m_service) {
+            m_service->launchFullUi();
         }
     });
 
@@ -142,15 +179,17 @@ void MainWindow::setupUi()
     // --- Background Service Initialization & Wiring ---
     m_service = new LinstackService(this);
 
+    // Dynamically calculate the exact available Android viewport dimensions by subtracting chrome
+    const QSize netViewport = calculateNetViewportSize();
+
     // Initialize uinput touch bridge for low-latency Linstack input
     m_uinputBridge = new UInputTouchBridge(this);
-    m_uinputBridge->initialize(1920, 1080);
+    m_uinputBridge->initialize(netViewport.width(), netViewport.height());
     m_canvas->setBridge(m_uinputBridge);
 
-    // Lock the canvas to a fixed 16:9 (1920×1080) aspect ratio.
-    // The InputTranslator will receive the actual viewport pixel dimensions
-    // via setScreenGeometry() inside AndroidCanvas::updateCanvasGeometry().
-    m_canvas->setBaseResolution(1920, 1080);
+    // Lock canvas aspect-ratio and configure container resolution
+    m_canvas->setBaseResolution(netViewport.width(), netViewport.height());
+    m_service->setDesiredResolution(netViewport.width(), netViewport.height());
 
     connect(m_service, &LinstackService::containerStateChanged, this, [this](LinstackService::ContainerState state) {
         if (state == LinstackService::ContainerState::Running) {
@@ -210,9 +249,15 @@ void MainWindow::setupUi()
         if (report.isHealthy) {
             m_titleBar->setEngineStatus("LinStack Ready", true);
             m_canvas->showToast("✔ LinStack subsystems & kernel modules verified healthy.", 2500);
+            if (m_service && m_service->sessionState() == LinstackService::SessionState::Idle) {
+                m_service->startSession();
+            }
         } else if (!report.hasCriticalFailures) {
             m_titleBar->setEngineStatus("System Warnings", false);
             m_canvas->showToast(QString("Notice: %1").arg(report.summary), 4000);
+            if (m_service && m_service->sessionState() == LinstackService::SessionState::Idle) {
+                m_service->startSession();
+            }
         } else {
             m_titleBar->setEngineStatus("Diagnostic Alert", false);
         }
@@ -278,13 +323,46 @@ void MainWindow::handleEcoModeToggle(bool active)
 
 void MainWindow::handleKeymapperToggle(bool active)
 {
+    if (!active && m_canvas->isAimModeActive()) {
+        m_canvas->setAimMode(false);
+    }
+    if (!active && m_canvas->keymapperOverlay() && m_canvas->keymapperOverlay()->translator()) {
+        auto *tr = m_canvas->keymapperOverlay()->translator();
+        if (tr->isAimLockActive()) {
+            tr->setAimLockActive(false, -1);
+        }
+    }
+
     m_canvas->setKeymapperVisible(active);
     if (active && m_canvas->keymapperOverlay()) {
         m_canvas->keymapperOverlay()->setMode(KeymapperOverlay::Mode::Play);
+        m_canvas->keymapperOverlay()->raise();
+        m_canvas->keymapperOverlay()->setFocus(Qt::OtherFocusReason);
+        m_canvas->showToast("⌨ Keymapping Enabled (Right-click icon or press Shortcut to edit)", 2500);
+    } else {
+        m_canvas->setFocus(Qt::OtherFocusReason);
+        m_canvas->showToast("⌨ Keymapping Disabled", 2000);
+    }
+}
+
+
+void MainWindow::handleKeymapperEdit()
+{
+    if (!m_sideToolBar->isKeymapperActive() || !m_canvas->isKeymapperVisible()) {
+        m_canvas->showToast("⚠️ Enable Keymapping from the sidebar button first before editing!", 3000);
+        return;
+    }
+
+    if (auto *overlay = m_canvas->keymapperOverlay()) {
+        auto nextMode = (overlay->mode() == KeymapperOverlay::Mode::Edit)
+        ? KeymapperOverlay::Mode::Play
+        : KeymapperOverlay::Mode::Edit;
+        overlay->setMode(nextMode);
     }
 }
 
 void MainWindow::handleInstallApk()
+
 {
     QString apkPath = QFileDialog::getOpenFileName(
         this,
@@ -453,6 +531,22 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
             newGeom.setBottom(qMax(m_dragStartGeometry.bottom() + delta.y(), m_dragStartGeometry.top() + minimumHeight()));
         }
 
+        // Strict Aspect Ratio constraint enforcement on net viewport
+        int topBarH = m_titleBar ? m_titleBar->height() : 48;
+        int sideBarW = m_sideToolBar ? m_sideToolBar->width() : 46;
+        int chromeW = sideBarW + 2;
+        int chromeH = topBarH + 2;
+
+        int netW = newGeom.width() - chromeW;
+        int netH = newGeom.height() - chromeH;
+
+        if (m_canvas && m_canvas->aspectRatioWindow()) {
+            bool anchorW = (m_resizeEdges & (Qt::LeftEdge | Qt::RightEdge)) != 0;
+            m_canvas->aspectRatioWindow()->snapSizeToAspectRatio(netW, netH, anchorW);
+            newGeom.setWidth(netW + chromeW);
+            newGeom.setHeight(netH + chromeH);
+        }
+
         setGeometry(newGeom);
         event->accept();
         return;
@@ -481,21 +575,50 @@ void MainWindow::changeEvent(QEvent *event)
     QMainWindow::changeEvent(event);
 }
 
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    if (m_canvas) {
+        QSize net = calculateNetViewportSize();
+        m_canvas->setBaseResolution(net.width(), net.height());
+    }
+}
+
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    // Shortcut: Ctrl + Shift + K -> Keymapper Overlay & Editor Mode
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_K) {
-        bool visible = !m_canvas->isKeymapperVisible();
-        m_canvas->setKeymapperVisible(visible);
-        if (visible && m_canvas->keymapperOverlay()) {
-            m_canvas->keymapperOverlay()->setMode(KeymapperOverlay::Mode::Edit);
-        }
+    int key = event->key();
+    if (key == Qt::Key_Control || key == Qt::Key_Shift || key == Qt::Key_Alt || key == Qt::Key_Meta) {
+        QMainWindow::keyPressEvent(event);
+        return;
+    }
+
+    QKeySequence pressedSeq(QKeyCombination(event->modifiers(), static_cast<Qt::Key>(key)));
+    QSettings settings("LinStack", "LinStack");
+
+    auto matchesShortcut = [&](const QString &id, const QString &defSeq) {
+        QString saved = settings.value("shortcuts/" + id, defSeq).toString();
+        return !saved.isEmpty() && QKeySequence::fromString(saved, QKeySequence::PortableText) == pressedSeq;
+    };
+
+    // 1A. Enable / Disable Keymapper completely
+    if (matchesShortcut("keymapper_toggle", "Ctrl+Shift+M")) {
+        bool nextActive = !m_sideToolBar->isKeymapperActive();
+        m_sideToolBar->setKeymapperActive(nextActive);
+        handleKeymapperToggle(nextActive);
         event->accept();
         return;
     }
 
-    // Shortcut: Ctrl + Shift + E -> Toggle Eco Mode
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_E) {
+    // 1B. Toggle Keymapper Editor Mode (Only works when Keymapper is already enabled)
+    if (matchesShortcut("keymapper", "Ctrl+Shift+K")) {
+        handleKeymapperEdit();
+        event->accept();
+        return;
+    }
+
+    // 2. Toggle Eco Mode
+
+    if (matchesShortcut("eco_mode", "Ctrl+Shift+E")) {
         bool eco = !m_sideToolBar->isEcoModeActive();
         m_sideToolBar->setEcoModeActive(eco);
         handleEcoModeToggle(eco);
@@ -503,62 +626,64 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    // Shortcut: Ctrl + Shift + S -> Take Screenshot
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_S) {
+    // 3. Take Screenshot
+    if (matchesShortcut("screenshot", "Ctrl+Shift+S")) {
         handleScreenshot();
         event->accept();
         return;
     }
 
-    // Shortcut: Ctrl + Shift + H -> Boss Key (Minimize/Hide immediately)
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_H) {
+    // 4. Boss Key (Minimize/Hide)
+    if (matchesShortcut("boss_key", "Ctrl+Shift+H")) {
         showMinimized();
         event->accept();
         return;
     }
 
-    // Shortcut: Ctrl + Shift + D -> Diagnostics & Health Recovery Dialog
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_D) {
-        if (m_healer) {
-            HealthReport rep = m_healer->engine()->latestReport();
-            if (rep.checks.isEmpty()) {
-                m_healer->startDiagnosticsAsync(false, this);
-            } else {
-                m_healer->showRecoveryDialog(rep, this);
-            }
-        }
-        event->accept();
-        return;
-    }
-
-    // Shortcut: Ctrl + Alt -> Lock / Free Mouse Cursor
-    if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::AltModifier)) {
-        if (m_canvas->keymapperOverlay() && m_canvas->keymapperOverlay()->translator()) {
-            auto *tr = m_canvas->keymapperOverlay()->translator();
-            tr->setAimLockActive(!tr->isAimLockActive());
-        }
-        event->accept();
-        return;
-    }
-
-    // Shortcut: F11 -> Fullscreen
-    if (event->key() == Qt::Key_F11) {
+    // 5. Fullscreen
+    if (matchesShortcut("fullscreen", "F11")) {
         handleFullscreenToggle();
         event->accept();
         return;
     }
 
-    // Shortcut: ESC -> Exit Fullscreen or release aim
-    if (event->key() == Qt::Key_Escape) {
-        if (isFullScreen()) {
-            showNormal();
-            m_titleBar->show();
-            m_sideToolBar->show();
+    // 6. Lock / Free Mouse Cursor
+    if (matchesShortcut("aim_lock", "Ctrl+Alt") ||
+        ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::AltModifier))) {
+        if (m_canvas->keymapperOverlay() && m_canvas->keymapperOverlay()->translator()) {
+            auto *tr = m_canvas->keymapperOverlay()->translator();
+            tr->setAimLockActive(!tr->isAimLockActive());
+        }
+        event->accept();
+    return;
+        }
+
+        // 7. Diagnostics Dialog
+        if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_D) {
+            if (m_healer) {
+                HealthReport rep = m_healer->engine()->latestReport();
+                if (rep.checks.isEmpty()) {
+                    m_healer->startDiagnosticsAsync(false, this);
+                } else {
+                    m_healer->showRecoveryDialog(rep, this);
+                }
+            }
             event->accept();
             return;
         }
-    }
-    QMainWindow::keyPressEvent(event);
+
+        // 8. ESC -> Exit Fullscreen
+        if (event->key() == Qt::Key_Escape) {
+            if (isFullScreen()) {
+                showNormal();
+                m_titleBar->show();
+                m_sideToolBar->show();
+                event->accept();
+                return;
+            }
+        }
+
+        QMainWindow::keyPressEvent(event);
 }
 
 void MainWindow::paintEvent(QPaintEvent *event)

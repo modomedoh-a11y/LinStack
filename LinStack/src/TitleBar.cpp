@@ -10,7 +10,7 @@
 TitleBar::TitleBar(QWidget *parent)
     : QWidget(parent)
 {
-    setFixedHeight(48);
+    setFixedHeight(32);
     setAttribute(Qt::WA_Hover, true);
     setupUi();
 }
@@ -24,7 +24,7 @@ void TitleBar::setupUi()
     // --- Left Section: Branding & Linstack Status ---
     // Logo Icon (Custom cyber hexagon badge)
     m_logoIconLabel = new QLabel(this);
-    m_logoIconLabel->setFixedSize(28, 28);
+    m_logoIconLabel->setFixedSize(22, 22);
     {
         QPixmap logoPix(56, 56);
         logoPix.fill(Qt::transparent);
@@ -63,7 +63,7 @@ void TitleBar::setupUi()
 
     // Title: LinStack
     m_titleLabel = new QLabel(this);
-    m_titleLabel->setText("<span style='font-size:15px; font-weight:800; color:#F9FAFB;'>lin</span><span style='font-size:15px; font-weight:800; color:#00FF66;'>Stack</span>");
+    m_titleLabel->setText("<span style='font-size:15px; font-weight:800; color:#F9FAFB;'>Lin</span><span style='font-size:15px; font-weight:800; color:#00FF66;'>Stack</span>");
     layout->addWidget(m_titleLabel);
 
     // Version Badge: v1.0
@@ -91,7 +91,7 @@ void TitleBar::setupUi()
     m_statusDot->setStyleSheet("background-color: #00FF66; border-radius: 4px;");
     layout->addWidget(m_statusDot);
 
-    m_statusText = new QLabel("Linstack Ready", this);
+    m_statusText = new QLabel("LinStack Ready", this);
     m_statusText->setStyleSheet("color: #9CA3AF; font-size: 11px; font-weight: 500;");
     layout->addWidget(m_statusText);
 
@@ -100,7 +100,7 @@ void TitleBar::setupUi()
     // --- Center Section: Play Store Search Bar ---
     auto *searchContainer = new QWidget(this);
     searchContainer->setFixedWidth(440);
-    searchContainer->setFixedHeight(34);
+    searchContainer->setFixedHeight(30);
     searchContainer->setStyleSheet(
         "QWidget {"
         "  background-color: #0D121D;"
@@ -120,7 +120,7 @@ void TitleBar::setupUi()
     searchLayout->setSpacing(6);
 
     auto *searchIcon = new QLabel(searchContainer);
-    searchIcon->setPixmap(Theme::renderIconPixmap(Theme::IconType::Search, Theme::ColorTextMuted, 16));
+    searchIcon->setPixmap(Theme::renderIconPixmap(Theme::IconType::Search, Theme::ColorTextMuted, 14));
     searchLayout->addWidget(searchIcon);
 
     m_searchEdit = new QLineEdit(searchContainer);
@@ -141,9 +141,9 @@ void TitleBar::setupUi()
 
     // Clear / Submit button
     m_searchBtn = new QPushButton(searchContainer);
-    m_searchBtn->setFixedSize(20, 20);
+    m_searchBtn->setFixedSize(18, 18);
     m_searchBtn->setCursor(Qt::PointingHandCursor);
-    m_searchBtn->setIcon(Theme::createIcon(Theme::IconType::PlayStore, Theme::ColorEmerald, 14));
+    m_searchBtn->setIcon(Theme::createIcon(Theme::IconType::PlayStore, Theme::ColorEmerald, 13));
     m_searchBtn->setToolTip("Search in Play Store");
     m_searchBtn->setStyleSheet("QPushButton { background: transparent; border: none; } QPushButton:hover { background: rgba(16, 185, 129, 0.2); border-radius: 10px; }");
     searchLayout->addWidget(m_searchBtn);
@@ -178,8 +178,8 @@ void TitleBar::setupUi()
 
     // Help Button
     m_helpBtn = new QPushButton(this);
-    m_helpBtn->setFixedSize(36, 32);
-    m_helpBtn->setIcon(Theme::createIcon(Theme::IconType::Help, Theme::ColorTextMuted, 16));
+    m_helpBtn->setFixedSize(32, 32);
+    m_helpBtn->setIcon(Theme::createIcon(Theme::IconType::Help, Theme::ColorTextMuted, 14));
     m_helpBtn->setToolTip("About LinStack 1.0 & Architecture");
     m_helpBtn->setStyleSheet(
         "QPushButton { background: transparent; border: none; border-radius: 4px; }"
@@ -190,8 +190,8 @@ void TitleBar::setupUi()
 
     // Minimize Button
     m_minBtn = new QPushButton(this);
-    m_minBtn->setFixedSize(40, 48);
-    m_minBtn->setIcon(Theme::createIcon(Theme::IconType::WindowMinimize, Theme::ColorTextMuted, 14));
+    m_minBtn->setFixedSize(32, 32);
+    m_minBtn->setIcon(Theme::createIcon(Theme::IconType::WindowMinimize, Theme::ColorTextMuted, 12));
     m_minBtn->setToolTip("Minimize");
     m_minBtn->setStyleSheet(
         "QPushButton { background: transparent; border: none; margin: 0; }"
@@ -202,8 +202,8 @@ void TitleBar::setupUi()
 
     // Maximize Button
     m_maxBtn = new QPushButton(this);
-    m_maxBtn->setFixedSize(40, 48);
-    m_maxBtn->setIcon(Theme::createIcon(Theme::IconType::WindowMaximize, Theme::ColorTextMuted, 14));
+    m_maxBtn->setFixedSize(32, 32);
+    m_maxBtn->setIcon(Theme::createIcon(Theme::IconType::WindowMaximize, Theme::ColorTextMuted, 12));
     m_maxBtn->setToolTip("Maximize");
     m_maxBtn->setStyleSheet(
         "QPushButton { background: transparent; border: none; margin: 0; }"
@@ -214,8 +214,8 @@ void TitleBar::setupUi()
 
     // Close Button
     m_closeBtn = new QPushButton(this);
-    m_closeBtn->setFixedSize(44, 48);
-    m_closeBtn->setIcon(Theme::createIcon(Theme::IconType::WindowClose, Theme::ColorTextMuted, 14));
+    m_closeBtn->setFixedSize(32, 32);
+    m_closeBtn->setIcon(Theme::createIcon(Theme::IconType::WindowClose, Theme::ColorTextMuted, 12));
     m_closeBtn->setToolTip("Close LinStack");
     m_closeBtn->setStyleSheet(
         "QPushButton { background: transparent; border: none; margin: 0; }"
