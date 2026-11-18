@@ -87,6 +87,7 @@ private:
     void updateNodeSettingsPanel();
     int  findNodeAt(const QPointF &pos) const;
     bool isGearClicked(int nodeIndex, const QPointF &pos) const;
+    bool isDeleteClicked(int nodeIndex, const QPointF &pos) const;
     bool hasNodeSettings(KeyNodeType type) const;
     void syncTranslatorNodes();
     void positionEditorBar();

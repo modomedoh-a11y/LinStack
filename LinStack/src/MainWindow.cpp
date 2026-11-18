@@ -16,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QCloseEvent>
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QDir>
@@ -155,7 +156,7 @@ void MainWindow::setupUi()
     });
 
     connect(m_canvas, &AndroidCanvas::firstFrameRendered, this, [this]() {
-        m_titleBar->setEngineStatus("Session Active (120 FPS)", true);
+        m_titleBar->setEngineStatus("Session Active", true);
         if (m_service) {
             m_service->setHasFirstFrame(true);
         }
@@ -696,4 +697,20 @@ void MainWindow::paintEvent(QPaintEvent *event)
         p.setPen(Theme::ColorBorder);
         p.drawRect(rect().adjusted(0, 0, -1, -1));
     }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    // إخفاء الواجهة فوراً للمستخدم
+    hide();
+    QApplication::processEvents();
+
+    // إيقاف جلسة الأندرويد بنظافة لحماية بيانات المستخدم من التلف
+    if (m_service) {
+        LOG_INFO("Core", "Gracefully stopping LinStack session before exit...");
+        m_service->stopSession();
+    }
+
+    event->accept();
+    QApplication::quit();
 }

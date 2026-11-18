@@ -413,6 +413,30 @@ void DiagnosticsWorker::performChecks()
         emit checkCompleted(r);
     }
 
+    {
+        DiagnosticCheckResult r;
+        r.id = "RAW_MOUSE_INPUT";
+        r.category = DiagnosticCategory::KernelModule;
+        r.name = "Raw Mouse Input (/dev/input/mice)";
+        r.canAutoHeal = true;
+        r.requiresElevation = true;
+
+        QFileInfo miceInfo("/dev/input/mice");
+        if (miceInfo.exists() && miceInfo.isReadable()) {
+            r.status = CheckStatus::Passed;
+            r.details = "Raw mouse device (/dev/input/mice) is readable for zero-latency 1:1 Aim Lock.";
+            LOG_INFO("Diagnostics", r.details);
+        } else {
+            r.status = CheckStatus::Warning;
+            r.errorCode = "WARN_RAW_MOUSE_PERMISSIONS";
+            r.details = "Raw mouse device (/dev/input/mice) lacks read permission. Aim Lock may feel jittery on Wayland.";
+            r.remediationHint = "chmod 0666 /dev/input/mice";
+            LOG_WARN("Diagnostics", r.details);
+        }
+        report.checks.append(r);
+        emit checkCompleted(r);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Finalize report
     // ─────────────────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
+    GuiPrivate
     Widgets
     Network
     OpenGL
@@ -34,6 +35,7 @@ if(NOT WLROOTS_FOUND)
 endif()
 
 pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
+pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
 pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.24)
 pkg_check_modules(EGL REQUIRED IMPORTED_TARGET egl)
 pkg_check_modules(GLESV2 REQUIRED IMPORTED_TARGET glesv2)
@@ -77,6 +79,17 @@ generate_wayland_protocol(
 generate_wayland_protocol(
     "${WAYLAND_PROTOCOLS_DIR}/stable/linux-dmabuf/linux-dmabuf-v1.xml"
     "linux-dmabuf-v1"
+)
+
+set(PTR_CONSTRAINTS_XML "${WAYLAND_PROTOCOLS_DIR}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml")
+set(PTR_CONSTRAINTS_HDR "${PROTOCOL_GEN_DIR}/pointer-constraints-unstable-v1-client-protocol.h")
+set(PTR_CONSTRAINTS_SRC "${PROTOCOL_GEN_DIR}/pointer-constraints-unstable-v1-client-protocol.c")
+add_custom_command(
+    OUTPUT ${PTR_CONSTRAINTS_HDR} ${PTR_CONSTRAINTS_SRC}
+    COMMAND ${WAYLAND_SCANNER_EXECUTABLE} client-header ${PTR_CONSTRAINTS_XML} ${PTR_CONSTRAINTS_HDR}
+    COMMAND ${WAYLAND_SCANNER_EXECUTABLE} private-code ${PTR_CONSTRAINTS_XML} ${PTR_CONSTRAINTS_SRC}
+    DEPENDS ${PTR_CONSTRAINTS_XML}
+    COMMENT "Generating Wayland client pointer-constraints protocol"
 )
 
 # Static library for wlroots embedded compositor engine
@@ -148,7 +161,8 @@ set(SOURCES
     src/InputTranslator.cpp
 )
 
-add_executable(LinStack ${SOURCES})
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--no-as-needed /usr/lib64/libwayland-client.so.0")
+add_executable(LinStack ${SOURCES} ${PTR_CONSTRAINTS_HDR})
 
 target_compile_definitions(LinStack PRIVATE
     LIN_STACK_INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}"
@@ -157,9 +171,21 @@ target_compile_definitions(LinStack PRIVATE
     WLR_USE_UNSTABLE=1
 )
 
+file(GLOB QT6_GUI_PRIVATE_DIRS "/usr/include/qt6/QtGui/*/QtGui")
+
+execute_process(
+    COMMAND bash -c "dirname $(dirname $(find /usr/include /usr/lib64 -name qplatformnativeinterface.h 2>/dev/null | head -n 1))"
+    OUTPUT_VARIABLE QPA_INCLUDE_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+
 target_include_directories(LinStack PRIVATE
     ${LIBEVDEV_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../wlroots_engine/include
+    ${PROTOCOL_GEN_DIR}
+    ${QT6_GUI_PRIVATE_DIRS}
+    ${QPA_INCLUDE_DIR}
     src
 )
 
@@ -174,11 +200,13 @@ target_link_libraries(LinStack PRIVATE
     wlroots_engine_lib
     Qt6::Core
     Qt6::Gui
+    Qt6::GuiPrivate
     Qt6::Widgets
     Qt6::Network
     Qt6::OpenGL
     Qt6::OpenGLWidgets
     ${LIBEVDEV_LIBRARIES}
+    -Wl,-lwayland-client
 )
 
 # Installation targets

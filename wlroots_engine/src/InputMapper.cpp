@@ -352,37 +352,49 @@ bool InputMapper::handleMouseMove(int winX, int winY, int deltaX, int deltaY, st
             effDy *= factor;
         }
 
+        // حساسية ناعمة 1:1 موزعة على كامل مساحة الشاشة
         float normDx = (effDx * aim->sensitivityX) / std::max(1, m_viewport.width);
         float normDy = (effDy * aim->sensitivityY) / std::max(1, m_viewport.height);
 
+        // بدء اللمسة من مكان أيقونة Aim Lock التي حددها المستخدم نفسه
+        const float baseCenterX = std::clamp(aim->centerX, 0.05f, 0.95f);
+        const float baseCenterY = std::clamp(aim->centerY, 0.05f, 0.95f);
+
         if (m_activeAimCameraSlot < 0) {
             m_activeAimCameraSlot = allocateSlot();
-            double cx = aim->centerX * m_androidWidth;
-            double cy = aim->centerY * m_androidHeight;
+            m_accumAimX = 0.0f;
+            m_accumAimY = 0.0f;
+            double cx = baseCenterX * m_androidWidth;
+            double cy = baseCenterY * m_androidHeight;
             wlr_seat_touch_notify_down(m_seat, rootSurf, now, m_activeAimCameraSlot, cx, cy);
             wlr_seat_touch_notify_frame(m_seat);
         }
 
-        m_accumAimX += normDx;
-        m_accumAimY += normDy;
+        float nextX = baseCenterX + m_accumAimX + normDx;
+        float nextY = baseCenterY + m_accumAimY + normDy;
 
-        float distSq = m_accumAimX * m_accumAimX + m_accumAimY * m_accumAimY;
-        float maxRadiusSq = aim->maxSweepRadius * aim->maxSweepRadius;
-
-        if (distSq >= maxRadiusSq) {
+        // إعادة التمركز فقط عند ملامسة الحافة القصوى للشاشة (2% من الحواف)
+        if (nextX <= 0.02f || nextX >= 0.98f || nextY <= 0.02f || nextY >= 0.98f) {
             wlr_seat_touch_notify_up(m_seat, now, m_activeAimCameraSlot);
             wlr_seat_touch_notify_frame(m_seat);
 
-            m_accumAimX = 0.0f;
-            m_accumAimY = 0.0f;
+            m_accumAimX = normDx;
+            m_accumAimY = normDy;
 
-            double cx = aim->centerX * m_androidWidth;
-            double cy = aim->centerY * m_androidHeight;
+            double cx = baseCenterX * m_androidWidth;
+            double cy = baseCenterY * m_androidHeight;
             wlr_seat_touch_notify_down(m_seat, rootSurf, now + 1, m_activeAimCameraSlot, cx, cy);
             wlr_seat_touch_notify_frame(m_seat);
+
+            double tx = std::clamp(static_cast<double>((baseCenterX + m_accumAimX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
+            double ty = std::clamp(static_cast<double>((baseCenterY + m_accumAimY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
+            wlr_seat_touch_notify_motion(m_seat, now + 2, m_activeAimCameraSlot, tx, ty);
+            wlr_seat_touch_notify_frame(m_seat);
         } else {
-            double targetX = std::clamp(static_cast<double>((aim->centerX + m_accumAimX) * m_androidWidth), 0.0, static_cast<double>(m_androidWidth - 1));
-            double targetY = std::clamp(static_cast<double>((aim->centerY + m_accumAimY) * m_androidHeight), 0.0, static_cast<double>(m_androidHeight - 1));
+            m_accumAimX += normDx;
+            m_accumAimY += normDy;
+            double targetX = std::clamp(static_cast<double>((baseCenterX + m_accumAimX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
+            double targetY = std::clamp(static_cast<double>((baseCenterY + m_accumAimY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
             wlr_seat_touch_notify_motion(m_seat, now, m_activeAimCameraSlot, targetX, targetY);
             wlr_seat_touch_notify_frame(m_seat);
         }

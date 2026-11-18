@@ -1103,10 +1103,21 @@ bool KeymapperOverlay::isGearClicked(int nodeIndex, const QPointF &pos) const
     return distSq <= 14.0 * 14.0;
 }
 
+bool KeymapperOverlay::isDeleteClicked(int nodeIndex, const QPointF &pos) const
+{
+    if (nodeIndex < 0 || nodeIndex >= m_nodes.size()) return false;
+    const auto &node = m_nodes[nodeIndex];
+
+    qreal dx = node.relX * width() - node.radius * 0.75;
+    qreal dy = node.relY * height() - node.radius * 0.75;
+    qreal distSq = (pos.x() - dx) * (pos.x() - dx) + (pos.y() - dy) * (pos.y() - dy);
+    return distSq <= 14.0 * 14.0;
+}
+
 int KeymapperOverlay::findNodeAt(const QPointF &pos) const
 {
     for (int i = m_nodes.size() - 1; i >= 0; --i) {
-        if (isGearClicked(i, pos)) return i;
+        if (isDeleteClicked(i, pos) || isGearClicked(i, pos)) return i;
 
         qreal cx = m_nodes[i].relX * width();
         qreal cy = m_nodes[i].relY * height();
@@ -1181,6 +1192,12 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
             if (idx >= 0) {
                 m_selectedNodeIndex = idx;
 
+                if (isDeleteClicked(idx, event->position())) {
+                    removeSelectedNode();
+                    event->accept();
+                    return;
+                }
+
                 if (isGearClicked(idx, event->position())) {
                     m_settingsOpen = !m_settingsOpen;
                     updateNodeSettingsPanel();
@@ -1188,6 +1205,7 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
                     event->accept();
                     return;
                 }
+
 
                 m_isDraggingNode = true;
                 m_isDraggingSwipeEnd = false;
@@ -1561,16 +1579,30 @@ void KeymapperOverlay::paintEvent(QPaintEvent *event)
             }
         }
 
-        if (m_mode == Mode::Edit && hasNodeSettings(node.type)) {
-            qreal gx = cx + node.radius * 0.75;
-            qreal gy = cy - node.radius * 0.75;
-            p.setBrush(QColor(11, 15, 25, 245));
-            p.setPen(QPen(Theme::ColorNeon, 1.3));
-            p.drawEllipse(QPointF(gx, gy), 11, 11);
+        if (m_mode == Mode::Edit) {
+            // زر الحذف الأحمر في الأعلى على اليسار لكل زر
+            qreal delX = cx - node.radius * 0.75;
+            qreal delY = cy - node.radius * 0.75;
+            p.setBrush(QColor(127, 29, 29, 245));
+            p.setPen(QPen(QColor("#EF4444"), 1.3));
+            p.drawEllipse(QPointF(delX, delY), 10, 10);
 
-            p.setPen(Theme::ColorNeon);
-            QFont gf = p.font(); gf.setPointSize(9); gf.setBold(true); p.setFont(gf);
-            p.drawText(QRectF(gx - 11, gy - 11, 22, 22), Qt::AlignCenter, "⚙");
+            p.setPen(QColor("#FCA5A5"));
+            QFont df = p.font(); df.setPointSize(8); df.setBold(true); p.setFont(df);
+            p.drawText(QRectF(delX - 10, delY - 10, 20, 20), Qt::AlignCenter, "✕");
+
+            // زر الإعدادات في الأعلى على اليمين للأزرار التي تدعم الإعدادات
+            if (hasNodeSettings(node.type)) {
+                qreal gx = cx + node.radius * 0.75;
+                qreal gy = cy - node.radius * 0.75;
+                p.setBrush(QColor(11, 15, 25, 245));
+                p.setPen(QPen(Theme::ColorNeon, 1.3));
+                p.drawEllipse(QPointF(gx, gy), 11, 11);
+
+                p.setPen(Theme::ColorNeon);
+                QFont gf = p.font(); gf.setPointSize(9); gf.setBold(true); p.setFont(gf);
+                p.drawText(QRectF(gx - 11, gy - 11, 22, 22), Qt::AlignCenter, "⚙");
+            }
         }
 
         if (isSelected) {

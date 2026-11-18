@@ -51,7 +51,7 @@ void SelfHealingManager::handleDiagnosticsFinished(const HealthReport &report)
     bool hasBlockingIssue = !fails.isEmpty();
     if (!hasBlockingIssue) {
         for (const auto &c : warns) {
-            if (c.requiresElevation || c.id == "KERNEL_BINDER") {
+            if (c.requiresElevation || c.id == "KERNEL_BINDER" || c.id == "RAW_MOUSE_INPUT") {
                 hasBlockingIssue = true;
                 break;
             }
@@ -183,7 +183,11 @@ bool SelfHealingManager::executeElevatedFixes(const HealthReport &report)
         commands << "chmod 0666 /dev/binder /dev/binderfs/binder /dev/vndbinder /dev/hwbinder 2>/dev/null || true";
     }
 
-    // 4. Ensure container daemon service is enabled and restarted
+    // 4. Raw mouse input permissions for smooth 1:1 Aim Lock on Wayland
+    commands << "echo 'KERNEL==\"mice\", SUBSYSTEM==\"input\", MODE=\"0666\"' > /etc/udev/rules.d/99-linstack-raw-mouse.rules 2>/dev/null || true";
+    commands << "chmod 0666 /dev/input/mice 2>/dev/null || true";
+
+    // 5. Ensure container daemon service is enabled and restarted
     commands << "systemctl enable --now linstack-container.service 2>/dev/null || true";
     commands << "systemctl restart linstack-container.service 2>/dev/null || true";
 
@@ -757,12 +761,23 @@ void RecoveryDialog::setReport(const HealthReport &report)
         desc += "<b>Critical Faults:</b><ul style='margin-top: 4px; margin-bottom: 4px;'>";
         for (const auto &f : fails) {
             desc += QString("<li><b>%1:</b> %2<br><span style='color:#34D399;'>Remediation: %3</span></li>")
-                        .arg(f.name, f.details, f.remediationHint);
+            .arg(f.name, f.details, f.remediationHint);
+        }
+        desc += "</ul>";
+    }
+    if (!warns.isEmpty()) {
+        desc += "<b>Warnings Requiring Attention:</b><ul style='margin-top: 4px; margin-bottom: 4px;'>";
+        for (const auto &w : warns) {
+            if (w.requiresElevation) {
+                desc += QString("<li><b>%1:</b> %2<br><span style='color:#FBBF24;'>Auto-Fix: %3</span></li>")
+                .arg(w.name, w.details, w.remediationHint);
+            }
         }
         desc += "</ul>";
     }
 
     m_descriptionLabel->setText(desc);
+
 
     // Update log console with recent lines
     m_logConsole->setPlainText(Logger::instance().recentLogsText(50));

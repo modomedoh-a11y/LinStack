@@ -139,6 +139,10 @@ private:
     bool m_ignoreNextMouseMove = false;
     QPoint m_lastMousePos;
     QPointF m_aimAnchorNorm = QPointF(0.5, 0.5);
+    int m_rawMouseFd = -1;
+    QSocketNotifier *m_rawMouseNotifier = nullptr;
+    void *m_wlPointerConstraints = nullptr;
+    void *m_wlLockedPointer = nullptr;
 
     bool m_simulatedActive = true;
     bool m_hasFirstFrame = false;

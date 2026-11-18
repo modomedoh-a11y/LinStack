@@ -34,7 +34,15 @@
 
 #include <QGuiApplication>
 #include <QScreen>
+#include <QWindow>
+#include <qpa/qplatformnativeinterface.h>
+extern "C" {
+    #include <wayland-client.h>
+    #include "pointer-constraints-unstable-v1-client-protocol.h"
+    #include "pointer-constraints-unstable-v1-client-protocol.c"
+}
 #include <unistd.h>
+#include <fcntl.h>
 #include "AndroidCanvas.h"
 #include "KeymapperOverlay.h"
 #include "InputTranslator.h"
@@ -830,20 +838,92 @@ void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
     m_aimModeActive = active;
     m_aimAnchorNorm = anchorNorm;
 
+    auto *wlApp = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
+    auto *pni = QGuiApplication::platformNativeInterface();
+
     if (m_aimModeActive) {
         setCursor(Qt::BlankCursor);
-        // قفل مؤشر الماوس فوق زر Aim Lock نفسه وليس في منتصف الشاشة
-        QPoint localAnchor(
-            m_viewportRect.x() + qRound(m_aimAnchorNorm.x() * m_viewportRect.width()),
-                           m_viewportRect.y() + qRound(m_aimAnchorNorm.y() * m_viewportRect.height())
-        );
-        QPoint globalAnchor = mapToGlobal(localAnchor);
-        QCursor::setPos(globalAnchor);
-        m_lastMousePos = globalAnchor;
-        m_ignoreNextMouseMove = true;
+        if (window()) window()->setCursor(Qt::BlankCursor);
+        if (m_keymapperOverlay) m_keymapperOverlay->setCursor(Qt::BlankCursor);
+        QGuiApplication::setOverrideCursor(Qt::BlankCursor);
+
+        // 1. قفل مؤشر النظام الحقيقي على مستوى Wayland
+        if (wlApp && pni && window() && window()->windowHandle() && !m_wlLockedPointer) {
+            struct wl_display *dpy = wlApp->display();
+            struct wl_pointer *ptr = wlApp->pointer();
+            auto *surf = static_cast<struct wl_surface *>(
+                pni->nativeResourceForWindow("surface", window()->windowHandle()));
+
+            if (dpy && ptr && surf) {
+                if (!m_wlPointerConstraints) {
+                    struct wl_registry *reg = wl_display_get_registry(dpy);
+                    static struct wl_registry_listener regListener = {
+                        [](void *data, struct wl_registry *r, uint32_t id, const char *iface, uint32_t ver) {
+                            if (std::string(iface) == zwp_pointer_constraints_v1_interface.name) {
+                                *static_cast<void **>(data) = wl_registry_bind(
+                                    r, id, &zwp_pointer_constraints_v1_interface, std::min(ver, 1u));
+                            }
+                        },
+                        [](void *, struct wl_registry *, uint32_t) {}
+                    };
+                    wl_registry_add_listener(reg, &regListener, &m_wlPointerConstraints);
+                    wl_display_roundtrip(dpy);
+                    wl_registry_destroy(reg);
+                }
+
+                if (m_wlPointerConstraints) {
+                    m_wlLockedPointer = zwp_pointer_constraints_v1_lock_pointer(
+                        static_cast<struct zwp_pointer_constraints_v1 *>(m_wlPointerConstraints),
+                                                                                surf, ptr, nullptr, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+                    wl_display_flush(dpy);
+                }
+            }
+        }
+
+        // 2. قراءة حركة الماوس الخام مباشرة من /dev/input/mice
+        if (m_rawMouseFd < 0) {
+            m_rawMouseFd = ::open("/dev/input/mice", O_RDONLY | O_NONBLOCK);
+            if (m_rawMouseFd >= 0) {
+                m_rawMouseNotifier = new QSocketNotifier(m_rawMouseFd, QSocketNotifier::Read, this);
+                connect(m_rawMouseNotifier, &QSocketNotifier::activated, this, [this]() {
+                    if (!m_aimModeActive || m_rawMouseFd < 0) return;
+                    signed char packet[3];
+                    int totalDx = 0, totalDy = 0;
+                    while (::read(m_rawMouseFd, packet, sizeof(packet)) == 3) {
+                        totalDx += static_cast<int>(packet[1]);
+                        totalDy -= static_cast<int>(packet[2]);
+                    }
+                    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+                    if (m_inputMapper && activeSurface && (totalDx != 0 || totalDy != 0)) {
+                        m_inputMapper->handleMouseMove(0, 0, totalDx, totalDy, activeSurface);
+                        if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+                    }
+                });
+            }
+        }
+
         showToast("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)", 2000);
     } else {
+        if (m_wlLockedPointer) {
+            zwp_locked_pointer_v1_destroy(static_cast<struct zwp_locked_pointer_v1 *>(m_wlLockedPointer));
+            m_wlLockedPointer = nullptr;
+            if (wlApp && wlApp->display()) wl_display_flush(wlApp->display());
+        }
+
+        while (QGuiApplication::overrideCursor()) {
+            QGuiApplication::restoreOverrideCursor();
+        }
+        if (m_rawMouseNotifier) {
+            delete m_rawMouseNotifier;
+            m_rawMouseNotifier = nullptr;
+        }
+        if (m_rawMouseFd >= 0) {
+            ::close(m_rawMouseFd);
+            m_rawMouseFd = -1;
+        }
         setCursor(Qt::ArrowCursor);
+        if (window()) window()->setCursor(Qt::ArrowCursor);
+        if (m_keymapperOverlay) m_keymapperOverlay->setCursor(Qt::ArrowCursor);
         showToast("Aim Lock Released", 1500);
     }
 
@@ -861,7 +941,6 @@ void AndroidCanvas::mousePressEvent(QMouseEvent *event)
         ViewportRect vp{m_viewportRect.x(), m_viewportRect.y(), m_viewportRect.width(), m_viewportRect.height()};
         m_inputMapper->setGeometry(vp, surfW, surfH);
 
-        // If Keymapper is disabled, temporarily ensure AimLock isn't intercepting clicks
         if (!isKeymapperVisible() && m_inputMapper->isAimLockActive()) {
             m_inputMapper->setAimLockActive(false, -1);
         }
@@ -880,32 +959,51 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
 
     if (isKeymapperVisible() && m_aimModeActive) {
-        if (m_ignoreNextMouseMove) {
-            m_ignoreNextMouseMove = false;
-            m_lastMousePos = event->globalPosition().toPoint();
+        // تجاهل أحداث Qt إذا كان قارئ الماوس الخام يعمل لمنع تضاعف الحركة
+        if (m_rawMouseFd >= 0) {
             event->accept();
             return;
         }
 
         QPoint currentGlobal = event->globalPosition().toPoint();
+        if (m_ignoreNextMouseMove) {
+            m_ignoreNextMouseMove = false;
+            m_lastMousePos = currentGlobal;
+            event->accept();
+            return;
+        }
+
         int dx = currentGlobal.x() - m_lastMousePos.x();
         int dy = currentGlobal.y() - m_lastMousePos.y();
+        m_lastMousePos = currentGlobal;
+
+        // تجاهل الارتداد العكسي المفاجئ الناتج عن قفزة المؤشر على Wayland
+        if (std::abs(dx) > 250 || std::abs(dy) > 250) {
+            event->accept();
+            return;
+        }
 
         if (m_inputMapper && activeSurface && (dx != 0 || dy != 0)) {
             m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), dx, dy, activeSurface);
             if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
         }
 
-        QPoint localAnchor(
-            m_viewportRect.x() + qRound(m_aimAnchorNorm.x() * m_viewportRect.width()),
-                           m_viewportRect.y() + qRound(m_aimAnchorNorm.y() * m_viewportRect.height())
-        );
+        // إعادة المؤشر للمنتصف فقط عند الاقتراب من الحواف لمنع التردد
+        QPoint localPos = event->position().toPoint();
+        const int margin = 90;
+        if (localPos.x() < margin || localPos.x() > width() - margin ||
+            localPos.y() < margin || localPos.y() > height() - margin) {
+            QPoint localAnchor(
+                m_viewportRect.x() + qRound(m_aimAnchorNorm.x() * m_viewportRect.width()),
+                               m_viewportRect.y() + qRound(m_aimAnchorNorm.y() * m_viewportRect.height())
+            );
         QPoint globalAnchor = mapToGlobal(localAnchor);
         m_ignoreNextMouseMove = true;
         QCursor::setPos(globalAnchor);
-        m_lastMousePos = globalAnchor;
-        event->accept();
-        return;
+            }
+
+            event->accept();
+            return;
     }
 
     if (m_inputMapper && activeSurface && (event->buttons() & Qt::LeftButton)) {
