@@ -27,6 +27,9 @@ signals:
     void helpRequested();
     void windowDragged(const QPoint &globalDelta);
     void maximizeToggled();
+    void restartSessionRequested();
+    void restartContainerRequested();
+
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;

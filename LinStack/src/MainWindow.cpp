@@ -106,6 +106,21 @@ void MainWindow::setupUi()
     connect(m_titleBar, &TitleBar::windowDragged, this, &MainWindow::handleWindowDrag);
     connect(m_titleBar, &TitleBar::helpRequested, this, &MainWindow::handleHelp);
     connect(m_titleBar, &TitleBar::searchTriggered, this, &MainWindow::handleSearch);
+    connect(m_titleBar, &TitleBar::restartSessionRequested, this, [this]() {
+        if (m_service) {
+            m_canvas->showToast("🔄 Restarting LinStack session...", 3000);
+            m_service->stopSession();
+            QTimer::singleShot(1200, m_service, &LinstackService::startSession);
+        }
+    });
+    connect(m_titleBar, &TitleBar::restartContainerRequested, this, [this]() {
+        if (m_service) {
+            m_canvas->showToast("⚡ Restarting Android container service...", 3500);
+            m_service->stopSession();
+            m_service->restartContainerService();
+            QTimer::singleShot(3000, m_service, &LinstackService::startSession);
+        }
+    });
 
     // --- Side Toolbar Connections ---
     connect(m_sideToolBar, &SideToolBar::fullscreenClicked, this, &MainWindow::handleFullscreenToggle);
@@ -204,8 +219,8 @@ void MainWindow::setupUi()
 
     connect(m_service, &LinstackService::sessionStateChanged, this, [this](LinstackService::SessionState state) {
         if (state == LinstackService::SessionState::Active) {
-            m_titleBar->setEngineStatus("LinStack Session Active", true);
-            m_canvas->showToast("LinStack Android 13 session is active and running.");
+            m_titleBar->setEngineStatus("Session Active", true);
+            m_canvas->showToast("LinStack Android session is active and running.");
         } else if (state == LinstackService::SessionState::Starting) {
             m_titleBar->setEngineStatus("Session Starting...", false);
             m_canvas->showToast("Spawning LinStack session process...");

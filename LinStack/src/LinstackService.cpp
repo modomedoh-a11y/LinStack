@@ -456,12 +456,17 @@ void LinstackService::retryFullUi()
 }
 
 void LinstackService::stopSession()
-
 {
     emit logMessage("Session", "Stopping LinStack session...");
     LOG_INFO("Session", "Stopping LinStack session...");
     setSessionState(SessionState::Stopping);
 
+    if (m_adbPollTimer) {
+        m_adbPollTimer->stop();
+    }
+    if (m_statusPollTimer) {
+        m_statusPollTimer->stop();
+    }
     if (m_sessionPollTimer) {
         m_sessionPollTimer->stop();
     }
@@ -486,17 +491,20 @@ void LinstackService::stopSession()
         }
     }
 
-    auto *stopProc = new QProcess(this);
-    connect(stopProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this, stopProc]() {
-        setSessionState(SessionState::Idle);
-        emit logMessage("Session", "LinStack session stopped.");
-        LOG_INFO("Session", "LinStack session stopped.");
-        stopProc->deleteLater();
-    });
-    PathResolver::configureProcess(stopProc, QStringList() << "session" << "stop");
-    stopProc->start();
+    // تنفيذ session stop بشكل متزامن لضمان إغلاق جلسة الأندرويد بالكامل قبل خروج البرنامج
+    QProcess stopProc;
+    PathResolver::configureProcess(&stopProc, QStringList() << "session" << "stop");
+    stopProc.start();
+    if (!stopProc.waitForFinished(5000)) {
+        stopProc.kill();
+        stopProc.waitForFinished(500);
+    }
+
+    setSessionState(SessionState::Idle);
+    emit logMessage("Session", "LinStack session stopped.");
+    LOG_INFO("Session", "LinStack session stopped.");
 }
+
 
 void LinstackService::handleSessionProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {

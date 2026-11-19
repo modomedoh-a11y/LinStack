@@ -5,6 +5,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QAction>
+#include <QMenu>
 #include <QWindow>
 
 TitleBar::TitleBar(QWidget *parent)
@@ -92,8 +93,14 @@ void TitleBar::setupUi()
     layout->addWidget(m_statusDot);
 
     m_statusText = new QLabel("LinStack Ready", this);
-    m_statusText->setStyleSheet("color: #9CA3AF; font-size: 11px; font-weight: 500;");
+    m_statusText->setCursor(Qt::PointingHandCursor);
+    m_statusText->setToolTip("Click for Session & Container actions");
+    m_statusText->setStyleSheet(
+        "QLabel { color: #9CA3AF; font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 4px; }"
+        "QLabel:hover { background-color: #161F30; color: #00FF66; }"
+    );
     layout->addWidget(m_statusText);
+
 
     layout->addStretch(1);
 
@@ -284,6 +291,26 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
         QWidget *child = childAt(event->position().toPoint());
+        if (child == m_statusText || child == m_statusDot) {
+            QMenu menu(this);
+            menu.setStyleSheet(
+                "QMenu { background-color: #0D121D; color: #F9FAFB; border: 1px solid #10B981; border-radius: 6px; padding: 4px; }"
+                "QMenu::item { padding: 6px 14px; border-radius: 4px; font-size: 12px; }"
+                "QMenu::item:selected { background-color: rgba(16, 185, 129, 0.2); color: #00FF66; }"
+            );
+            QAction *actRestartSession = menu.addAction("🔄 Restart Session");
+            QAction *actRestartContainer = menu.addAction("⚡ Restart Container");
+
+            QAction *chosen = menu.exec(m_statusText->mapToGlobal(QPoint(0, m_statusText->height() + 4)));
+            if (chosen == actRestartSession) {
+                emit restartSessionRequested();
+            } else if (chosen == actRestartContainer) {
+                emit restartContainerRequested();
+            }
+            event->accept();
+            return;
+        }
+
         if (child == nullptr || child == this || child == m_titleLabel || child == m_logoIconLabel) {
             m_isDragging = true;
             m_dragStartPos = event->globalPosition().toPoint();
@@ -293,6 +320,7 @@ void TitleBar::mousePressEvent(QMouseEvent *event)
     }
     QWidget::mousePressEvent(event);
 }
+
 
 void TitleBar::mouseMoveEvent(QMouseEvent *event)
 {
