@@ -839,7 +839,6 @@ void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
     m_aimAnchorNorm = anchorNorm;
 
     auto *wlApp = qGuiApp->nativeInterface<QNativeInterface::QWaylandApplication>();
-    auto *pni = QGuiApplication::platformNativeInterface();
 
     if (m_aimModeActive) {
         setCursor(Qt::BlankCursor);
@@ -848,13 +847,20 @@ void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
         QGuiApplication::setOverrideCursor(Qt::BlankCursor);
 
         // 1. قفل مؤشر النظام الحقيقي على مستوى Wayland
-        if (wlApp && pni && window() && window()->windowHandle() && !m_wlLockedPointer) {
+        auto *pni = QGuiApplication::platformNativeInterface();
+        struct wl_surface *surf = (pni && window() && window()->windowHandle())
+        ? static_cast<struct wl_surface *>(pni->nativeResourceForWindow("surface", window()->windowHandle()))
+        : nullptr;
+
+        if (wlApp && surf && !m_wlLockedPointer) {
+
+
             struct wl_display *dpy = wlApp->display();
             struct wl_pointer *ptr = wlApp->pointer();
-            auto *surf = static_cast<struct wl_surface *>(
-                pni->nativeResourceForWindow("surface", window()->windowHandle()));
 
             if (dpy && ptr && surf) {
+
+
                 if (!m_wlPointerConstraints) {
                     struct wl_registry *reg = wl_display_get_registry(dpy);
                     static struct wl_registry_listener regListener = {

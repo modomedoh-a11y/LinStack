@@ -13,6 +13,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+set(QT_NO_PRIVATE_MODULE_WARNING ON)
 find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
@@ -171,22 +172,13 @@ target_compile_definitions(LinStack PRIVATE
     WLR_USE_UNSTABLE=1
 )
 
-file(GLOB QT6_GUI_PRIVATE_DIRS "/usr/include/qt6/QtGui/*/QtGui" "/usr/include/*/qt6/QtGui/*/QtGui")
-
-execute_process(
-    COMMAND bash -c "dirname $(dirname $(find /usr/include -name qplatformnativeinterface.h 2>/dev/null | head -n 1))"
-    OUTPUT_VARIABLE QPA_INCLUDE_DIR
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
 target_include_directories(LinStack PRIVATE
     ${LIBEVDEV_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../wlroots_engine/include
     ${PROTOCOL_GEN_DIR}
-    ${QT6_GUI_PRIVATE_DIRS}
-    ${QPA_INCLUDE_DIR}
     src
 )
+
 
 target_compile_options(LinStack PRIVATE
     -Wall
@@ -207,6 +199,8 @@ target_link_libraries(LinStack PRIVATE
     ${LIBEVDEV_LIBRARIES}
     PkgConfig::WAYLAND_CLIENT
 )
+
+
 
 
 # Self-contained installation inside $HOME/LinStack
