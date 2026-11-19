@@ -114,24 +114,32 @@ void InputMapper::setAimLockActive(bool active, int nodeIndex) {
     uint32_t now = getTimestampMs();
 
     if (m_aimLockActive && m_seat) {
+        if (m_pendingReleaseCameraSlot >= 0) {
+            wlr_seat_touch_notify_up(m_seat, now, m_pendingReleaseCameraSlot);
+            wlr_seat_touch_notify_frame(m_seat);
+            releaseSlot(m_pendingReleaseCameraSlot);
+            m_pendingReleaseCameraSlot = -1;
+        }
         if (m_activeAimCameraSlot >= 0) {
-            wlr_seat_touch_notify_up(m_seat, now, m_activeAimCameraSlot);
+            wlr_seat_touch_notify_up(m_seat, now + 1, m_activeAimCameraSlot);
+            wlr_seat_touch_notify_frame(m_seat);
             releaseSlot(m_activeAimCameraSlot);
             m_activeAimCameraSlot = -1;
         }
         if (m_firing && m_activeAimFireSlot >= 0) {
-            wlr_seat_touch_notify_up(m_seat, now, m_activeAimFireSlot);
+            wlr_seat_touch_notify_up(m_seat, now + 2, m_activeAimFireSlot);
+            wlr_seat_touch_notify_frame(m_seat);
             releaseSlot(m_activeAimFireSlot);
             m_activeAimFireSlot = -1;
             m_firing = false;
         }
-        wlr_seat_touch_notify_frame(m_seat);
     }
 
     m_aimLockActive = active;
     m_activeAimIndex = active ? nodeIndex : -1;
     m_accumAimX = 0.0f;
     m_accumAimY = 0.0f;
+
 }
 
 void InputMapper::updateDpad(struct wlr_surface *surface) {
@@ -297,6 +305,7 @@ bool InputMapper::handleMouseDown(int button, int winX, int winY, struct wlr_sur
     return false;
 }
 
+
 bool InputMapper::handleMouseUp(int button, int winX, int winY, struct wlr_surface *surface) {
     (void)winX;
     (void)winY;
@@ -342,6 +351,14 @@ bool InputMapper::handleMouseMove(int winX, int winY, int deltaX, int deltaY, st
 
     const auto *aim = activeAimNode();
     if (aim) {
+        if (m_pendingReleaseCameraSlot >= 0) {
+            wlr_seat_touch_notify_up(m_seat, now, m_pendingReleaseCameraSlot);
+            wlr_seat_touch_notify_frame(m_seat);
+            releaseSlot(m_pendingReleaseCameraSlot);
+            m_pendingReleaseCameraSlot = -1;
+            now += 1;
+        }
+
         float effDx = static_cast<float>(deltaX);
         float effDy = static_cast<float>(deltaY);
 
@@ -352,11 +369,9 @@ bool InputMapper::handleMouseMove(int winX, int winY, int deltaX, int deltaY, st
             effDy *= factor;
         }
 
-        // حساسية ناعمة 1:1 موزعة على كامل مساحة الشاشة
         float normDx = (effDx * aim->sensitivityX) / std::max(1, m_viewport.width);
         float normDy = (effDy * aim->sensitivityY) / std::max(1, m_viewport.height);
 
-        // بدء اللمسة من مكان أيقونة Aim Lock التي حددها المستخدم نفسه
         const float baseCenterX = std::clamp(aim->centerX, 0.05f, 0.95f);
         const float baseCenterY = std::clamp(aim->centerY, 0.05f, 0.95f);
 
@@ -368,28 +383,32 @@ bool InputMapper::handleMouseMove(int winX, int winY, int deltaX, int deltaY, st
             double cy = baseCenterY * m_androidHeight;
             wlr_seat_touch_notify_down(m_seat, rootSurf, now, m_activeAimCameraSlot, cx, cy);
             wlr_seat_touch_notify_frame(m_seat);
+            now += 1;
         }
 
         float nextX = baseCenterX + m_accumAimX + normDx;
         float nextY = baseCenterY + m_accumAimY + normDy;
 
-        // إعادة التمركز فقط عند ملامسة الحافة القصوى للشاشة (2% من الحواف)
-        if (nextX <= 0.02f || nextX >= 0.98f || nextY <= 0.02f || nextY >= 0.98f) {
-            wlr_seat_touch_notify_up(m_seat, now, m_activeAimCameraSlot);
-            wlr_seat_touch_notify_frame(m_seat);
+        if (nextX <= 0.04f || nextX >= 0.96f || nextY <= 0.04f || nextY >= 0.96f) {
+            int32_t oldSlot = m_activeAimCameraSlot;
+            int32_t newSlot = allocateSlot();
 
             m_accumAimX = normDx;
             m_accumAimY = normDy;
 
             double cx = baseCenterX * m_androidWidth;
             double cy = baseCenterY * m_androidHeight;
-            wlr_seat_touch_notify_down(m_seat, rootSurf, now + 1, m_activeAimCameraSlot, cx, cy);
+
+            wlr_seat_touch_notify_down(m_seat, rootSurf, now, newSlot, cx, cy);
             wlr_seat_touch_notify_frame(m_seat);
 
             double tx = std::clamp(static_cast<double>((baseCenterX + m_accumAimX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
             double ty = std::clamp(static_cast<double>((baseCenterY + m_accumAimY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
-            wlr_seat_touch_notify_motion(m_seat, now + 2, m_activeAimCameraSlot, tx, ty);
+            wlr_seat_touch_notify_motion(m_seat, now + 1, newSlot, tx, ty);
             wlr_seat_touch_notify_frame(m_seat);
+
+            m_pendingReleaseCameraSlot = oldSlot;
+            m_activeAimCameraSlot = newSlot;
         } else {
             m_accumAimX += normDx;
             m_accumAimY += normDy;

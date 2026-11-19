@@ -123,6 +123,7 @@ private:
     bool m_aimLockActive = false;
     int m_activeAimIndex = -1;
     int32_t m_activeAimCameraSlot = -1;
+    int32_t m_pendingReleaseCameraSlot = -1;
     int32_t m_activeAimFireSlot = -1;
     bool m_firing = false;
 
