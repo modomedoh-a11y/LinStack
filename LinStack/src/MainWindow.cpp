@@ -125,10 +125,12 @@ void MainWindow::setupUi()
     // --- Side Toolbar Connections ---
     connect(m_sideToolBar, &SideToolBar::fullscreenClicked, this, &MainWindow::handleFullscreenToggle);
     connect(m_sideToolBar, &SideToolBar::volumeUpClicked, this, [this]() {
-        m_canvas->showToast("🔊 Volume Up (85%)");
+        m_canvas->sendWaylandSystemKey(115); // KEY_VOLUMEUP
+        m_canvas->showToast("🔊 Volume Up");
     });
     connect(m_sideToolBar, &SideToolBar::volumeDownClicked, this, [this]() {
-        m_canvas->showToast("🔉 Volume Down (70%)");
+        m_canvas->sendWaylandSystemKey(114); // KEY_VOLUMEDOWN
+        m_canvas->showToast("🔉 Volume Down");
     });
     connect(m_sideToolBar, &SideToolBar::keymapperToggled, this, &MainWindow::handleKeymapperToggle);
     connect(m_sideToolBar, &SideToolBar::keymapperEditRequested, this, &MainWindow::handleKeymapperEdit);
@@ -149,17 +151,17 @@ void MainWindow::setupUi()
     });
     connect(m_sideToolBar, &SideToolBar::settingsClicked, this, &MainWindow::handleSettings);
 
-    // Android navigation buttons - sending native Android events directly into the container session
+    // Android navigation buttons - sending native Wayland wl_keyboard system keys directly to Android
     connect(m_sideToolBar, &SideToolBar::androidBackClicked, this, [this]() {
-        PathResolver::startDetachedLinstack(QStringList() << "shell" << "input" << "keyevent" << "4");
+        m_canvas->sendWaylandSystemKey(158); // KEY_BACK
         m_canvas->showToast("◁ Android Back");
     });
     connect(m_sideToolBar, &SideToolBar::androidHomeClicked, this, [this]() {
-        PathResolver::startDetachedLinstack(QStringList() << "shell" << "input" << "keyevent" << "3");
+        m_canvas->sendWaylandSystemKey(172); // KEY_HOMEPAGE
         m_canvas->showToast("◯ Android Home");
     });
     connect(m_sideToolBar, &SideToolBar::androidRecentsClicked, this, [this]() {
-        PathResolver::startDetachedLinstack(QStringList() << "shell" << "input" << "keyevent" << "187");
+        m_canvas->sendWaylandRecents(); // Alt+Tab Android Overview
         m_canvas->showToast("▢ Android Recents");
     });
 

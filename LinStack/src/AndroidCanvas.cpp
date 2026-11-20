@@ -794,6 +794,28 @@ void AndroidCanvas::initWaylandCompositor()
 }
 
 
+void AndroidCanvas::sendWaylandRecents()
+{
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    if (m_inputMapper && activeSurface) {
+        m_inputMapper->sendRecentsCombo(activeSurface);
+        if (m_compositor->getDisplay()) {
+            wl_display_flush_clients(m_compositor->getDisplay());
+        }
+    }
+}
+
+void AndroidCanvas::sendWaylandSystemKey(uint32_t evdevKeyCode)
+{
+    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+    if (m_inputMapper && activeSurface) {
+        m_inputMapper->sendSystemKey(evdevKeyCode, activeSurface);
+        if (m_compositor->getDisplay()) {
+            wl_display_flush_clients(m_compositor->getDisplay());
+        }
+    }
+}
+
 void AndroidCanvas::showToast(const QString &message, int durationMs)
 {
     m_toastLabel->setText(message);

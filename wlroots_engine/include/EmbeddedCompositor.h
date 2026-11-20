@@ -15,6 +15,10 @@
 #include <algorithm>
 
 #include "wlroots_compat.h"
+extern "C" {
+#include <wlr/types/wlr_keyboard.h>
+#include <wlr/interfaces/wlr_keyboard.h>
+}
 
 struct EmbeddedCompositorConfig {
     std::string socketName = "wayland-linstack-0";
@@ -131,6 +135,8 @@ private:
     struct wlr_linux_drm_syncobj_manager_v1 *m_drmSyncobj = nullptr;
     struct wlr_xdg_shell *m_xdgShell = nullptr;
     struct wlr_seat *m_seat = nullptr;
+    struct wlr_keyboard m_virtualKeyboard{};
+    bool m_keyboardInitialized = false;
     struct wlr_relative_pointer_manager_v1 *m_relativePointerManager = nullptr;
     struct wlr_output_layout *m_outputLayout = nullptr;
     struct wlr_output *m_headlessOutput = nullptr;

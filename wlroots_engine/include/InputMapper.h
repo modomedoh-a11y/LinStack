@@ -73,6 +73,8 @@ public:
     // Hardware Scancode Event Handlers (works across all keyboard languages)
     bool handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surface);
     bool handleScanCodeUp(uint32_t scanCode, struct wlr_surface *surface);
+    void sendSystemKey(uint32_t evdevKeyCode, struct wlr_surface *surface);
+    void sendRecentsCombo(struct wlr_surface *surface);
 
     bool handleMouseDown(int button, int winX, int winY, struct wlr_surface *surface);
     bool handleMouseUp(int button, int winX, int winY, struct wlr_surface *surface);

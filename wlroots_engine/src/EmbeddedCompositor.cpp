@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <xkbcommon/xkbcommon.h>
 
 void handleClientCreatedThunk(struct wl_listener *listener, void *data) {
     auto *compositor = wl_container_of(listener, (EmbeddedCompositor *)nullptr, m_clientCreatedListener);
@@ -209,6 +210,19 @@ bool EmbeddedCompositor::initialize() {
     m_seat = wlr_seat_create(m_display, "linstack-seat-0");
     wlr_seat_set_capabilities(m_seat, WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD | WL_SEAT_CAPABILITY_TOUCH);
 
+    // Initialize virtual wlr_keyboard directly (wlroots 0.20 API) for Android system keys
+    static const struct wlr_keyboard_impl virtual_kbd_impl = { .name = "linstack-virtual-kbd", .led_update = nullptr };
+    wlr_keyboard_init(&m_virtualKeyboard, &virtual_kbd_impl, "linstack-virtual-kbd");
+    struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    struct xkb_keymap *keymap = xkb_keymap_new_from_names(ctx, nullptr, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    if (keymap) {
+        wlr_keyboard_set_keymap(&m_virtualKeyboard, keymap);
+        wlr_seat_set_keyboard(m_seat, &m_virtualKeyboard);
+        m_keyboardInitialized = true;
+        xkb_keymap_unref(keymap);
+    }
+    if (ctx) xkb_context_unref(ctx);
+
     // 8. Relative pointer manager for FPS mouse look
     m_relativePointerManager = wlr_relative_pointer_manager_v1_create(m_display);
 
@@ -282,6 +296,16 @@ void EmbeddedCompositor::shutdown() {
     if (m_newXdgToplevelListener.link.prev && m_newXdgToplevelListener.link.next) {
         wl_list_remove(&m_newXdgToplevelListener.link);
         wl_list_init(&m_newXdgToplevelListener.link);
+    }
+
+    if (m_keyboardInitialized) {
+        wlr_keyboard_finish(&m_virtualKeyboard);
+        m_keyboardInitialized = false;
+    }
+
+    if (m_keyboardInitialized) {
+        wlr_keyboard_finish(&m_virtualKeyboard);
+        m_keyboardInitialized = false;
     }
 
     if (m_outputLayout) {

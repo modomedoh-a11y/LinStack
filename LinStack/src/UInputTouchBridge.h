@@ -31,6 +31,7 @@ public:
     void touchDown(int slot, int x, int y);
     void touchMove(int slot, int x, int y);
     void touchUp(int slot);
+    void sendKeyEvent(unsigned int keyCode);
     void sync();
 
 signals:

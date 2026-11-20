@@ -75,6 +75,8 @@ public:
     QString activeAppPackage() const { return m_activePackage; }
 
     void initWaylandCompositor();
+    void sendWaylandSystemKey(uint32_t evdevKeyCode);
+    void sendWaylandRecents();
     QString waylandSocketName() const { return m_waylandSocketName; }
     EmbeddedCompositor *compositor() const { return m_compositor.get(); }
     AspectRatioWindow *aspectRatioWindow() const { return m_aspectRatio.get(); }

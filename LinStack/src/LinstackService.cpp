@@ -813,6 +813,16 @@ void LinstackService::handleAdbSocketError()
     }
 }
 
+void LinstackService::sendAndroidKeyEvent(int androidKeyCode)
+{
+    auto *proc = new QProcess(this);
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            proc, &QProcess::deleteLater);
+
+    QString cmd = QString("adb connect 127.0.0.1:5555 >/dev/null 2>&1; adb -s 127.0.0.1:5555 shell input keyevent %1").arg(androidKeyCode);
+    proc->start("/bin/sh", QStringList() << "-c" << cmd);
+}
+
 void LinstackService::installApk(const QString &apkFilePath)
 {
     QFileInfo fi(apkFilePath);

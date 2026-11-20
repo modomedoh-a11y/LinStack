@@ -195,6 +195,45 @@ void InputMapper::updateDpad(struct wlr_surface *surface) {
     }
 }
 
+void InputMapper::sendRecentsCombo(struct wlr_surface *surface) {
+    if (!m_seat || !surface) return;
+    struct wlr_surface *rootSurf = wlr_surface_get_root_surface(surface);
+    if (!rootSurf) rootSurf = surface;
+
+    struct wlr_keyboard *kbd = wlr_seat_get_keyboard(m_seat);
+    if (kbd) {
+        wlr_seat_keyboard_notify_enter(m_seat, rootSurf, kbd->keycodes, kbd->num_keycodes, &kbd->modifiers);
+    } else {
+        wlr_seat_keyboard_notify_enter(m_seat, rootSurf, nullptr, 0, nullptr);
+    }
+
+    uint32_t now = getTimestampMs();
+    // KEY_LEFTALT = 56, KEY_TAB = 15 (Universal Android Recents / Overview shortcut)
+    wlr_seat_keyboard_notify_key(m_seat, now, 56, WL_KEYBOARD_KEY_STATE_PRESSED);
+    wlr_seat_keyboard_notify_modifiers(m_seat, nullptr);
+    wlr_seat_keyboard_notify_key(m_seat, now + 10, 15, WL_KEYBOARD_KEY_STATE_PRESSED);
+    wlr_seat_keyboard_notify_key(m_seat, now + 25, 15, WL_KEYBOARD_KEY_STATE_RELEASED);
+    wlr_seat_keyboard_notify_key(m_seat, now + 35, 56, WL_KEYBOARD_KEY_STATE_RELEASED);
+    wlr_seat_keyboard_notify_modifiers(m_seat, nullptr);
+}
+
+void InputMapper::sendSystemKey(uint32_t evdevKeyCode, struct wlr_surface *surface) {
+    if (!m_seat || !surface) return;
+    struct wlr_surface *rootSurf = wlr_surface_get_root_surface(surface);
+    if (!rootSurf) rootSurf = surface;
+
+    struct wlr_keyboard *kbd = wlr_seat_get_keyboard(m_seat);
+    if (kbd) {
+        wlr_seat_keyboard_notify_enter(m_seat, rootSurf, kbd->keycodes, kbd->num_keycodes, &kbd->modifiers);
+    } else {
+        wlr_seat_keyboard_notify_enter(m_seat, rootSurf, nullptr, 0, nullptr);
+    }
+
+    uint32_t now = getTimestampMs();
+    wlr_seat_keyboard_notify_key(m_seat, now, evdevKeyCode, WL_KEYBOARD_KEY_STATE_PRESSED);
+    wlr_seat_keyboard_notify_key(m_seat, now + 15, evdevKeyCode, WL_KEYBOARD_KEY_STATE_RELEASED);
+}
+
 bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surface) {
     if (scanCode == 0) return false;
 

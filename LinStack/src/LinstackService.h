@@ -127,6 +127,7 @@ public:
     bool isAdbConnected() const { return m_adbConnected; }
     void checkAdbConnection();
     void installApk(const QString &apkFilePath);
+    void sendAndroidKeyEvent(int androidKeyCode);
 
     // --- Status Query ---
     void refreshStatus();

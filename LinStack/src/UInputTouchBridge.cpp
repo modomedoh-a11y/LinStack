@@ -79,6 +79,11 @@ bool UInputTouchBridge::initialize(int screenWidth, int screenHeight)
     libevdev_enable_event_type(m_dev, EV_SYN);
     libevdev_enable_event_type(m_dev, EV_KEY);
     libevdev_enable_event_code(m_dev, EV_KEY, BTN_TOUCH, nullptr);
+    libevdev_enable_event_code(m_dev, EV_KEY, KEY_BACK, nullptr);
+    libevdev_enable_event_code(m_dev, EV_KEY, KEY_HOMEPAGE, nullptr);
+    libevdev_enable_event_code(m_dev, EV_KEY, KEY_APPSELECT, nullptr);
+    libevdev_enable_event_code(m_dev, EV_KEY, KEY_VOLUMEUP, nullptr);
+    libevdev_enable_event_code(m_dev, EV_KEY, KEY_VOLUMEDOWN, nullptr);
     libevdev_enable_event_code(m_dev, EV_KEY, BTN_TOOL_FINGER, nullptr);
 
     // Absolute axis configuration for multi-touch
@@ -195,6 +200,15 @@ void UInputTouchBridge::touchUp(int slot)
 
     sync();
     emit touchEventInjected(slot, m_slots[slot].x, m_slots[slot].y, false);
+}
+
+void UInputTouchBridge::sendKeyEvent(unsigned int keyCode)
+{
+    if (!m_isReady) return;
+    emitEvent(EV_KEY, keyCode, 1);
+    sync();
+    emitEvent(EV_KEY, keyCode, 0);
+    sync();
 }
 
 void UInputTouchBridge::sync()
