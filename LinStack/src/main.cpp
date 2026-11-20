@@ -50,12 +50,7 @@ int main(int argc, char *argv[])
 
     // Fast non-session pre-flight diagnostic check (kernel binder / modules)
     // Note: session is NOT started here; MainWindow initializes the embedded compositor first
-    SelfHealingManager healer;
-    if (!isHeadless && !healer.checkHealth()) {
-        if (!healer.promptRepair()) {
-            return 1;
-        }
-    }
+    // الفحص التشخيصي يعمل في الخلفية من MainWindow لفتح الواجهة فوراً دون تأخير
 
     // Apply dark cyber palette
     QPalette cyberPalette;

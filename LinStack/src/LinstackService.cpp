@@ -53,7 +53,7 @@ LinstackService::LinstackService(QObject *parent)
 
     // Periodic ADB probe timer (every 4 seconds)
     m_adbPollTimer = new QTimer(this);
-    m_adbPollTimer->setInterval(4000);
+    m_adbPollTimer->setInterval(8000);
     connect(m_adbPollTimer, &QTimer::timeout, this, &LinstackService::checkAdbConnection);
     m_adbPollTimer->start();
 
@@ -305,9 +305,9 @@ void LinstackService::startSession()
             if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
                 QString xml = QString::fromUtf8(f.readAll());
                 f.close();
-                xml.replace(QRegularExpression("<stable-display-width>\d+</stable-display-width>"),
+                xml.replace(QRegularExpression("<stable-display-width>[0-9]+</stable-display-width>"),
                             QString("<stable-display-width>%1</stable-display-width>").arg(m_desiredWidth));
-                xml.replace(QRegularExpression("<stable-display-height>\d+</stable-display-height>"),
+                xml.replace(QRegularExpression("<stable-display-height>[0-9]+</stable-display-height>"),
                             QString("<stable-display-height>%1</stable-display-height>").arg(m_desiredHeight));
                 if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
                     f.write(xml.toUtf8());
@@ -405,11 +405,7 @@ void LinstackService::checkSessionStartupStatus()
     if (isSessionRunning()) {
         if (m_sessionPollTimer) m_sessionPollTimer->stop();
         setSessionState(SessionState::Active);
-        if (m_desiredWidth > 0 && m_desiredHeight > 0) {
-            LOG_INFO("Session", QString("Applying active session resolution: %1x%2").arg(m_desiredWidth).arg(m_desiredHeight));
-            QProcess pW; PathResolver::configureProcess(&pW, QStringList() << "prop" << "set" << "persist.waydroid.width" << QString::number(m_desiredWidth)); pW.start(); pW.waitForFinished(1500);
-            QProcess pH; PathResolver::configureProcess(&pH, QStringList() << "prop" << "set" << "persist.waydroid.height" << QString::number(m_desiredHeight)); pH.start(); pH.waitForFinished(1500);
-        }
+        // Resolution already written to container config before boot
         emit logMessage("Session", "LinStack session is confirmed RUNNING. Launching UI...");
         LOG_INFO("Session", "LinStack session is confirmed RUNNING. Launching UI...");
         launchFullUi();
