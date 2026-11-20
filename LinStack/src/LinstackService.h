@@ -184,6 +184,7 @@ private:
     int m_uiRetryCount = 0;
     bool m_hasFirstFrame = false;
     bool m_isStopping = false;
+    bool m_wasAlreadyRunning = false;
 
     // Active script operation process
 

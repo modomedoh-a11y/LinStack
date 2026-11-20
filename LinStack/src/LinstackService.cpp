@@ -294,7 +294,8 @@ void LinstackService::startSession()
     }
 
     // If session is already active or running, immediately trigger show-full-ui without hanging on session start
-    if (isSessionRunning()) {
+    m_wasAlreadyRunning = isSessionRunning();
+    if (m_wasAlreadyRunning) {
         LOG_INFO("Session", "Active LinStack container session detected (RUNNING). Immediately triggering show-full-ui on wayland-linstack-0...");
         emit logMessage("Session", "Active session running. Triggering show-full-ui immediately...");
         setSessionState(SessionState::Active);
@@ -442,7 +443,8 @@ void LinstackService::retryFullUi()
     }
 
     m_uiRetryCount++;
-    if (m_uiRetryCount >= 12) {
+    int maxRetries = m_wasAlreadyRunning ? 3 : 10;
+    if (m_uiRetryCount >= maxRetries) {
         // الجلسة السابقة مرتبطة بمقبس Wayland قديم مغلق -> نعيد تشغيل الجلسة للارتباط بالمقبس الجديد
         LOG_WARN("UI", "Stale session detected (no frames after 4 retries). Rebinding session to new Wayland socket...");
         m_uiRetryCount = 0;
