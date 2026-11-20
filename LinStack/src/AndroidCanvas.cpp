@@ -73,6 +73,13 @@ AndroidCanvas::AndroidCanvas(QWidget *parent)
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
 
+    if (QScreen *scr = QGuiApplication::primaryScreen()) {
+        QSize s = scr->size();
+        if (s.width() > 0 && s.height() > 0) {
+            m_baseWidth = s.width();
+            m_baseHeight = s.height();
+        }
+    }
     m_aspectRatio = std::make_unique<AspectRatioWindow>(m_baseWidth, m_baseHeight);
     m_simulatedActive = true;
 
@@ -500,6 +507,18 @@ void AndroidCanvas::paintGL()
 
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
     if (!activeSurface) return;
+
+    int surfW = activeSurface->current.width;
+    int surfH = activeSurface->current.height;
+    if (surfW > 0 && surfH > 0 && (surfW != m_baseWidth || surfH != m_baseHeight)) {
+        m_baseWidth = surfW;
+        m_baseHeight = surfH;
+        if (m_aspectRatio) {
+            m_aspectRatio->setTargetResolution(m_baseWidth, m_baseHeight);
+            vp = m_aspectRatio->computeViewport(w, h);
+            m_viewportRect = QRect(vp.x, vp.y, vp.width, vp.height);
+        }
+    }
 
     EGLDisplay qtDpy  = eglGetCurrentDisplay();
     EGLContext qtCtx  = eglGetCurrentContext();

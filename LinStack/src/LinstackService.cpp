@@ -283,6 +283,60 @@ void LinstackService::startSession()
     qputenv("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
     qputenv("XDG_RUNTIME_DIR", runtimeDir.toUtf8());
 
+    // 1. التأكد من أن خدمة الحاوية (linstack-container) تعمل قبل ضبط الخصائص وبدء الجلسة
+    if (QFileInfo::exists("/run/systemd/system")) {
+        QProcess sysChk;
+        sysChk.start("systemctl", QStringList() << "is-active" << "--quiet" << "linstack-container.service");
+        sysChk.waitForFinished(1000);
+        if (sysChk.exitCode() != 0) {
+            LOG_INFO("Container", "Starting linstack-container.service before configuring display resolution...");
+            QProcess sysStart;
+            sysStart.start("systemctl", QStringList() << "start" << "linstack-container.service");
+            sysStart.waitForFinished(4000);
+        }
+    }
+
+    // 2. كتابة أوامر تحديد أبعاد شاشة الأندرويد (width & height) بشكل متزامن قبل إقلاع الجلسة
+    if (m_desiredWidth > 0 && m_desiredHeight > 0) {
+        // حذف أو تحديث display-manager-state.xml حتى لا يفرض DisplayManager ارتفاعاً قديماً (مثل 1080)
+        QString dmStateFile = PathResolver::userDataDir() + "/data/system/display-manager-state.xml";
+        if (QFile::exists(dmStateFile)) {
+            QFile f(dmStateFile);
+            if (f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                QString xml = QString::fromUtf8(f.readAll());
+                f.close();
+                xml.replace(QRegularExpression("<stable-display-width>\d+</stable-display-width>"),
+                            QString("<stable-display-width>%1</stable-display-width>").arg(m_desiredWidth));
+                xml.replace(QRegularExpression("<stable-display-height>\d+</stable-display-height>"),
+                            QString("<stable-display-height>%1</stable-display-height>").arg(m_desiredHeight));
+                if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+                    f.write(xml.toUtf8());
+                    f.close();
+                }
+            }
+        }
+        LOG_INFO("Session", QString("Setting container resolution properties: %1x%2").arg(m_desiredWidth).arg(m_desiredHeight));
+        QProcess pW;
+        PathResolver::configureProcess(&pW, QStringList() << "prop" << "set" << "persist.waydroid.width" << QString::number(m_desiredWidth));
+        pW.start();
+        pW.waitForFinished(2000);
+
+        QProcess pH;
+        PathResolver::configureProcess(&pH, QStringList() << "prop" << "set" << "persist.waydroid.height" << QString::number(m_desiredHeight));
+        pH.start();
+        pH.waitForFinished(2000);
+
+        QProcess pLW;
+        PathResolver::configureProcess(&pLW, QStringList() << "prop" << "set" << "persist.linstack.width" << QString::number(m_desiredWidth));
+        pLW.start();
+        pLW.waitForFinished(1500);
+
+        QProcess pLH;
+        PathResolver::configureProcess(&pLH, QStringList() << "prop" << "set" << "persist.linstack.height" << QString::number(m_desiredHeight));
+        pLH.start();
+        pLH.waitForFinished(1500);
+    }
+
     // Pre-flight check
     KernelDiagnostic diag = runKernelDiagnostics();
     if (!diag.binderFound) {
@@ -351,6 +405,11 @@ void LinstackService::checkSessionStartupStatus()
     if (isSessionRunning()) {
         if (m_sessionPollTimer) m_sessionPollTimer->stop();
         setSessionState(SessionState::Active);
+        if (m_desiredWidth > 0 && m_desiredHeight > 0) {
+            LOG_INFO("Session", QString("Applying active session resolution: %1x%2").arg(m_desiredWidth).arg(m_desiredHeight));
+            QProcess pW; PathResolver::configureProcess(&pW, QStringList() << "prop" << "set" << "persist.waydroid.width" << QString::number(m_desiredWidth)); pW.start(); pW.waitForFinished(1500);
+            QProcess pH; PathResolver::configureProcess(&pH, QStringList() << "prop" << "set" << "persist.waydroid.height" << QString::number(m_desiredHeight)); pH.start(); pH.waitForFinished(1500);
+        }
         emit logMessage("Session", "LinStack session is confirmed RUNNING. Launching UI...");
         LOG_INFO("Session", "LinStack session is confirmed RUNNING. Launching UI...");
         launchFullUi();

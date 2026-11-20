@@ -24,6 +24,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QWindow>
+#include <QScreen>
 #include <QApplication>
 #include <QSettings>
 #include <QFileInfo>
@@ -36,13 +37,85 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
-    setMinimumSize(1024, 620);
-    resize(1280, 768);
     setMouseTracking(true);
+    setAttribute(Qt::WA_Hover, true);
 
     setStyleSheet(Theme::cyberEmeraldStyleSheet());
 
     setupUi();
+    qApp->installEventFilter(this);
+
+    QSize scrSize(1440, 900);
+    QRect availRect(0, 0, 1440, 900);
+    if (QScreen *scr = screen() ? screen() : QGuiApplication::primaryScreen()) {
+        if (scr->size().width() > 0 && scr->size().height() > 0) {
+            scrSize = scr->size();
+        }
+        availRect = scr->availableGeometry();
+    }
+
+    // قراءة الأبعاد الفعلية للشريط الجانبي والعلوي + 2px للإطار الخارجي
+    const int sideW = (m_sideToolBar && m_sideToolBar->width() > 0) ? m_sideToolBar->width() : 46;
+    const int topH  = (m_titleBar && m_titleBar->height() > 0) ? m_titleBar->height() : 48;
+    const int chromeW = sideW + 2;
+    const int chromeH = topH + 2;
+    const double scrAr = static_cast<double>(scrSize.width()) / static_cast<double>(scrSize.height());
+
+    // 1. حد تصغير النافذة = نصف أبعاد شاشة المستخدم (1/2) للعرض الصافي + أبعاد الشريطين
+    int minNetW = scrSize.width() / 2;
+    int minNetH = qRound(minNetW / scrAr);
+    setMinimumSize(minNetW + chromeW, minNetH + chromeH);
+
+    // 2. حجم الإقلاع الابتدائي = ثلثي أبعاد شاشة المستخدم (2/3) للعرض الصافي (Android Canvas)
+    int targetNetW = (scrSize.width() * 2) / 3;
+    int targetNetH = qRound(targetNetW / scrAr);
+
+    // التأكد من أن (العرض الصافي + الشريطين) لا يتجاوز المساحة المتاحة من سطح المكتب حتى لا يضغطه مدير النوافذ
+    int maxAllowedNetW = availRect.width() - chromeW;
+    int maxAllowedNetH = availRect.height() - chromeH;
+    if (targetNetW > maxAllowedNetW) {
+        targetNetW = maxAllowedNetW;
+        targetNetH = qRound(targetNetW / scrAr);
+    }
+    if (targetNetH > maxAllowedNetH) {
+        targetNetH = maxAllowedNetH;
+        targetNetW = qRound(targetNetH * scrAr);
+    }
+
+    // الحجم الإجمالي للنافذة = أبعاد الأندرويد الصافية + أبعاد الشريط العلوي والجانبي
+    int targetW = targetNetW + chromeW;
+    int targetH = targetNetH + chromeH;
+
+    resize(targetW, targetH);
+
+    QTimer::singleShot(50, this, [this, scrSize, scrAr, availRect]() {
+        if (!isFullScreen() && !isMaximized()) {
+            // إعادة القراءة الفعلية بعد اكتمال رسم التخطيط لضمان دقة البكسل
+            int realChromeW = (m_sideToolBar ? m_sideToolBar->width() : 46) + 2;
+            int realChromeH = (m_titleBar ? m_titleBar->height() : 48) + 2;
+
+            int minW = scrSize.width() / 2;
+            int minH = qRound(minW / scrAr);
+            setMinimumSize(minW + realChromeW, minH + realChromeH);
+
+            int netW = (scrSize.width() * 2) / 3;
+            int netH = qRound(netW / scrAr);
+
+            int maxNetW = availRect.width() - realChromeW;
+            int maxNetH = availRect.height() - realChromeH;
+            if (netW > maxNetW) { netW = maxNetW; netH = qRound(netW / scrAr); }
+            if (netH > maxNetH) { netH = maxNetH; netW = qRound(netH * scrAr); }
+
+            int finalW = netW + realChromeW;
+            int finalH = netH + realChromeH;
+
+            resize(finalW, finalH);
+            move(availRect.x() + (availRect.width() - finalW) / 2,
+                 availRect.y() + (availRect.height() - finalH) / 2);
+            LOG_INFO("UI", QString("Startup window size enforced: %1x%2 (Android Viewport: %3x%4 | Chrome: %5x%6)")
+                .arg(finalW).arg(finalH).arg(netW).arg(netH).arg(realChromeW).arg(realChromeH));
+        }
+    });
 }
 
 MainWindow::~MainWindow()
@@ -70,6 +143,8 @@ void MainWindow::setupUi()
     // Central container widget
     auto *centralContainer = new QWidget(this);
     centralContainer->setObjectName("centralContainer");
+    centralContainer->setMouseTracking(true);
+    centralContainer->setAttribute(Qt::WA_Hover, true);
     centralContainer->setStyleSheet(
         "#centralContainer {"
         "  background-color: #0B0F19;"
@@ -183,8 +258,23 @@ void MainWindow::setupUi()
     });
 
     connect(m_canvas, &AndroidCanvas::waylandClientConnected, this, [this]() {
-        LOG_INFO("MainWindow", "Wayland client connected to embedded compositor -> triggering launchFullUi()");
+        LOG_INFO("MainWindow", "Wayland client connected -> applying Android display props & launching UI...");
         if (m_service) {
+            QSize scr(1440, 900);
+            if (QScreen *s = screen() ? screen() : QGuiApplication::primaryScreen()) {
+                if (s->size().width() > 0 && s->size().height() > 0) scr = s->size();
+            }
+            m_service->setDesiredResolution(scr.width(), scr.height());
+            // تنفيذ أوامر linstack prop set الآن بعد جاهزية waydroidplatform
+            QString cmd = QString(
+                "linstack prop set persist.waydroid.width %1; "
+                "linstack prop set persist.waydroid.height %2; "
+                "linstack prop set persist.waydroid.length %2; "
+                "linstack prop set persist.linstack.width %1; "
+                "linstack prop set persist.linstack.height %2; "
+                "linstack prop set persist.linstack.length %2"
+            ).arg(scr.width()).arg(scr.height());
+            QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
             m_service->launchFullUi();
         }
     });
@@ -200,17 +290,22 @@ void MainWindow::setupUi()
     // --- Background Service Initialization & Wiring ---
     m_service = new LinstackService(this);
 
-    // Dynamically calculate the exact available Android viewport dimensions by subtracting chrome
-    const QSize netViewport = calculateNetViewportSize();
+    // قراءة أبعاد شاشة المستخدم الفعلية وحساب نسبة الأبعاد لتمريرها للأندرويد قبل الإقلاع
+    QSize androidRes(1920, 1080);
+    if (QScreen *scr = QGuiApplication::primaryScreen()) {
+        if (scr->size().width() > 0 && scr->size().height() > 0) {
+            androidRes = scr->size();
+        }
+    }
 
     // Initialize uinput touch bridge for low-latency Linstack input
     m_uinputBridge = new UInputTouchBridge(this);
-    m_uinputBridge->initialize(netViewport.width(), netViewport.height());
+    m_uinputBridge->initialize(androidRes.width(), androidRes.height());
     m_canvas->setBridge(m_uinputBridge);
 
-    // Lock canvas aspect-ratio and configure container resolution
-    m_canvas->setBaseResolution(netViewport.width(), netViewport.height());
-    m_service->setDesiredResolution(netViewport.width(), netViewport.height());
+    // Lock canvas aspect-ratio to match user screen resolution (e.g. 16:9 or 16:10)
+    m_canvas->setBaseResolution(androidRes.width(), androidRes.height());
+    m_service->setDesiredResolution(androidRes.width(), androidRes.height());
 
     connect(m_service, &LinstackService::containerStateChanged, this, [this](LinstackService::ContainerState state) {
         if (state == LinstackService::ContainerState::Running) {
@@ -308,11 +403,43 @@ void MainWindow::handleWindowDrag(const QPoint &delta)
 
 void MainWindow::handleMaximizeToggle()
 {
-    if (isMaximized()) {
-        showNormal();
+    static bool s_customMax = false;
+    static QRect s_restoreGeom;
+
+    QScreen *scr = screen() ? screen() : QGuiApplication::primaryScreen();
+    QRect avail = scr ? scr->availableGeometry() : QRect(0, 0, 1920, 1080);
+
+    if (s_customMax || isMaximized()) {
+        if (isMaximized()) showNormal();
+        s_customMax = false;
+        if (s_restoreGeom.isValid()) {
+            setGeometry(s_restoreGeom);
+        }
         m_titleBar->setMaximizedState(false);
     } else {
-        showMaximized();
+        s_restoreGeom = geometry();
+        s_customMax = true;
+
+        int chromeW = (m_sideToolBar ? m_sideToolBar->width() : 46) + 2;
+        int chromeH = (m_titleBar ? m_titleBar->height() : 48) + 2;
+
+        int maxNetW = avail.width() - chromeW;
+        int maxNetH = avail.height() - chromeH;
+
+        if (m_canvas && m_canvas->aspectRatioWindow()) {
+            float targetAr = m_canvas->aspectRatioWindow()->getAspectRatio();
+            if (maxNetW > maxNetH * targetAr) {
+                maxNetW = qRound(maxNetH * targetAr);
+            } else {
+                maxNetH = qRound(maxNetW / targetAr);
+            }
+        }
+
+        int finalW = maxNetW + chromeW;
+        int finalH = maxNetH + chromeH;
+        setGeometry(avail.x() + (avail.width() - finalW) / 2,
+                    avail.y() + (avail.height() - finalH) / 2,
+                    finalW, finalH);
         m_titleBar->setMaximizedState(true);
     }
 }
@@ -324,6 +451,8 @@ void MainWindow::handleFullscreenToggle()
         m_titleBar->show();
         m_sideToolBar->show();
     } else {
+        m_titleBar->hide();
+        m_sideToolBar->hide();
         showFullScreen();
         m_canvas->showToast("Entered Fullscreen mode. Press F11 or ESC to exit.");
     }
@@ -576,11 +705,14 @@ void MainWindow::handleSettings()
                 m_service->applyDeviceProfileByName(m_settingsDialog->deviceProfile());
             }
             if (m_settingsDialog->isSharedStorageEnabled()) mountShared(m_settingsDialog->sharedStoragePath(), false); else unmountShared(false);
-            // Update the locked aspect ratio to match the user's chosen base resolution
-            const QSize res = m_settingsDialog->baseResolutionSize();
-            m_canvas->setBaseResolution(res.width(), res.height());
-            if (m_uinputBridge) {
-                m_uinputBridge->initialize(res.width(), res.height());
+            // الحفاظ على نسبة أبعاد شاشة المستخدم الفعلية عند حفظ الإعدادات
+            if (QScreen *scr = screen() ? screen() : QGuiApplication::primaryScreen()) {
+                if (scr->size().width() > 0 && scr->size().height() > 0) {
+                    m_canvas->setBaseResolution(scr->size().width(), scr->size().height());
+                    if (m_uinputBridge) {
+                        m_uinputBridge->initialize(scr->size().width(), scr->size().height());
+                    }
+                }
             }
         });
     }
@@ -621,6 +753,26 @@ void MainWindow::handleDiagnostics()
     }
 }
 
+bool MainWindow::eventFilter(QObject *watched, QEvent *event)
+{
+    if (!m_resizing && !isMaximized() && !isFullScreen()) {
+        if (event->type() == QEvent::Leave && watched == this) {
+            setCursor(Qt::ArrowCursor);
+        } else if (event->type() == QEvent::MouseMove || event->type() == QEvent::HoverMove) {
+            QPoint localPos = mapFromGlobal(QCursor::pos());
+            Qt::Edges edges = rect().contains(localPos) ? calculateEdges(localPos) : Qt::Edges();
+            if (edges == Qt::Edges()) {
+                if (cursor().shape() != Qt::ArrowCursor) {
+                    setCursor(Qt::ArrowCursor);
+                }
+            } else {
+                checkEdgeResize(localPos);
+            }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
+}
+
 Qt::Edges MainWindow::calculateEdges(const QPoint &pos)
 {
     Qt::Edges edges = Qt::Edges();
@@ -658,11 +810,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton && !isMaximized() && !isFullScreen()) {
         m_resizeEdges = calculateEdges(event->position().toPoint());
         if (m_resizeEdges != Qt::Edges()) {
-            // Try Wayland / X11 native system resize if supported
-            if (windowHandle() && windowHandle()->startSystemResize(m_resizeEdges)) {
-                event->accept();
-                return;
-            }
+            // Aspect-ratio locked resize enforced below
 
             m_resizing = true;
             m_dragStartGeometry = geometry();
@@ -705,8 +853,27 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
         if (m_canvas && m_canvas->aspectRatioWindow()) {
             bool anchorW = (m_resizeEdges & (Qt::LeftEdge | Qt::RightEdge)) != 0;
             m_canvas->aspectRatioWindow()->snapSizeToAspectRatio(netW, netH, anchorW);
-            newGeom.setWidth(netW + chromeW);
-            newGeom.setHeight(netH + chromeH);
+
+            // الحفاظ على الحد الأدنى للنافذة (1024x620) مع احترام نسبة الأبعاد
+            if (netW + chromeW < minimumWidth()) {
+                netW = minimumWidth() - chromeW;
+                m_canvas->aspectRatioWindow()->snapSizeToAspectRatio(netW, netH, true);
+            }
+            if (netH + chromeH < minimumHeight()) {
+                netH = minimumHeight() - chromeH;
+                m_canvas->aspectRatioWindow()->snapSizeToAspectRatio(netW, netH, false);
+            }
+
+            if (m_resizeEdges & Qt::LeftEdge) {
+                newGeom.setLeft(newGeom.right() - (netW + chromeW) + 1);
+            } else {
+                newGeom.setWidth(netW + chromeW);
+            }
+            if (m_resizeEdges & Qt::TopEdge) {
+                newGeom.setTop(newGeom.bottom() - (netH + chromeH) + 1);
+            } else {
+                newGeom.setHeight(netH + chromeH);
+            }
         }
 
         setGeometry(newGeom);
@@ -740,10 +907,6 @@ void MainWindow::changeEvent(QEvent *event)
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
-    if (m_canvas) {
-        QSize net = calculateNetViewportSize();
-        m_canvas->setBaseResolution(net.width(), net.height());
-    }
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event)

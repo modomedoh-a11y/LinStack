@@ -468,6 +468,12 @@ void EmbeddedCompositor::handleNewXdgSurface(struct wlr_xdg_surface *xdgSurface)
 void EmbeddedCompositor::handleXdgSurfaceMap(struct wlr_xdg_surface *xdgSurface) {
     if (!xdgSurface || !xdgSurface->surface) return;
     m_activeSurface = xdgSurface->surface;
+    struct wlr_xdg_toplevel *toplevel = wlr_xdg_toplevel_try_from_wlr_surface(xdgSurface->surface);
+    if (toplevel && (xdgSurface->surface->current.width != m_config.defaultWidth ||
+                     xdgSurface->surface->current.height != m_config.defaultHeight)) {
+        wlr_xdg_toplevel_set_size(toplevel, m_config.defaultWidth, m_config.defaultHeight);
+        wlr_xdg_surface_schedule_configure(xdgSurface);
+    }
     std::cout << "[EmbeddedCompositor] Android Wayland surface mapped ("
     << xdgSurface->surface->current.width << "x" << xdgSurface->surface->current.height
     << ", surface: " << xdgSurface->surface << ")" << std::endl;
