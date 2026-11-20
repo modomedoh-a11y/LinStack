@@ -337,7 +337,7 @@ void MainWindow::setupUi()
 
     connect(m_service, &LinstackService::apkInstallStarted, this, [this](const QString &apkPath) {
         QFileInfo fi(apkPath);
-        m_canvas->showToast(QString("Installing %1 via ADB (127.0.0.1:5555)...").arg(fi.fileName()), 3000);
+        m_canvas->showToast(QString("Installing %1 via LinStack...").arg(fi.fileName()), 3000);
     });
 
     connect(m_service, &LinstackService::apkInstallProgress, this, [this](const QString &apkPath, int percent, const QString &status) {

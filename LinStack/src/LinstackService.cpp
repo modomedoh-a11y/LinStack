@@ -904,56 +904,50 @@ void LinstackService::executeAdbInstallProcess(const QString &apkPath)
     auto *proc = new QProcess(this);
     QString fileName = QFileInfo(apkPath).fileName();
 
+    QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
+
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("XDG_RUNTIME_DIR", runtimeDir);
+    env.insert("WAYLAND_DISPLAY", "wayland-linstack-0");
+    env.insert("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
+    proc->setProcessEnvironment(env);
+
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc, apkPath, fileName]() {
         QString text = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
-        emit logMessage("ADB Stream", text);
-
-        int percent = 30;
-        if (text.contains("Performing Streamed Install", Qt::CaseInsensitive)) percent = 50;
-        if (text.contains("Success", Qt::CaseInsensitive)) percent = 100;
-
-        // Parse regex for percentage if adb reports transfer progress
-        static const QRegularExpression rx("(\\d+)%");
-        auto match = rx.match(text);
-        if (match.hasMatch()) {
-            percent = match.captured(1).toInt();
+        if (!text.isEmpty()) {
+            emit logMessage("LinStack Install", text);
+            emit apkInstallProgress(apkPath, 60, text.left(60));
         }
-
-        emit apkInstallProgress(apkPath, percent, text.left(60));
     });
 
     connect(proc, &QProcess::readyReadStandardError, this, [this, proc, fileName]() {
         QString err = QString::fromUtf8(proc->readAllStandardError()).trimmed();
-        emit logMessage("ADB Error", QString("[%1]: %2").arg(fileName).arg(err));
+        if (!err.isEmpty()) {
+            emit logMessage("LinStack Install [STDERR]", QString("[%1]: %2").arg(fileName).arg(err));
+        }
     });
 
     connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, [this, proc, apkPath, fileName](int exitCode, QProcess::ExitStatus) {
-        QString fullOutput = proc->readAllStandardOutput() + " " + proc->readAllStandardError();
-        bool success = (exitCode == 0) && fullOutput.contains("Success", Qt::CaseInsensitive);
+        QString fullOutput = (proc->readAllStandardOutput() + " " + proc->readAllStandardError()).trimmed();
+        bool success = (exitCode == 0) && !fullOutput.contains("ERROR", Qt::CaseInsensitive) && !fullOutput.contains("Failed", Qt::CaseInsensitive);
 
         if (success) {
             emit apkInstallProgress(apkPath, 100, "Installed Successfully");
-            emit apkInstallFinished(apkPath, true, QString("Package %1 installed successfully.").arg(fileName));
-            emit logMessage("ADB Install", QString("Successfully installed %1 into LinStack container.").arg(fileName));
+            emit apkInstallFinished(apkPath, true, QString("Package %1 installed successfully via LinStack.").arg(fileName));
+            emit logMessage("LinStack Install", QString("Successfully installed %1 via native linstack app install.").arg(fileName));
         } else {
-            QString errorMsg = fullOutput.trimmed();
-            if (errorMsg.isEmpty()) errorMsg = QString("Process exited with code %1").arg(exitCode);
-
+            QString errorMsg = fullOutput.isEmpty() ? QString("Process exited with code %1").arg(exitCode) : fullOutput;
             emit apkInstallFinished(apkPath, false, errorMsg);
             emit errorOccurred(ServiceError::AdbInstallFailed,
                                QString("Failed to install %1: %2").arg(fileName).arg(errorMsg),
-                               QStringList{
-                                   "adb connect 127.0.0.1:5555",
-                                   "adb devices",
-                                   QString("adb install -r -d \"%1\"").arg(apkPath)
-                               });
+                               QStringList{ QString("linstack app install \"%1\"").arg(apkPath) });
         }
         proc->deleteLater();
     });
 
-    // Invoke adb with destination target 127.0.0.1:5555
-    QStringList args;
-    args << "-s" << "127.0.0.1:5555" << "install" << "-r" << apkPath;
-    proc->start("adb", args);
+    // التثبيت الأصلي المباشر عبر محرك LinStack بدون الحاجة لـ adb
+    PathResolver::configureProcess(proc, QStringList() << "app" << "install" << apkPath);
+    proc->start();
 }
