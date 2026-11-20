@@ -396,7 +396,7 @@ void LinstackService::startSession()
         connect(m_sessionPollTimer, &QTimer::timeout, this, &LinstackService::checkSessionStartupStatus);
     }
     m_sessionPollCount = 0;
-    m_sessionPollTimer->start(400);
+    m_sessionPollTimer->start(1000);
 }
 
 void LinstackService::checkSessionStartupStatus()
@@ -630,6 +630,7 @@ void LinstackService::handleSessionStderr()
 
 void LinstackService::refreshStatus()
 {
+    if (m_sessionState == SessionState::Starting || m_sessionState == SessionState::Stopping) return;
     // Check linstack status non-blocking
     auto *statusProc = new QProcess(this);
     connect(statusProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),

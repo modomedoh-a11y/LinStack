@@ -379,9 +379,12 @@ void MainWindow::setupUi()
         }
     });
 
-    // Run asynchronous diagnostics pipeline non-blocking on startup
-    QTimer::singleShot(600, this, [this]() {
-        LOG_INFO("Core", "Initiating asynchronous background diagnostic pipeline from MainWindow...");
+    // بدء جلسة الأندرويد فوراً دون تأخير، وتشغيل الفحص التشخيصي في الخلفية بعد 3 ثوانٍ
+    if (m_service && m_service->sessionState() == LinstackService::SessionState::Idle) {
+        m_service->startSession();
+    }
+    QTimer::singleShot(3500, this, [this]() {
+        LOG_INFO("Core", "Initiating background diagnostic check...");
         m_healer->startDiagnosticsAsync(true, this);
     });
 }
