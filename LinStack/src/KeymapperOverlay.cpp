@@ -2,6 +2,7 @@
 #include "UInputTouchBridge.h"
 #include "Theme.h"
 #include "InputMapper.h"
+#include "AndroidCanvas.h"
 
 #include <QComboBox>
 #include <QSlider>
@@ -1313,6 +1314,12 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
     } else {
         if (m_translator) {
             if (m_translator->isAimLockActive()) {
+                if (auto *canvas = qobject_cast<AndroidCanvas*>(parentWidget())) {
+                    if (canvas->isRawMouseActive()) {
+                        event->accept();
+                        return;
+                    }
+                }
                 QPoint currentPos = event->position().toPoint();
                 if (!m_ignoreNextMouseMove) {
                     int dx = currentPos.x() - m_lastMousePos.x();

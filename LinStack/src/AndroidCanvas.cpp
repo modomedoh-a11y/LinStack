@@ -39,8 +39,7 @@
 extern "C" {
     #include <wayland-client.h>
     #include "pointer-constraints-unstable-v1-client-protocol.h"
-    #include "pointer-constraints-unstable-v1-client-protocol.c"
-}
+    }
 #include <unistd.h>
 #include <fcntl.h>
 #include "AndroidCanvas.h"

@@ -163,7 +163,7 @@ set(SOURCES
     src/InputTranslator.cpp
 )
 
-add_executable(LinStack ${SOURCES} ${PTR_CONSTRAINTS_HDR})
+add_executable(LinStack ${SOURCES} ${PTR_CONSTRAINTS_HDR} ${PTR_CONSTRAINTS_SRC})
 
 target_compile_definitions(LinStack PRIVATE
     LIN_STACK_INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}"

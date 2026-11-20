@@ -82,6 +82,7 @@ public:
 
     // Aim Lock Mode (anchored at the AimLock node position, no right-click toggle)
     bool isAimModeActive() const { return m_aimModeActive; }
+    bool isRawMouseActive() const { return m_rawMouseFd >= 0; }
     void setAimMode(bool active, QPointF anchorNorm = QPointF(0.5, 0.5));
 
 signals:

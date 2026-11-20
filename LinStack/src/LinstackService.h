@@ -183,6 +183,7 @@ private:
     int m_sessionPollCount = 0;
     int m_uiRetryCount = 0;
     bool m_hasFirstFrame = false;
+    bool m_isStopping = false;
 
     // Active script operation process
 

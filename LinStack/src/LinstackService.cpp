@@ -66,6 +66,7 @@ LinstackService::LinstackService(QObject *parent)
 
 LinstackService::~LinstackService()
 {
+    m_isStopping = true;
     // إيقاف جميع المؤقتات لمنع إعادة تشغيل الواجهة أثناء إغلاق البرنامج
     if (m_adbPollTimer) m_adbPollTimer->stop();
     if (m_statusPollTimer) m_statusPollTimer->stop();
@@ -268,6 +269,7 @@ void LinstackService::setHasFirstFrame(bool hasFrame)
 
 void LinstackService::startSession()
 {
+    m_isStopping = false;
     if (m_sessionState == SessionState::Starting || m_sessionState == SessionState::Active) {
         emit logMessage("Session", "LinStack session is already starting or active.");
         return;
@@ -361,6 +363,7 @@ void LinstackService::checkSessionStartupStatus()
 
 void LinstackService::launchFullUi()
 {
+    if (m_isStopping) return;
     QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
     if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
 
@@ -457,6 +460,7 @@ void LinstackService::retryFullUi()
 
 void LinstackService::stopSession()
 {
+    m_isStopping = true;
     emit logMessage("Session", "Stopping LinStack session...");
     LOG_INFO("Session", "Stopping LinStack session...");
     setSessionState(SessionState::Stopping);
@@ -509,6 +513,7 @@ void LinstackService::stopSession()
 void LinstackService::handleSessionProcessFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     Q_UNUSED(exitStatus);
+    if (m_isStopping || m_sessionState == SessionState::Stopping) return;
     emit logMessage("Session", QString("LinStack session process exited (code %1).").arg(exitCode));
     LOG_INFO("Session", QString("LinStack session process exited (code %1).").arg(exitCode));
     if (exitCode == 0 || isSessionRunning()) {
