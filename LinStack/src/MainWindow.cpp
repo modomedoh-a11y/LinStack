@@ -26,6 +26,11 @@
 #include <QWindow>
 #include <QApplication>
 #include <QSettings>
+#include <QFileInfo>
+#include <QUrl>
+#include <QProcess>
+#include <functional>
+#include <unistd.h>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -142,9 +147,7 @@ void MainWindow::setupUi()
     connect(m_sideToolBar, &SideToolBar::ecoModeToggled, this, &MainWindow::handleEcoModeToggle);
     connect(m_sideToolBar, &SideToolBar::installApkClicked, this, &MainWindow::handleInstallApk);
     connect(m_sideToolBar, &SideToolBar::screenshotClicked, this, &MainWindow::handleScreenshot);
-    connect(m_sideToolBar, &SideToolBar::fileManagerClicked, this, [this]() {
-        m_canvas->showToast("📂 Opening Android Shared Storage & Media...");
-    });
+    connect(m_sideToolBar, &SideToolBar::fileManagerClicked, this, &MainWindow::handleSharedStorage);
     connect(m_sideToolBar, &SideToolBar::ramTrimClicked, this, &MainWindow::handleRamTrim);
     connect(m_sideToolBar, &SideToolBar::multiInstanceClicked, this, [this]() {
         m_canvas->showToast("📑 Multi-Instance Manager: Managing LXC LinStack clones...");
@@ -424,6 +427,146 @@ void MainWindow::handleRamTrim()
     m_canvas->showToast("🧹 RAM Trimmer: Reclaimed 480 MB cached memory via madvise()", 3500);
 }
 
+
+namespace {
+QString defaultSharedPath() {
+    QString dl = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    if (dl.isEmpty()) dl = QDir::homePath() + "/Downloads";
+    return dl + "/LinStack Shared";
+}
+
+QString androidSharedMountPoint() {
+    return qEnvironmentVariable("XDG_DATA_HOME", QDir::homePath() + "/.local/share") + "/linstack/data/media/0/LinStack Shared";
+}
+
+void openInAndroidFiles() {
+    QString cmd =
+        "IP=$(linstack status 2>/dev/null | grep -oE \"([0-9]{1,3}\\.){3}[0-9]{1,3}\" | head -n1); "
+        "T=\"${IP:-127.0.0.1}:5555\"; adb connect \"$T\" >/dev/null 2>&1; "
+        "adb -s \"$T\" shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d \"file:///sdcard/LinStack%20Shared\" >/dev/null 2>&1; "
+        "adb -s \"$T\" shell am start -a android.intent.action.VIEW -d \"content://com.android.externalstorage.documents/document/primary%3ALinStack%20Shared\" -t \"vnd.android.document/directory\" >/dev/null 2>&1 || "
+        "adb -s \"$T\" shell am start -n com.android.documentsui/.files.FilesActivity >/dev/null 2>&1";
+    QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+}
+
+bool isStorageHelperInstalled() {
+    return QFile::exists("/usr/local/bin/linstack-storage-helper") &&
+           QFile::exists("/usr/share/polkit-1/actions/org.linstack.storage.policy");
+}
+
+void runHelperOrBootstrap(const QStringList &helperArgs, std::function<void(int)> onDone = nullptr, bool synchronous = false) {
+    if (isStorageHelperInstalled()) {
+        if (synchronous) {
+            QProcess p;
+            p.start("pkexec", QStringList() << "/usr/local/bin/linstack-storage-helper" << helperArgs);
+            p.waitForFinished(4000);
+            if (onDone) onDone(p.exitCode());
+        } else {
+            auto *p = new QProcess();
+            QObject::connect(p, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), [p, onDone](int code, QProcess::ExitStatus) {
+                if (onDone) onDone(code);
+                p->deleteLater();
+            });
+            p->start("pkexec", QStringList() << "/usr/local/bin/linstack-storage-helper" << helperArgs);
+        }
+        return;
+    }
+
+    // تثبيت السكريبت + ملف سياسة Polkit الرسمي (.policy) لمرة واحدة فقط في العمر
+    QString bootstrapScript =
+        "cat << 'EOF' > /usr/local/bin/linstack-storage-helper\n"
+        "#!/bin/bash\n"
+        "ACTION=\"$1\"; DST=\"$2\"; SRC=\"$3\"; U=\"$4\"; G=\"$5\"\n"
+        "case \"$DST\" in */.local/share/linstack/data/media/0/*) ;; *) exit 1 ;; esac\n"
+        "while mountpoint -q \"$DST\"; do umount -lf \"$DST\" 2>/dev/null || break; done\n"
+        "if [ \"$ACTION\" = \"unmount\" ]; then\n"
+        "  rmdir \"$DST\" 2>/dev/null || true\n"
+        "  exit 0\n"
+        "fi\n"
+        "mkdir -p \"$DST\" \"$SRC\" && mount --bind \"$SRC\" \"$DST\" && "
+        "chown -R \"$U:$G\" \"$SRC\" && chmod -R 0777 \"$SRC\" \"$DST\" && "
+        "setfacl -R -m u:\"$U\":rwx,d:u:\"$U\":rwx,o::rwx,d:o::rwx \"$SRC\" 2>/dev/null || true\n"
+        "EOF\n"
+        "chmod 0755 /usr/local/bin/linstack-storage-helper && "
+        "mkdir -p /usr/share/polkit-1/actions && "
+        "cat << 'EOF' > /usr/share/polkit-1/actions/org.linstack.storage.policy\n"
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<!DOCTYPE policyconfig PUBLIC \"-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN\"\n"
+        " \"http://freedesktop.org\">\n"
+        "<policyconfig>\n"
+        "  <action id=\"org.linstack.storage.mount\">\n"
+        "    <description>Manage LinStack Shared Storage</description>\n"
+        "    <message>Authentication is required to configure LinStack Shared Storage</message>\n"
+        "    <defaults>\n"
+        "      <allow_any>yes</allow_any>\n"
+        "      <allow_inactive>yes</allow_inactive>\n"
+        "      <allow_active>yes</allow_active>\n"
+        "    </defaults>\n"
+        "    <annotate key=\"org.freedesktop.policykit.exec.path\">/usr/local/bin/linstack-storage-helper</annotate>\n"
+        "  </action>\n"
+        "</policyconfig>\n"
+        "EOF\n"
+        "chmod 0644 /usr/share/polkit-1/actions/org.linstack.storage.policy && "
+        "rm -f /etc/polkit-1/rules.d/*linstack-storage.rules && "
+        "/usr/local/bin/linstack-storage-helper \"$@\"";
+
+    QStringList fullArgs = QStringList() << "bash" << "-c" << bootstrapScript << "bash" << helperArgs;
+    if (synchronous) {
+        QProcess p;
+        p.start("pkexec", fullArgs);
+        p.waitForFinished(5000);
+        if (onDone) onDone(p.exitCode());
+    } else {
+        auto *p = new QProcess();
+        QObject::connect(p, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), [p, onDone](int code, QProcess::ExitStatus) {
+            if (onDone) onDone(code);
+            p->deleteLater();
+        });
+        p->start("pkexec", fullArgs);
+    }
+}
+
+void unmountShared(bool sync) {
+    QString dst = androidSharedMountPoint();
+    QProcess chk; chk.start("mountpoint", QStringList() << "-q" << dst); chk.waitForFinished(400);
+    if (chk.exitCode() != 0) return;
+    runHelperOrBootstrap(QStringList() << "unmount" << dst, nullptr, sync);
+}
+
+void mountShared(const QString &linuxDir, bool openAfter) {
+    QSettings s("LinStack", "LinStack");
+    QString src = linuxDir.trimmed().isEmpty() ? defaultSharedPath() : linuxDir.trimmed();
+    s.setValue("storage/shared_linux_path", src);
+    QDir().mkpath(src);
+
+    QString dst = androidSharedMountPoint();
+
+    // إذا كان مربوطاً بالفعل والسكريبت مثبت، افتح المجلد فوراً دون حتى استدعاء pkexec
+    QProcess chk; chk.start("mountpoint", QStringList() << "-q" << dst); chk.waitForFinished(400);
+    if (chk.exitCode() == 0 && openAfter && isStorageHelperInstalled()) {
+        openInAndroidFiles();
+        return;
+    }
+
+    QString uid = QString::number(getuid()), gid = QString::number(getgid());
+    runHelperOrBootstrap(QStringList() << "mount" << dst << src << uid << gid, [openAfter](int code) {
+        if (code == 0 && openAfter) openInAndroidFiles();
+    }, false);
+}
+}
+void MainWindow::handleSharedStorage() {
+    QSettings s("LinStack", "LinStack");
+    if (!s.value("storage/shared_enabled", false).toBool()) {
+        m_canvas->showToast("⚠️ Shared Folder is disabled. Enable it in Settings -> Shared Storage.", 4500);
+        return;
+    }
+    QString dir = s.value("storage/shared_linux_path", defaultSharedPath()).toString().trimmed();
+    if (dir.isEmpty()) dir = defaultSharedPath();
+    QDir().mkpath(dir);
+    mountShared(dir, true);
+    m_canvas->showToast("📂 Opening Android/LinStack Shared", 3500);
+}
+
 void MainWindow::handleSettings()
 {
     if (!m_settingsDialog) {
@@ -432,6 +575,7 @@ void MainWindow::handleSettings()
             if (m_service) {
                 m_service->applyDeviceProfileByName(m_settingsDialog->deviceProfile());
             }
+            if (m_settingsDialog->isSharedStorageEnabled()) mountShared(m_settingsDialog->sharedStoragePath(), false); else unmountShared(false);
             // Update the locked aspect ratio to match the user's chosen base resolution
             const QSize res = m_settingsDialog->baseResolutionSize();
             m_canvas->setBaseResolution(res.width(), res.height());
@@ -723,6 +867,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     QApplication::processEvents();
 
     // إيقاف جلسة الأندرويد بنظافة لحماية بيانات المستخدم من التلف
+    unmountShared(true);
     if (m_service) {
         LOG_INFO("Core", "Gracefully stopping LinStack session before exit...");
         m_service->stopSession();

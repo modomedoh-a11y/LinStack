@@ -6,6 +6,7 @@
 #include <QComboBox>
 #include <QSlider>
 #include <QCheckBox>
+#include <QLineEdit>
 #include <QRadioButton>
 #include <QLabel>
 #include <QPushButton>
@@ -26,6 +27,8 @@ public:
     QString deviceProfile()      const;
     bool    isAdbBridgeEnabled() const;
     bool    isVsyncEnabled()     const;
+    bool    isSharedStorageEnabled() const;
+    QString sharedStoragePath()  const;
 
 signals:
     void settingsApplied();
@@ -41,6 +44,7 @@ private:
     QWidget *createGraphicsTab();
     QWidget *createPhoneProfileTab();
     QWidget *createShortcutsTab();
+    QWidget *createSharedStorageTab();
 
     QTabWidget *m_tabs = nullptr;
 
@@ -68,6 +72,8 @@ private:
 
     // Shortcuts (Hotkey Manager)
     QTableWidget *m_tableShortcuts = nullptr;
+    QCheckBox *m_checkSharedEnabled = nullptr;
+    QLineEdit *m_editSharedPath = nullptr;
 };
 
 #endif // SETTINGSDIALOG_H

@@ -46,6 +46,7 @@ private slots:
     void handleHelp();
     void handleSearch(const QString &query);
     void handleDiagnostics();
+    void handleSharedStorage();
 
 private:
     void setupUi();

@@ -11,6 +11,9 @@
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QSettings>
+#include <QFileDialog>
+#include <QStandardPaths>
+#include <QDir>
 
 SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
@@ -58,6 +61,7 @@ void SettingsDialog::setupUi()
     m_tabs->addTab(createGraphicsTab(), "Graphics && Audio");
     m_tabs->addTab(createPhoneProfileTab(), "Phone Profile");
     m_tabs->addTab(createShortcutsTab(), "Shortcuts");
+    m_tabs->addTab(createSharedStorageTab(), "Shared Storage");
     rootLayout->addWidget(m_tabs);
 
     // Bottom Action Buttons
@@ -73,6 +77,8 @@ void SettingsDialog::setupUi()
     btnSave->setProperty("primary", true);
     btnSave->setFixedWidth(130);
     connect(btnSave, &QPushButton::clicked, this, [this]() {
+        QSettings("LinStack", "LinStack").setValue("storage/shared_enabled", isSharedStorageEnabled());
+        QSettings("LinStack", "LinStack").setValue("storage/shared_linux_path", sharedStoragePath());
         emit settingsApplied();
         accept();
     });
@@ -445,6 +451,58 @@ bool SettingsDialog::isVsyncEnabled() const
 {
     return m_checkVsync->isChecked();
 }
+
+
+QWidget *SettingsDialog::createSharedStorageTab()
+{
+    auto *tab = new QWidget(this);
+    auto *layout = new QVBoxLayout(tab);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(14);
+    auto *group = new QGroupBox("Linux <-> Android Shared Folder", tab);
+    group->setStyleSheet("QGroupBox { color: #10B981; font-weight: 700; border: 1px solid #1F2937; border-radius: 6px; margin-top: 6px; padding-top: 14px; }");
+    auto *gLayout = new QVBoxLayout(group);
+    gLayout->setSpacing(10);
+    QSettings settings("LinStack", "LinStack");
+    bool enabled = settings.value("storage/shared_enabled", false).toBool();
+    m_checkSharedEnabled = new QCheckBox("Enable Shared Folder between Linux and Android", group);
+    m_checkSharedEnabled->setChecked(enabled);
+    m_checkSharedEnabled->setStyleSheet("QCheckBox { color: #F9FAFB; font-weight: 700; font-size: 12px; }");
+    gLayout->addWidget(m_checkSharedEnabled);
+    auto *desc = new QLabel("Shares the selected Linux folder with Android (/sdcard/<FolderName>). Default path is created automatically when enabled.", group);
+    desc->setWordWrap(true);
+    desc->setStyleSheet("color: #9CA3AF; font-size: 11px;");
+    gLayout->addWidget(desc);
+    QString defDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    if (defDir.isEmpty()) defDir = QDir::homePath() + "/Downloads";
+    defDir += "/LinStack Shared";
+    QString savedPath = settings.value("storage/shared_linux_path", defDir).toString().trimmed();
+    if (savedPath.isEmpty()) savedPath = defDir;
+    auto *row = new QHBoxLayout();
+    m_editSharedPath = new QLineEdit(savedPath, group);
+    m_editSharedPath->setReadOnly(true);
+    m_editSharedPath->setEnabled(enabled);
+    m_editSharedPath->setStyleSheet("QLineEdit { background: #0D121D; border: 1px solid #1F2937; border-radius: 5px; color: #F9FAFB; padding: 6px 10px; }");
+    row->addWidget(m_editSharedPath, 1);
+    auto *btnBrowse = new QPushButton("Choose Folder...", group);
+    btnBrowse->setEnabled(enabled);
+    btnBrowse->setStyleSheet("QPushButton { background: #161F30; border: 1px solid #10B981; color: #00FF66; font-weight: 600; padding: 6px 12px; border-radius: 5px; }");
+    connect(btnBrowse, &QPushButton::clicked, this, [this]() {
+        QString dir = QFileDialog::getExistingDirectory(this, "Select Linux Shared Folder", m_editSharedPath->text());
+        if (!dir.isEmpty()) m_editSharedPath->setText(dir);
+    });
+    row->addWidget(btnBrowse);
+    gLayout->addLayout(row);
+    connect(m_checkSharedEnabled, &QCheckBox::toggled, this, [this, btnBrowse](bool checked) {
+        m_editSharedPath->setEnabled(checked);
+        btnBrowse->setEnabled(checked);
+    });
+    layout->addWidget(group);
+    layout->addStretch(1);
+    return tab;
+}
+bool SettingsDialog::isSharedStorageEnabled() const { return m_checkSharedEnabled ? m_checkSharedEnabled->isChecked() : false; }
+QString SettingsDialog::sharedStoragePath() const { return m_editSharedPath ? m_editSharedPath->text().trimmed() : QString(); }
 
 void SettingsDialog::paintEvent(QPaintEvent *event)
 {
