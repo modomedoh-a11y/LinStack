@@ -266,15 +266,14 @@ void MainWindow::setupUi()
             }
             m_service->setDesiredResolution(scr.width(), scr.height());
             // تنفيذ أوامر linstack prop set الآن بعد جاهزية waydroidplatform
-            QString cmd = QString(
-                "linstack prop set persist.waydroid.width %1; "
-                "linstack prop set persist.waydroid.height %2; "
-                "linstack prop set persist.waydroid.length %2; "
-                "linstack prop set persist.linstack.width %1; "
-                "linstack prop set persist.linstack.height %2; "
-                "linstack prop set persist.linstack.length %2"
-            ).arg(scr.width()).arg(scr.height());
-            QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+            // تأخير بسيط (1.5 ثانية) حتى يستقر SurfaceFlinger قبل تحديث الخصائص عبر Binder
+            QTimer::singleShot(1500, this, [scr]() {
+                QString cmd = QString(
+                    "linstack prop set persist.waydroid.width %1 && "
+                    "linstack prop set persist.waydroid.height %2"
+                ).arg(scr.width()).arg(scr.height());
+                QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+            });
             m_service->launchFullUi();
         }
     });

@@ -40,10 +40,8 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("LinStack Project");
 
-    bool isHeadless = false;
     for (int i = 1; i < argc; ++i) {
         if (QString(argv[i]).startsWith("--screenshot")) {
-            isHeadless = true;
             break;
         }
     }
