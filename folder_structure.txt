@@ -101,7 +101,6 @@
 │   └── src
 │       ├── AndroidCanvas.cpp
 │       ├── AndroidCanvas.h
-│       ├── CMakeLists.txt
 │       ├── DiagnosticsEngine.cpp
 │       ├── DiagnosticsEngine.h
 │       ├── InitializationDialog.cpp
@@ -135,6 +134,7 @@
 │       ├── TitleBar.h
 │       ├── UInputTouchBridge.cpp
 │       └── UInputTouchBridge.h
+├── linstack_context.txt
 ├── LinStack_Scripts
 │   ├── assets
 │   │   ├── 1.png

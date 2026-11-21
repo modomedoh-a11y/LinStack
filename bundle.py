@@ -5,7 +5,7 @@ def bundle_project():
     script_name = os.path.basename(__file__)
 
     # تحديد المجلدات والملفات المراد تجاهلها
-    ignored_dirs = {".git", "build"}
+    ignored_dirs = {".git", "build", "nlohmann"}
     ignored_files = {"system.img", "vendor.img", output_file, script_name}
 
     with open(output_file, "w", encoding="utf-8") as outfile:
