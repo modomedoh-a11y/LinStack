@@ -2,10 +2,11 @@ import os
 
 def bundle_project():
     output_file = "linstack_context.txt"
+    script_name = os.path.basename(__file__)
 
     # تحديد المجلدات والملفات المراد تجاهلها
     ignored_dirs = {".git", "build"}
-    ignored_files = {"system.img", "vendor.img", output_file}
+    ignored_files = {"system.img", "vendor.img", output_file, script_name}
 
     with open(output_file, "w", encoding="utf-8") as outfile:
         for root, dirs, files in os.walk("."):
