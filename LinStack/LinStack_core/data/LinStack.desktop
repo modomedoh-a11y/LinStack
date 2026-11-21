@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=LinStack
+GenericName=Android Container
+GenericName[ru]=Контейнер с Android
+Exec=LinStack
+Comment=Zero-Copy Embedded Android Virtualization & Gaming Engine
+Icon=linstack
+Categories=Utility;System;Emulator;Game;
+Actions=stop;initialize;
+X-Purism-FormFactor=Workstation;Mobile;
+
+[Desktop Action stop]
+Name=Stop LinStack
+Name[ru]=Остановить LinStack
+Exec=linstack session stop
+Icon=linstack
+
+[Desktop Action initialize]
+Name=Initialize LinStack
+Name[ru]=Инициализировать LinStack
+Exec=LinStack

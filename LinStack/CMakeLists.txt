@@ -260,3 +260,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LinStack_core")
         PATTERN "*.pyc" EXCLUDE
     )
 endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../LinStack_Scripts")
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../LinStack_Scripts/
+        DESTINATION LinStack_Scripts
+        PATTERN "venv" EXCLUDE
+        PATTERN ".venv" EXCLUDE
+        PATTERN "__pycache__" EXCLUDE
+        PATTERN "*.pyc" EXCLUDE
+    )
+endif()

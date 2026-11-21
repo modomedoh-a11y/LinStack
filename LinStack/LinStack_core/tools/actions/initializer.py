@@ -22,18 +22,21 @@ from gi.repository import GLib
 
 DEFAULT_SYSTEM_URL = "https://sourceforge.net/projects/waydroid/files/images/system/lineage/waydroid_x86_64/lineage-18.1-20250628-VANILLA-waydroid_x86_64-system.zip/download"
 DEFAULT_VENDOR_URL = "https://sourceforge.net/projects/waydroid/files/images/vendor/waydroid_x86_64/lineage-18.1-20250628-MAINLINE-waydroid_x86_64-vendor.zip/download"
-INFO_NOTE_TEXT = "These are links for Waydroid Lineage OS Android 11 you can put your android images links or you can copy them to LinStack/LinStack/resources as system.img and vendor.img"
+INFO_NOTE_TEXT = "These are links for Waydroid Lineage OS Android 11. You can enter your own Android image links, or copy system.img and vendor.img into LinStack/resources (or /opt/linstack/resources before running Init)."
 
 def resolve_project_resources():
-    """Dynamically resolve the project root and LinStack/resources directory."""
-    if Path("/opt/linstack/resources").is_dir():
-        return Path("/opt/linstack/resources").resolve()
+    """Dynamically resolve the resources directory (/opt/linstack/resources or LinStack/resources)."""
+    opt_res = Path("/opt/linstack/resources")
+    if opt_res.is_dir():
+        # Check if images exist or directory is writable by current user/root
+        if (opt_res / "system.img").is_file() or os.access(str(opt_res), os.W_OK) or os.geteuid() == 0:
+            return opt_res.resolve()
 
     cur = Path(__file__).resolve()
     for parent in [cur] + list(cur.parents):
         if (parent / ".git").exists() or (parent / "install.sh").exists() or (parent / "wlroots_engine").exists():
             res = parent / "LinStack" / "resources"
-            return res
+            return res.resolve()
         if (parent / "LinStack" / "resources").exists() and (parent / "LinStack" / "LinStack_core").exists():
             return (parent / "LinStack" / "resources").resolve()
         if (parent / "resources").exists() and (parent / "linstack.py").exists():
@@ -46,7 +49,11 @@ def resolve_project_resources():
         if (parent / "LinStack" / "resources").exists():
             return (parent / "LinStack" / "resources").resolve()
 
-    return (cur.parents[3] / "resources").resolve()
+    if opt_res.is_dir():
+        return opt_res.resolve()
+
+    fallback = Path.home() / ".local" / "share" / "linStack" / "resources"
+    return fallback.resolve()
 
 def download_image_zip(url, target_path, progress_prefix="Downloading"):
     """Download a zip archive from URL handling redirects cleanly with streaming progress."""
@@ -142,8 +149,20 @@ def ensure_images_available(args, system_url=None, vendor_url=None):
       Step B: If both exist, skip downloading and initialize using local files.
       Step C: If either is missing, download zip archive(s) and extract them into LinStack/resources/.
     """
-    res_dir = resolve_project_resources()
-    os.makedirs(res_dir, exist_ok=True)
+    # Check /opt/linstack/resources first when installed system-wide
+    opt_res = Path("/opt/linstack/resources")
+    if opt_res.is_dir() and (opt_res / "system.img").is_file() and (opt_res / "vendor.img").is_file():
+        res_dir = opt_res.resolve()
+    else:
+        res_dir = resolve_project_resources()
+
+    try:
+        os.makedirs(res_dir, exist_ok=True)
+    except (PermissionError, OSError) as e:
+        logging.warning("Cannot write to %s (%s); falling back to user local directory.", res_dir, e)
+        fallback = (Path.home() / ".local" / "share" / "linStack" / "resources").resolve()
+        fallback.mkdir(parents=True, exist_ok=True)
+        res_dir = fallback
 
     system_img_path = os.path.join(res_dir, "system.img")
     vendor_img_path = os.path.join(res_dir, "vendor.img")

@@ -17,10 +17,11 @@ LinstackService::LinstackService(QObject *parent)
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidateScriptDirs = {
         "/opt/linstack/LinStack_Scripts",
+        appDir + "/LinStack_Scripts",
         appDir + "/../LinStack_Scripts",
         appDir + "/../../LinStack_Scripts",
         QDir::currentPath() + "/LinStack_Scripts",
-        PathResolver::userDataDir() + "/linstack_script"
+        PathResolver::userDataDir() + "/LinStack_Scripts"
     };
     for (const QString &d : candidateScriptDirs) {
         if (QFileInfo::exists(d + "/main.py")) {
@@ -29,7 +30,7 @@ LinstackService::LinstackService(QObject *parent)
         }
     }
     if (m_scriptsPath.isEmpty()) {
-        m_scriptsPath = PathResolver::userDataDir() + "/linstack_script";
+        m_scriptsPath = "/opt/linstack/LinStack_Scripts";
     }
 
     // Initialize predefined gaming profiles for unlocking high refresh rates
@@ -664,7 +665,7 @@ void LinstackService::refreshStatus()
 }
 
 // =========================================================================
-// linstack-scripts Integration (Casualsnek/linstack_script)
+// LinStack_Scripts Integration
 // =========================================================================
 
 void LinstackService::setScriptsPath(const QString &path)
@@ -684,50 +685,66 @@ QString LinstackService::findPythonInterpreter() const
     if (QFileInfo::exists(venvPython)) {
         return venvPython;
     }
-    return QStandardPaths::findExecutable("python3");
+    return PathResolver::resolvePython3();
 }
 
 void LinstackService::installScriptsEnvironment()
 {
-    emit scriptOperationStarted("Setup linstack-scripts Environment");
-    emit scriptOperationProgress("Setup linstack-scripts Environment", 10, "Cloning Casualsnek/linstack_script...");
+    emit scriptOperationStarted("Setup LinStack Scripts Environment");
+    emit scriptOperationProgress("Setup LinStack Scripts Environment", 10, "Locating bundled LinStack_Scripts...");
 
-    QDir().mkpath(QFileInfo(m_scriptsPath).path());
-
-    auto *cloneProc = new QProcess(this);
-    cloneProc->setWorkingDirectory(QFileInfo(m_scriptsPath).path());
-
-    QStringList cloneArgs;
-    cloneArgs << "clone" << "https://github.com/Casualsnek/linstack_script" << m_scriptsPath;
-
-    connect(cloneProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, [this, cloneProc](int exitCode, QProcess::ExitStatus) {
-        if (exitCode == 0 || isScriptsInstalled()) {
-            emit scriptOperationProgress("Setup linstack-scripts Environment", 50, "Creating Python virtualenv...");
-
-            // Setup venv and requirements
-            auto *venvProc = new QProcess(this);
-            venvProc->setWorkingDirectory(m_scriptsPath);
-
-            QString command = "python3 -m venv venv && ./venv/bin/pip install -r requirements.txt";
-            connect(venvProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                    this, [this, venvProc](int venvExit, QProcess::ExitStatus) {
-                if (venvExit == 0) {
-                    emit scriptOperationProgress("Setup linstack-scripts Environment", 100, "Ready");
-                    emit scriptOperationFinished("Setup linstack-scripts Environment", true, "linstack-scripts configured.");
-                } else {
-                    emit scriptOperationFinished("Setup linstack-scripts Environment", false, "Failed to install Python requirements.");
-                }
-                venvProc->deleteLater();
-            });
-            venvProc->start("/bin/bash", QStringList() << "-c" << command);
-        } else {
-            emit scriptOperationFinished("Setup linstack-scripts Environment", false, "Failed to git clone linstack_script repo.");
+    // Re-resolve candidate script dirs if current path is invalid
+    if (!isScriptsInstalled()) {
+        QString appDir = QCoreApplication::applicationDirPath();
+        QStringList candidateDirs = {
+            "/opt/linstack/LinStack_Scripts",
+            appDir + "/LinStack_Scripts",
+            appDir + "/../LinStack_Scripts",
+            appDir + "/../../LinStack_Scripts",
+            QDir::currentPath() + "/LinStack_Scripts",
+            PathResolver::userDataDir() + "/LinStack_Scripts"
+        };
+        for (const QString &d : candidateDirs) {
+            if (QFileInfo::exists(d + "/main.py")) {
+                m_scriptsPath = QDir::cleanPath(d);
+                break;
+            }
         }
-        cloneProc->deleteLater();
+    }
+
+    if (!isScriptsInstalled()) {
+        emit scriptOperationFinished("Setup LinStack Scripts Environment", false,
+            QString("Bundled LinStack_Scripts directory not found (checked /opt/linstack/LinStack_Scripts and relative paths)."));
+        return;
+    }
+
+    emit scriptOperationProgress("Setup LinStack Scripts Environment", 30, "Configuring Python virtualenv & dependencies...");
+
+    auto *venvProc = new QProcess(this);
+    venvProc->setWorkingDirectory(m_scriptsPath);
+
+    bool needsRoot = !QFileInfo(m_scriptsPath).isWritable();
+    QString pkexec = QStandardPaths::findExecutable("pkexec");
+
+    QString setupCmd = QString("cd \"%1\" && python3 -m venv venv && ./venv/bin/pip install -r requirements.txt")
+                       .arg(m_scriptsPath);
+
+    connect(venvProc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, [this, venvProc](int venvExit, QProcess::ExitStatus) {
+        if (venvExit == 0) {
+            emit scriptOperationProgress("Setup LinStack Scripts Environment", 100, "Ready");
+            emit scriptOperationFinished("Setup LinStack Scripts Environment", true, "LinStack_Scripts environment configured successfully.");
+        } else {
+            emit scriptOperationFinished("Setup LinStack Scripts Environment", false, "Failed to initialize Python virtualenv or install requirements.");
+        }
+        venvProc->deleteLater();
     });
 
-    cloneProc->start("git", cloneArgs);
+    if (needsRoot && !pkexec.isEmpty()) {
+        venvProc->start(pkexec, QStringList() << "sh" << "-c" << setupCmd);
+    } else {
+        venvProc->start("/bin/bash", QStringList() << "-c" << setupCmd);
+    }
 }
 
 void LinstackService::executeScriptCommand(const QString &operationName, const QStringList &scriptArgs)
@@ -739,25 +756,33 @@ void LinstackService::executeScriptCommand(const QString &operationName, const Q
 
     if (!isScriptsInstalled()) {
         emit errorOccurred(ServiceError::LinstackScriptsNotFound,
-                           "linstack-scripts repository not found.",
-                           QStringList{QString("git clone https://github.com/Casualsnek/linstack_script %1").arg(m_scriptsPath)});
-        emit scriptOperationFinished(operationName, false, "linstack-scripts not installed.");
+                           "LinStack_Scripts not found.",
+                           QStringList{QString("Ensure LinStack_Scripts is present at %1 or /opt/linstack/LinStack_Scripts").arg(m_scriptsPath)});
+        emit scriptOperationFinished(operationName, false, "LinStack_Scripts directory not found.");
         return;
     }
 
     m_activeScriptOp = operationName;
     emit scriptOperationStarted(operationName);
-    emit scriptOperationProgress(operationName, 10, "Starting script execution...");
+    emit scriptOperationProgress(operationName, 10, "Starting privileged script execution...");
 
     m_scriptProcess = new QProcess(this);
     m_scriptProcess->setWorkingDirectory(m_scriptsPath);
 
     QString pythonBin = findPythonInterpreter();
-    QStringList fullArgs;
-    fullArgs << "main.py" << scriptArgs;
+    QString scriptMain = m_scriptsPath + "/main.py";
+    QString pkexec = QStandardPaths::findExecutable("pkexec");
 
-    // Use pkexec or sudo if needed, or invoke directly
-    QString executable = pythonBin;
+    QString executable;
+    QStringList fullArgs;
+
+    if (!pkexec.isEmpty()) {
+        executable = pkexec;
+        fullArgs << pythonBin << scriptMain << scriptArgs;
+    } else {
+        executable = pythonBin;
+        fullArgs << scriptMain << scriptArgs;
+    }
 
     connect(m_scriptProcess, &QProcess::readyReadStandardOutput, this, [this]() {
         if (!m_scriptProcess) return;

@@ -11,12 +11,12 @@
   <project_license>GPL-3.0-only</project_license>
   <developer_name>LinStack</developer_name>
 
-  <url type="homepage">https://github.com/</url>
-  <url type="bugtracker">https://github.com/linstack/linstack/issues</url>
-  <url type="faq">https://docs.waydro.id/faq</url>
-  <url type="help">https://github.com/discussions/#/#linstack:matrix.org</url>
-  <url type="donation">https://github.com/linstack/donate</url>
-  <url type="contact">https://github.com/discussions/#/#linstack:matrix.org</url>
+  <url type="homepage">https://github.com/modomedoh-a11y/LinStack</url>
+  <url type="bugtracker">https://github.com/modomedoh-a11y/LinStack/issues</url>
+  <url type="faq">https://github.com/modomedoh-a11y/LinStack#readme</url>
+  <url type="help">https://github.com/modomedoh-a11y/LinStack/discussions</url>
+  <url type="donation">https://github.com/modomedoh-a11y/LinStack</url>
+  <url type="contact">https://github.com/modomedoh-a11y/LinStack</url>
 
   <supports>
     <control>pointing</control>
@@ -32,7 +32,7 @@
     <p xml:lang="ru">LinStack запускает полноценную систему Android в контейнере поверх обычной системы GNU/Linux. Android внутри контейнера получает прямой доступ к нужному оборудованию через LXC и интерфейс binder.</p>
   </description>
 
-  <launchable type="desktop-id">Linstack.desktop</launchable>
+  <launchable type="desktop-id">LinStack.desktop</launchable>
   <screenshots>
     <screenshot type="default">
       <image>https://github.com/assets/images/hero/main_landing.jpeg</image>

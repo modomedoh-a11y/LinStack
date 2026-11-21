@@ -109,7 +109,7 @@ public:
     void setHasFirstFrame(bool hasFrame);
     bool hasFirstFrame() const { return m_hasFirstFrame; }
 
-    // --- linstack-scripts Integration (Casualsnek/linstack_script) ---
+    // --- LinStack_Scripts Integration ---
     void setScriptsPath(const QString &path);
     QString scriptsPath() const { return m_scriptsPath; }
     bool isScriptsInstalled() const;

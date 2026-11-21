@@ -21,7 +21,7 @@
 │   │   │   │   ├── config_base
 │   │   │   │   └── linstack.seccomp
 │   │   │   ├── id.linstack.linstack.metainfo.xml
-│   │   │   ├── Linstack.desktop
+│   │   │   ├── LinStack.desktop
 │   │   │   ├── linstack.directory
 │   │   │   ├── linstack.menu
 │   │   │   └── scripts

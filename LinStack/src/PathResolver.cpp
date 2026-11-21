@@ -218,6 +218,7 @@ void PathResolver::configureProcess(QProcess *proc, const QStringList &args)
     QString toolsParent;
     if (exe.endsWith(".py")) {
         toolsParent = QFileInfo(exe).absolutePath();
+        proc->setWorkingDirectory(toolsParent);
     } else {
         QString toolsDir = resolveToolsDir();
         if (!toolsDir.isEmpty()) {
@@ -251,9 +252,9 @@ int PathResolver::executeLinstack(const QStringList &args, int timeoutMs)
 
 bool PathResolver::startDetachedLinstack(const QStringList &args)
 {
-    QStringList effectiveArgs = args;
-    QString prog = resolveLinstackCommand(effectiveArgs);
-    return QProcess::startDetached(prog, effectiveArgs);
+    QProcess proc;
+    configureProcess(&proc, args);
+    return proc.startDetached();
 }
 
 QString PathResolver::userDataDir()

@@ -21,7 +21,7 @@ static const QString DEFAULT_SYS_URL =
 static const QString DEFAULT_VND_URL =
     "https://sourceforge.net/projects/waydroid/files/images/vendor/waydroid_x86_64/lineage-18.1-20250628-MAINLINE-waydroid_x86_64-vendor.zip/download";
 static const QString HELPER_NOTICE_TEXT =
-    "These are links for Waydroid Lineage OS Android 11 you can put your android images links or you can copy them to LinStack/LinStack/resources as system.img and vendor.img";
+    "These are links for Waydroid Lineage OS Android 11. You can enter your own Android image links, or copy system.img and vendor.img into LinStack/resources (or /opt/linstack/resources before running Init).";
 
 InitializationDialog::InitializationDialog(QWidget *parent)
     : QDialog(parent)

@@ -269,11 +269,13 @@ void MainWindow::setupUi()
             // تنفيذ أوامر linstack prop set الآن بعد جاهزية waydroidplatform
             // تأخير بسيط (1.5 ثانية) حتى يستقر SurfaceFlinger قبل تحديث الخصائص عبر Binder
             QTimer::singleShot(1500, this, [scr]() {
-                QString cmd = QString(
-                    "linstack prop set persist.waydroid.width %1 && "
-                    "linstack prop set persist.waydroid.height %2"
-                ).arg(scr.width()).arg(scr.height());
-                QProcess::startDetached("/bin/sh", QStringList() << "-c" << cmd);
+                QString widthStr = QString::number(scr.width());
+                QString heightStr = QString::number(scr.height());
+
+                PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.linstack.width" << widthStr);
+                PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.linstack.height" << heightStr);
+                PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.waydroid.width" << widthStr);
+                PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.waydroid.height" << heightStr);
             });
             m_service->launchFullUi();
         }
