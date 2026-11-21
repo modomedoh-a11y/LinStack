@@ -1,11 +1,6 @@
 #ifndef EMBEDDED_COMPOSITOR_H
 #define EMBEDDED_COMPOSITOR_H
 
-#ifndef WLR_USE_UNSTABLE
-#define WLR_USE_UNSTABLE 1
-#endif
-
-// Include standard C++ headers first before re-mapping C99 static array bounds
 #include <string>
 #include <functional>
 #include <memory>
@@ -14,17 +9,13 @@
 #include <cmath>
 #include <algorithm>
 
-#include "wlroots_compat.h"
-extern "C" {
-#include <wlr/types/wlr_keyboard.h>
-#include <wlr/interfaces/wlr_keyboard.h>
-}
+#include "wlr_c_bridge.h"
 
 struct EmbeddedCompositorConfig {
     std::string socketName = "wayland-linstack-0";
     int defaultWidth = 1920;
     int defaultHeight = 1080;
-    int refreshRate = 60; // سيتحدث تلقائياً من شاشة المستخدم
+    int refreshRate = 60;
 };
 
 class EmbeddedCompositor {
@@ -63,9 +54,11 @@ public:
      */
     bool makeCurrent();
 
-    // Getters
+    // Getters returning opaque pointers
     struct wl_display *getDisplay() const { return m_display; }
     struct wl_event_loop *getEventLoop() const { return m_eventLoop; }
+    int getEventLoopFd() const { return wlr_bridge_event_loop_get_fd(m_eventLoop); }
+    void flush() const { if (m_display) wlr_bridge_display_flush_clients(m_display); }
     struct wlr_backend *getBackend() const { return m_backend; }
     struct wlr_renderer *getRenderer() const { return m_renderer; }
     struct wlr_seat *getSeat() const { return m_seat; }
@@ -86,13 +79,11 @@ public:
 
     /**
      * @brief Returns the EGL display used by the wlroots GLES2 renderer.
-     *        Required for cross-context EGLImageKHR texture sharing into Qt's context.
      */
     EGLDisplay getEglDisplay() const;
 
     /**
      * @brief Returns the EGL context used by the wlroots GLES2 renderer.
-     *        Required for cross-context EGLImageKHR creation from wlroots GL textures.
      */
     EGLContext getEglContext() const;
 
@@ -102,7 +93,7 @@ public:
     std::function<void(struct wlr_surface *surface)> onSurfaceCommit;
     std::function<void(struct wl_client *client)> onClientConnected;
 
-    // Internal listener callbacks (invoked from C listener thunks)
+    // Internal bridge callbacks
     void handleClientCreated(struct wl_client *client);
     void handleNewSurface(struct wlr_surface *surface);
     void handleNewXdgSurface(struct wlr_xdg_surface *xdgSurface);
@@ -132,11 +123,9 @@ private:
     struct wlr_fractional_scale_manager_v1 *m_fractionalScale = nullptr;
     struct wlr_pointer_constraints_v1 *m_pointerConstraints = nullptr;
     struct wlr_single_pixel_buffer_manager_v1 *m_singlePixelBuffer = nullptr;
-    struct wlr_linux_drm_syncobj_manager_v1 *m_drmSyncobj = nullptr;
     struct wlr_xdg_shell *m_xdgShell = nullptr;
     struct wlr_seat *m_seat = nullptr;
-    struct wlr_keyboard m_virtualKeyboard{};
-    bool m_keyboardInitialized = false;
+    struct wlr_keyboard *m_virtualKeyboard = nullptr;
     struct wlr_relative_pointer_manager_v1 *m_relativePointerManager = nullptr;
     struct wlr_output_layout *m_outputLayout = nullptr;
     struct wlr_output *m_headlessOutput = nullptr;
@@ -145,82 +134,20 @@ private:
     struct wlr_surface *m_activeSurface = nullptr;
     struct wlr_xdg_toplevel *m_activeToplevel = nullptr;
 
-    friend void handleNewXdgSurfaceThunk(struct wl_listener *listener, void *data);
-    friend void handleNewSurfaceThunk(struct wl_listener *listener, void *data);
-    friend void handleClientCreatedThunk(struct wl_listener *listener, void *data);
-    friend void handleNewXdgToplevelThunk(struct wl_listener *listener, void *data);
+    // Signal listeners from C bridge
+    struct wlr_bridge_listener *m_clientCreatedListener = nullptr;
+    struct wlr_bridge_listener *m_newSurfaceListener = nullptr;
+    struct wlr_bridge_listener *m_newXdgSurfaceListener = nullptr;
+    struct wlr_bridge_listener *m_newXdgToplevelListener = nullptr;
 
-    // Signal listeners
-    struct wl_listener m_clientCreatedListener;
-    struct wl_listener m_newSurfaceListener;
-    struct wl_listener m_newXdgSurfaceListener;
-    struct wl_listener m_newXdgToplevelListener;
+    // Track active XDG surface records
+    std::vector<std::unique_ptr<struct wlr_bridge_xdg_surface_record, void(*)(struct wlr_bridge_xdg_surface_record*)>> m_surfaceRecords;
 
-    // Track active XDG surface listeners
-    struct XdgSurfaceRecord {
-        EmbeddedCompositor *compositor = nullptr;
-        struct wlr_xdg_surface *xdgSurface = nullptr;
-        struct wl_listener map{};
-        struct wl_listener unmap{};
-        struct wl_listener destroy{};
-        struct wl_listener commit{};
+    // Track XDG toplevel records
+    std::vector<std::unique_ptr<struct wlr_bridge_xdg_toplevel_record, void(*)(struct wlr_bridge_xdg_toplevel_record*)>> m_toplevelRecords;
 
-        XdgSurfaceRecord() {
-            wl_list_init(&map.link);
-            wl_list_init(&unmap.link);
-            wl_list_init(&destroy.link);
-            wl_list_init(&commit.link);
-        }
-        ~XdgSurfaceRecord() {
-            wl_list_remove(&map.link);
-            wl_list_remove(&unmap.link);
-            wl_list_remove(&destroy.link);
-            wl_list_remove(&commit.link);
-        }
-    };
-    std::vector<std::unique_ptr<XdgSurfaceRecord>> m_surfaceRecords;
-
-    // Track XDG toplevels (fires AFTER role assignment — correct place to configure)
-    struct XdgToplevelRecord {
-        EmbeddedCompositor *compositor = nullptr;
-        struct wlr_xdg_toplevel *toplevel = nullptr;
-        struct wl_listener request_maximize{};
-        struct wl_listener request_fullscreen{};
-        struct wl_listener request_minimize{};
-        struct wl_listener destroy{};
-
-        XdgToplevelRecord() {
-            wl_list_init(&request_maximize.link);
-            wl_list_init(&request_fullscreen.link);
-            wl_list_init(&request_minimize.link);
-            wl_list_init(&destroy.link);
-        }
-        ~XdgToplevelRecord() {
-            wl_list_remove(&request_maximize.link);
-            wl_list_remove(&request_fullscreen.link);
-            wl_list_remove(&request_minimize.link);
-            wl_list_remove(&destroy.link);
-        }
-    };
-    std::vector<std::unique_ptr<XdgToplevelRecord>> m_toplevelRecords;
-
-    // Track all created wl_surface instances (including hwcomposer surfaces & subsurfaces)
-    struct RawSurfaceRecord {
-        EmbeddedCompositor *compositor = nullptr;
-        struct wlr_surface *surface = nullptr;
-        struct wl_listener commit{};
-        struct wl_listener destroy{};
-
-        RawSurfaceRecord() {
-            wl_list_init(&commit.link);
-            wl_list_init(&destroy.link);
-        }
-        ~RawSurfaceRecord() {
-            wl_list_remove(&commit.link);
-            wl_list_remove(&destroy.link);
-        }
-    };
-    std::vector<std::unique_ptr<RawSurfaceRecord>> m_rawSurfaceRecords;
+    // Track raw surface records
+    std::vector<std::unique_ptr<struct wlr_bridge_raw_surface_record, void(*)(struct wlr_bridge_raw_surface_record*)>> m_rawSurfaceRecords;
 };
 
 #endif // EMBEDDED_COMPOSITOR_H

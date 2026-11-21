@@ -82,3 +82,8 @@ env/
 LinStack/build/
 build/
 wlroots_engine/build/
+build_test/
+
+# Generated context and dumps
+*context.txt
+LinStack/LinStack_core/folder_structure.txt

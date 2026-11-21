@@ -6,6 +6,8 @@ project(LinStack
     LANGUAGES C CXX
 )
 
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -29,11 +31,36 @@ include(GNUInstallDirs)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBEVDEV REQUIRED libevdev)
 
-# Query wlroots and Wayland libraries
-pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET wlroots-0.20)
-if(NOT WLROOTS_FOUND)
-    pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET wlroots)
+# Query wlroots versions (0.20, 0.19, 0.18, 0.17 or generic wlroots)
+set(WLROOTS_VERSION_MINOR 0)
+pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.20)
+if(WLROOTS_FOUND)
+    set(WLROOTS_VERSION_MINOR 20)
+else()
+    pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.19)
+    if(WLROOTS_FOUND)
+        set(WLROOTS_VERSION_MINOR 19)
+    else()
+        pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.18)
+        if(WLROOTS_FOUND)
+            set(WLROOTS_VERSION_MINOR 18)
+        else()
+            pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.17)
+            if(WLROOTS_FOUND)
+                set(WLROOTS_VERSION_MINOR 17)
+            else()
+                pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET wlroots)
+                if(WLROOTS_VERSION MATCHES "^0\\.([0-9]+)")
+                    set(WLROOTS_VERSION_MINOR ${CMAKE_MATCH_1})
+                else()
+                    set(WLROOTS_VERSION_MINOR 20)
+                endif()
+            endif()
+        endif()
+    endif()
 endif()
+
+message(STATUS "Found wlroots version ${WLROOTS_VERSION} (minor: ${WLROOTS_VERSION_MINOR})")
 
 pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
@@ -96,6 +123,7 @@ add_custom_command(
 
 # Static library for wlroots embedded compositor engine
 add_library(wlroots_engine_lib STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../wlroots_engine/src/wlr_c_bridge.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../wlroots_engine/src/EmbeddedCompositor.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../wlroots_engine/src/WaylandSurfaceRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../wlroots_engine/src/AspectRatioWindow.cpp
@@ -113,6 +141,7 @@ target_include_directories(wlroots_engine_lib PUBLIC
 
 target_compile_definitions(wlroots_engine_lib PUBLIC
     WLR_USE_UNSTABLE=1
+    WLR_VERSION_MINOR=${WLROOTS_VERSION_MINOR}
 )
 
 target_compile_options(wlroots_engine_lib PRIVATE
@@ -172,6 +201,7 @@ target_compile_definitions(LinStack PRIVATE
     LIN_STACK_DATADIR="${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/linstack"
     HAVE_WAYLAND_COMPOSITOR=1
     WLR_USE_UNSTABLE=1
+    WLR_VERSION_MINOR=${WLROOTS_VERSION_MINOR}
 )
 
 target_include_directories(LinStack PRIVATE

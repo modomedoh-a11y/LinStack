@@ -75,11 +75,8 @@ int main(int argc, char *argv[]) {
     InputMapper inputMapper(compositor.getSeat(), compositor.getRelativePointerManager());
     inputMapper.setGeometry(viewport, config.defaultWidth, config.defaultHeight);
 
-    // Try loading game profile or save default
-    std::string profilePath = "keymap_default.json";
-    if (!inputMapper.loadProfile(profilePath)) {
-        inputMapper.saveProfile(profilePath);
-    }
+    // Setup default game profile
+    inputMapper.setupDefaultProfile();
 
     // 5. Connect Surface lifecycle callbacks
     compositor.onSurfaceMapped = [&](struct wlr_surface *surface) {

@@ -508,8 +508,8 @@ void AndroidCanvas::paintGL()
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
     if (!activeSurface) return;
 
-    int surfW = activeSurface->current.width;
-    int surfH = activeSurface->current.height;
+    int surfW = 0, surfH = 0;
+    wlr_bridge_surface_get_size(activeSurface, &surfW, &surfH);
     if (surfW > 0 && surfH > 0 && (surfW != m_baseWidth || surfH != m_baseHeight)) {
         m_baseWidth = surfW;
         m_baseHeight = surfH;
@@ -527,9 +527,9 @@ void AndroidCanvas::paintGL()
 
     bool rendered = false;
 
-    // 1. محاولة المسار السريع Zero-Copy عبر استخراج DMA-BUF من المخزن المؤقت للسطح مباشرة    // 1. المسار السريع Zero-Copy الحقيقي (يدعم تعدد المستويات لبطاقات Intel HD 530)
-    struct wlr_dmabuf_attributes dmabuf = {};
-    if (activeSurface->buffer && wlr_buffer_get_dmabuf(&activeSurface->buffer->base, &dmabuf)) {
+    // 1. المسار السريع Zero-Copy الحقيقي (يدعم تعدد المستويات لبطاقات Intel HD 530)
+    struct wlr_bridge_dmabuf_attribs dmabuf = {};
+    if (wlr_bridge_surface_get_dmabuf(activeSurface, &dmabuf)) {
         static auto s_eglCreateImageKHR = reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(
             eglGetProcAddress("eglCreateImageKHR"));
         static auto s_eglDestroyImageKHR = reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(
@@ -585,25 +585,22 @@ void AndroidCanvas::paintGL()
 
     // 2. المسار الاحتياطي (CPU Readback) فقط إذا فشل DMA-BUF أو كان التطبيق يستخدم wl_shm
     if (!rendered && m_compositor->makeCurrent()) {
-        struct wlr_texture *wlrTex = wlr_surface_get_texture(activeSurface);
-        if (wlrTex && wlrTex->width > 0 && wlrTex->height > 0) {
-            uint32_t stride = static_cast<uint32_t>(wlrTex->width) * 4u;
-            m_cpuReadbackBuffer.resize(stride * wlrTex->height);
+        struct wlr_texture *wlrTex = wlr_bridge_surface_get_texture(activeSurface);
+        int texW = 0, texH = 0;
+        wlr_bridge_texture_get_size(wlrTex, &texW, &texH);
+        if (wlrTex && texW > 0 && texH > 0) {
+            uint32_t stride = static_cast<uint32_t>(texW) * 4u;
+            m_cpuReadbackBuffer.resize(stride * texH);
 
-            struct wlr_texture_read_pixels_options opts = {};
-            opts.data   = m_cpuReadbackBuffer.data();
-            opts.format = DRM_FORMAT_ABGR8888;
-            opts.stride = stride;
-
-            bool readOk = wlr_texture_read_pixels(wlrTex, &opts);
+            bool readOk = wlr_bridge_texture_read_pixels(wlrTex, DRM_FORMAT_ABGR8888, stride, m_cpuReadbackBuffer.data());
             eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
 
             if (readOk) {
                 rendered = m_surfaceRenderer->renderCpuPixels(
                     m_cpuReadbackBuffer.data(),
-                                                              static_cast<int>(wlrTex->width),
-                                                              static_cast<int>(wlrTex->height),
-                                                              vp, w, h);
+                    texW,
+                    texH,
+                    vp, w, h);
             }
         } else {
             eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
@@ -734,7 +731,7 @@ void AndroidCanvas::initWaylandCompositor()
     }
 
     // ربط حلقة أحداث Wayland بحلقة Qt عبر QSocketNotifier
-    int wlFd = wl_event_loop_get_fd(m_compositor->getEventLoop());
+    int wlFd = m_compositor->getEventLoopFd();
     if (wlFd >= 0) {
         m_waylandNotifier = new QSocketNotifier(wlFd, QSocketNotifier::Read, this);
         connect(m_waylandNotifier, &QSocketNotifier::activated, this, [this]() {
@@ -758,8 +755,8 @@ void AndroidCanvas::initWaylandCompositor()
         struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
         if (m_inputMapper && activeSurface) {
             m_inputMapper->tick(activeSurface);
-            if (m_compositor->getDisplay()) {
-                wl_display_flush_clients(m_compositor->getDisplay());
+            if (m_compositor) {
+                m_compositor->flush();
             }
         }
     });
@@ -830,8 +827,8 @@ void AndroidCanvas::sendWaylandRecents()
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
     if (m_inputMapper && activeSurface) {
         m_inputMapper->sendRecentsCombo(activeSurface);
-        if (m_compositor->getDisplay()) {
-            wl_display_flush_clients(m_compositor->getDisplay());
+        if (m_compositor) {
+            m_compositor->flush();
         }
     }
 }
@@ -841,8 +838,8 @@ void AndroidCanvas::sendWaylandSystemKey(uint32_t evdevKeyCode)
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
     if (m_inputMapper && activeSurface) {
         m_inputMapper->sendSystemKey(evdevKeyCode, activeSurface);
-        if (m_compositor->getDisplay()) {
-            wl_display_flush_clients(m_compositor->getDisplay());
+        if (m_compositor) {
+            m_compositor->flush();
         }
     }
 }
@@ -954,7 +951,7 @@ void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
                     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
                     if (m_inputMapper && activeSurface && (totalDx != 0 || totalDy != 0)) {
                         m_inputMapper->handleMouseMove(0, 0, totalDx, totalDy, activeSurface);
-                        if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+                        if (m_compositor) m_compositor->flush();
                     }
                 });
             }
@@ -994,8 +991,11 @@ void AndroidCanvas::mousePressEvent(QMouseEvent *event)
     int button = (event->button() == Qt::LeftButton) ? 1 : ((event->button() == Qt::RightButton) ? 3 : 2);
 
     if (m_inputMapper && activeSurface) {
-        int surfW = activeSurface->current.width > 0 ? activeSurface->current.width : m_baseWidth;
-        int surfH = activeSurface->current.height > 0 ? activeSurface->current.height : m_baseHeight;
+        int surfW = m_baseWidth;
+        int surfH = m_baseHeight;
+        wlr_bridge_surface_get_size(activeSurface, &surfW, &surfH);
+        if (surfW <= 0) surfW = m_baseWidth;
+        if (surfH <= 0) surfH = m_baseHeight;
         ViewportRect vp{m_viewportRect.x(), m_viewportRect.y(), m_viewportRect.width(), m_viewportRect.height()};
         m_inputMapper->setGeometry(vp, surfW, surfH);
 
@@ -1004,7 +1004,7 @@ void AndroidCanvas::mousePressEvent(QMouseEvent *event)
         }
 
         if (m_inputMapper->handleMouseDown(button, qRound(event->position().x()), qRound(event->position().y()), activeSurface)) {
-            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            if (m_compositor) m_compositor->flush();
             event->accept();
             return;
         }
@@ -1043,7 +1043,7 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
 
         if (m_inputMapper && activeSurface && (dx != 0 || dy != 0)) {
             m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), dx, dy, activeSurface);
-            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            if (m_compositor) m_compositor->flush();
         }
 
         // إعادة المؤشر للمنتصف فقط عند الاقتراب من الحواف لمنع التردد
@@ -1066,14 +1066,14 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
 
     if (isKeymapperVisible() && m_inputMapper && activeSurface && m_inputMapper->isSmartCasting()) {
         m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), 0, 0, activeSurface);
-        if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+        if (m_compositor) m_compositor->flush();
         event->accept();
         return;
     }
 
     if (m_inputMapper && activeSurface && (event->buttons() & Qt::LeftButton)) {
         m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), 0, 0, activeSurface);
-        if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+        if (m_compositor) m_compositor->flush();
         event->accept();
         return;
     }
@@ -1088,7 +1088,7 @@ void AndroidCanvas::mouseReleaseEvent(QMouseEvent *event)
 
     if (m_inputMapper && activeSurface) {
         if (m_inputMapper->handleMouseUp(button, qRound(event->position().x()), qRound(event->position().y()), activeSurface)) {
-            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            if (m_compositor) m_compositor->flush();
             event->accept();
             return;
         }
@@ -1113,7 +1113,7 @@ void AndroidCanvas::keyPressEvent(QKeyEvent *event)
     if (isKeymapperVisible() && m_inputMapper && activeSurface) {
         quint32 scanCode = event->nativeScanCode();
         if (m_inputMapper->handleScanCodeDown(scanCode, activeSurface)) {
-            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            if (m_compositor) m_compositor->flush();
             bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
             if (nowLocked != m_aimModeActive) {
                 QPointF anchor(0.5, 0.5);
@@ -1142,7 +1142,7 @@ void AndroidCanvas::keyReleaseEvent(QKeyEvent *event)
     if (isKeymapperVisible() && m_inputMapper && activeSurface) {
         quint32 scanCode = event->nativeScanCode();
         if (m_inputMapper->handleScanCodeUp(scanCode, activeSurface)) {
-            if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            if (m_compositor) m_compositor->flush();
             bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
             if (nowLocked != m_aimModeActive) {
                 QPointF anchor(0.5, 0.5);

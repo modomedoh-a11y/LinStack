@@ -437,6 +437,30 @@ void DiagnosticsWorker::performChecks()
         emit checkCompleted(r);
     }
 
+    {
+        DiagnosticCheckResult r;
+        r.id = "POLKIT_ELEVATION";
+        r.category = DiagnosticCategory::ServiceSocket;
+        r.name = "PolicyKit Elevation Agent (pkexec / polkit)";
+        r.canAutoHeal = false;
+        r.requiresElevation = false;
+
+        QString pkexecPath = QStandardPaths::findExecutable("pkexec");
+        if (pkexecPath.isEmpty()) {
+            r.status = CheckStatus::Warning;
+            r.errorCode = "WARN_PKEXEC_MISSING";
+            r.details = "pkexec binary not found in PATH. Container graphical elevation will fallback to terminal sudo.";
+            r.remediationHint = "Install polkit (e.g. sudo apt install polkitd pkexec || sudo dnf install polkit)";
+            LOG_WARN("Diagnostics", r.details);
+        } else {
+            r.status = CheckStatus::Passed;
+            r.details = QString("Found pkexec at %1 for privileged operations.").arg(pkexecPath);
+            LOG_INFO("Diagnostics", r.details);
+        }
+        report.checks.append(r);
+        emit checkCompleted(r);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Finalize report
     // ─────────────────────────────────────────────────────────────────────────

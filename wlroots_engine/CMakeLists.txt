@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(LinStackWlrootsCompositor LANGUAGES C CXX)
 
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -10,11 +12,37 @@ add_compile_definitions(WLR_USE_UNSTABLE=1)
 
 find_package(PkgConfig REQUIRED)
 
-# Query wlroots (wlroots-0.20 or wlroots)
-pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET wlroots-0.20)
-if(NOT WLROOTS_FOUND)
-    pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET wlroots)
+# Query wlroots versions (0.20, 0.19, 0.18, 0.17 or generic wlroots)
+set(WLROOTS_VERSION_MINOR 0)
+pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.20)
+if(WLROOTS_FOUND)
+    set(WLROOTS_VERSION_MINOR 20)
+else()
+    pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.19)
+    if(WLROOTS_FOUND)
+        set(WLROOTS_VERSION_MINOR 19)
+    else()
+        pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.18)
+        if(WLROOTS_FOUND)
+            set(WLROOTS_VERSION_MINOR 18)
+        else()
+            pkg_check_modules(WLROOTS IMPORTED_TARGET wlroots-0.17)
+            if(WLROOTS_FOUND)
+                set(WLROOTS_VERSION_MINOR 17)
+            else()
+                pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET wlroots)
+                if(WLROOTS_VERSION MATCHES "^0\\.([0-9]+)")
+                    set(WLROOTS_VERSION_MINOR ${CMAKE_MATCH_1})
+                else()
+                    set(WLROOTS_VERSION_MINOR 20)
+                endif()
+            endif()
+        endif()
+    endif()
 endif()
+
+message(STATUS "Found wlroots version ${WLROOTS_VERSION} (minor: ${WLROOTS_VERSION_MINOR})")
+add_compile_definitions(WLR_VERSION_MINOR=${WLROOTS_VERSION_MINOR})
 
 pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
 pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.24)
@@ -65,6 +93,7 @@ generate_wayland_protocol(
 
 # Target executable / library
 set(SOURCES
+    src/wlr_c_bridge.c
     src/EmbeddedCompositor.cpp
     src/WaylandSurfaceRenderer.cpp
     src/InputMapper.cpp

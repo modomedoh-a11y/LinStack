@@ -40,7 +40,6 @@
 │   │   │   ├── rules
 │   │   │   └── source
 │   │   │       └── format
-│   │   ├── folder_structure.txt
 │   │   ├── .gitignore
 │   │   ├── LICENSE
 │   │   ├── linstack.py
@@ -136,7 +135,6 @@
 │       ├── TitleBar.h
 │       ├── UInputTouchBridge.cpp
 │       └── UInputTouchBridge.h
-├── linstack_context.txt
 ├── LinStack_Scripts
 │   ├── assets
 │   │   ├── 1.png
@@ -200,18 +198,18 @@
     │   ├── AspectRatioWindow.h
     │   ├── EmbeddedCompositor.h
     │   ├── InputMapper.h
-    │   ├── InputMapper.h.bak
     │   ├── nlohmann
     │   │   └── json.hpp
     │   ├── WaylandSurfaceRenderer.h
+    │   ├── wlr_c_bridge.h
     │   └── wlroots_compat.h
     ├── keymap_default.json
     └── src
         ├── AspectRatioWindow.cpp
         ├── EmbeddedCompositor.cpp
         ├── InputMapper.cpp
-        ├── InputMapper.cpp.bak
         ├── main.cpp
-        └── WaylandSurfaceRenderer.cpp
+        ├── WaylandSurfaceRenderer.cpp
+        └── wlr_c_bridge.c
 
-34 directories, 181 files
+34 directories, 179 files

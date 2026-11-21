@@ -18,11 +18,6 @@
 // DRM fourcc pixel format codes (needed for wlr_texture_read_pixels format arg)
 #include <drm_fourcc.h>
 
-#ifdef __cplusplus
-#define static
-extern "C" {
-#endif
-
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <wlr/backend/headless.h>
@@ -48,10 +43,7 @@ extern "C" {
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
-
-#ifdef __cplusplus
-}
-#undef static
-#endif
+#include <wlr/types/wlr_keyboard.h>
+#include <wlr/interfaces/wlr_keyboard.h>
 
 #endif // WLROOTS_COMPAT_H

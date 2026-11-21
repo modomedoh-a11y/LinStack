@@ -261,23 +261,24 @@ bool WaylandSurfaceRenderer::renderSurface(struct wlr_surface *surface,
                                            int windowWidth, int windowHeight) {
     if (!surface || !m_initialized) return false;
 
-    struct wlr_texture *wlrTex = wlr_surface_get_texture(surface);
+    struct wlr_texture *wlrTex = wlr_bridge_surface_get_texture(surface);
     if (!wlrTex) return false;
-    if (!wlr_texture_is_gles2(wlrTex)) {
+    if (!wlr_bridge_texture_is_gles2(wlrTex)) {
         std::cerr << "[Renderer] Warning: Surface texture is not GLES2." << std::endl;
         return false;
     }
 
-    struct wlr_gles2_texture_attribs attribs;
-    wlr_gles2_texture_get_attribs(wlrTex, &attribs);
-    if (attribs.tex == 0) return false;
+    uint32_t target = 0, tex = 0;
+    if (!wlr_bridge_gles2_texture_get_attribs(wlrTex, &target, &tex) || tex == 0) {
+        return false;
+    }
 
-    GLuint prog  = (attribs.target == GL_TEXTURE_EXTERNAL_OES && m_programExternalOES)
+    GLuint prog  = (target == GL_TEXTURE_EXTERNAL_OES && m_programExternalOES)
                    ? m_programExternalOES : m_program2D;
     GLint  uProj = (prog == m_programExternalOES) ? m_uProjExternal : m_uProj2D;
     GLint  uTex  = (prog == m_programExternalOES) ? m_uTexExternal  : m_uTex2D;
 
-    return drawQuad(prog, uProj, uTex, attribs.target, attribs.tex,
+    return drawQuad(prog, uProj, uTex, target, tex,
                     destRect, windowWidth, windowHeight);
 }
 
@@ -357,9 +358,7 @@ bool WaylandSurfaceRenderer::renderCpuPixels(const uint8_t *pixels,
 
 void WaylandSurfaceRenderer::sendFrameDone(struct wlr_surface *surface) {
     if (!surface) return;
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    wlr_surface_send_frame_done(surface, &now);
+    wlr_bridge_surface_send_frame_done(surface);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

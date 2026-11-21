@@ -24,7 +24,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#include "wlroots_compat.h"
+#include "wlr_c_bridge.h"
 
 struct ViewportRect {
     int x = 0;

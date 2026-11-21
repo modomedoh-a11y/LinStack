@@ -80,7 +80,23 @@ EOF
     sed \"s|/usr/bin/linstack|\$CORE_DIR/linstack.py|g\" \"\$CORE_DIR/dbus/id.linstack.Container.service\" > /usr/share/dbus-1/system-services/id.linstack.Container.service
 
     systemctl daemon-reload
-    systemctl enable --now linstack-container.service 2>/dev/null || true
+    systemctl enable linstack-container.service 2>/dev/null || true
+    if [ -f "/var/lib/linstack/linstack.cfg" ]; then
+        echo "Starting linstack-container.service..."
+        systemctl start linstack-container.service 2>/dev/null || true
+    else
+        echo "Notice: Container is not yet initialized (/var/lib/linstack/linstack.cfg not found)."
+        echo "The container service will start automatically after first-time initialization via 'LinStack' or 'sudo linstack init'."
+    fi
+
+    # 8. Restore SELinux security contexts if SELinux utilities are available (Fedora/RHEL/CentOS)
+    if command -v restorecon >/dev/null 2>&1; then
+        echo "Applying SELinux security contexts..."
+        restorecon -Rv '$OPT_DIR' /etc/systemd/system/linstack-container.service /usr/share/dbus-1/system* 2>/dev/null || true
+    fi
+    if command -v chcon >/dev/null 2>&1; then
+        chcon -t bin_t '$OPT_DIR/bin/LinStack' '$OPT_DIR/LinStack_core/linstack.py' 2>/dev/null || true
+    fi
 "
 
 # Also install launcher into current user local applications directory

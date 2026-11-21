@@ -1074,9 +1074,17 @@ void KeymapperOverlay::resetToDefaultBinds()
     aim.enableFireButton = true; aim.fireRelX = 0.82; aim.fireRelY = 0.64;
     m_nodes.append(aim);
 
-    KeyBindingNode jump{"tap_jump", KeyNodeType::Tap, "SPACE", "Jump", Qt::Key_Space, 65, 0.88, 0.78, 24.0};
-    KeyBindingNode crouch{"tap_crouch", KeyNodeType::Tap, "C", "Crouch", Qt::Key_C, 54, 0.82, 0.86, 22.0};
-    KeyBindingNode reload{"tap_reload", KeyNodeType::Tap, "R", "Reload", Qt::Key_R, 27, 0.88, 0.52, 22.0};
+    KeyBindingNode jump;
+    jump.id = "tap_jump"; jump.type = KeyNodeType::Tap; jump.label = "SPACE"; jump.action = "Jump";
+    jump.primaryKey = Qt::Key_Space; jump.primaryScanCode = 65; jump.relX = 0.88; jump.relY = 0.78; jump.radius = 24.0;
+
+    KeyBindingNode crouch;
+    crouch.id = "tap_crouch"; crouch.type = KeyNodeType::Tap; crouch.label = "C"; crouch.action = "Crouch";
+    crouch.primaryKey = Qt::Key_C; crouch.primaryScanCode = 54; crouch.relX = 0.82; crouch.relY = 0.86; crouch.radius = 22.0;
+
+    KeyBindingNode reload;
+    reload.id = "tap_reload"; reload.type = KeyNodeType::Tap; reload.label = "R"; reload.action = "Reload";
+    reload.primaryKey = Qt::Key_R; reload.primaryScanCode = 27; reload.relX = 0.88; reload.relY = 0.52; reload.radius = 22.0;
     m_nodes.append(jump);
     m_nodes.append(crouch);
     m_nodes.append(reload);

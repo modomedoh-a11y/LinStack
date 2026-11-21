@@ -14,7 +14,7 @@
 #include <cmath>
 #include <algorithm>
 
-#include "wlroots_compat.h"
+#include "wlr_c_bridge.h"
 #include "WaylandSurfaceRenderer.h"
 
 enum class WlrKeyNodeType {

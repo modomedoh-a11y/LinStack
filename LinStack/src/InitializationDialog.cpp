@@ -328,6 +328,9 @@ void InitializationDialog::handleProcessError()
     if (!m_process) return;
     QByteArray rawData = m_process->readAllStandardError();
     QString text = QString::fromUtf8(rawData);
+    if (text.contains("No session for cookie") || text.contains("Cannot register authentication agent") || text.contains("Not authorized")) {
+        appendLog("[Polkit] Authentication failed or no Polkit agent available in current session. Run 'sudo linstack init' in a terminal as fallback.", "#F59E0B");
+    }
     QStringList lines = text.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
     for (const QString &line : lines) {
         if (!line.trimmed().isEmpty()) {
@@ -355,6 +358,9 @@ void InitializationDialog::handleProcessFinished(int exitCode, QProcess::ExitSta
         m_lblStatus->setText("Initialization failed. Check logs.");
         QString err = QString("Process finished with error code %1.").arg(exitCode);
         appendLog(err, "#EF4444");
+        if (exitCode == 126 || exitCode == 127) {
+            appendLog("[Hint] Elevated authentication failed or was cancelled. If no graphical Polkit agent is running, run 'sudo linstack init' in a terminal.", "#F59E0B");
+        }
         emit initializationFailed(err);
     }
 }
