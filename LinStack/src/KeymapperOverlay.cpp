@@ -943,6 +943,10 @@ void KeymapperOverlay::syncTranslatorNodes()
         m_inputMapper->clearExtraNodes();
 
         DpadConfig emptyDp{};
+        emptyDp.scanUp = 0;
+        emptyDp.scanDown = 0;
+        emptyDp.scanLeft = 0;
+        emptyDp.scanRight = 0;
         m_inputMapper->setDpad(emptyDp);
 
         for (const auto &node : m_nodes) {
