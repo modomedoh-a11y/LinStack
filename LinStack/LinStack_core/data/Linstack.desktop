@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Linstack
+Name=LinStack
 GenericName=Android Container
 GenericName[ru]=Контейнер с Android
 Exec=linstack

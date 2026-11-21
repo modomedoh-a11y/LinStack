@@ -9,6 +9,7 @@
 #include <vector>
 #include <unordered_map>
 #include <set>
+#include <utility>
 #include <iostream>
 #include <cmath>
 #include <algorithm>
@@ -57,6 +58,43 @@ struct AimLockNodeConfig {
     int32_t fireTouchSlot = 2;
 };
 
+struct BurstTapConfig {
+    std::string id;
+    uint32_t scanCode = 0;
+    float relX = 0.5f;
+    float relY = 0.5f;
+    int burstHz = 10;
+};
+
+struct FreeLookConfig {
+    std::string id;
+    uint32_t holdScanCode = 0;
+    float centerX = 0.5f;
+    float centerY = 0.5f;
+    float sensitivityX = 1.2f;
+    float sensitivityY = 1.2f;
+    bool acceleration = false;
+};
+
+struct SwipeConfig {
+    std::string id;
+    uint32_t scanCode = 0;
+    float startX = 0.5f;
+    float startY = 0.7f;
+    float endX = 0.5f;
+    float endY = 0.3f;
+    int durationMs = 150;
+    std::vector<std::pair<float, float>> pathPoints;
+};
+
+struct SmartCastConfig {
+    std::string id;
+    uint32_t scanCode = 0;
+    float centerX = 0.75f;
+    float centerY = 0.75f;
+    float castRadius = 160.0f;
+};
+
 class InputMapper {
 public:
     explicit InputMapper(struct wlr_seat *seat = nullptr,
@@ -80,11 +118,18 @@ public:
     bool handleMouseUp(int button, int winX, int winY, struct wlr_surface *surface);
     bool handleMouseMove(int winX, int winY, int deltaX, int deltaY, struct wlr_surface *surface);
 
-    // Multi-Node Aim Lock Management
+    // Periodic tick for BurstTap and Swipe animations
+    void tick(struct wlr_surface *surface);
+
+    // Multi-Node Aim Lock & Free Look Management
     void setAimLockActive(bool active, int nodeIndex = 0);
     bool isAimLockActive() const { return m_aimLockActive; }
     int activeAimNodeIndex() const { return m_activeAimIndex; }
     const AimLockNodeConfig* activeAimNode() const;
+
+    bool isFreeLookActive() const { return m_freeLookActive; }
+    const FreeLookConfig* activeFreeLookNode() const;
+    bool isSmartCasting() const { return m_smartCasting; }
 
     void setupDefaultProfile();
 
@@ -93,6 +138,17 @@ public:
     void setDpad(const DpadConfig &dpad) { m_dpad = dpad; }
     void clearAimNodes() { m_aimNodes.clear(); }
     void addAimNode(const AimLockNodeConfig &aim) { m_aimNodes.push_back(aim); }
+
+    void clearExtraNodes() {
+        m_burstNodes.clear();
+        m_freeLookNodes.clear();
+        m_swipeNodes.clear();
+        m_smartCastNodes.clear();
+    }
+    void addBurstNode(const BurstTapConfig &b) { m_burstNodes.push_back(b); }
+    void addFreeLookNode(const FreeLookConfig &fl) { m_freeLookNodes.push_back(fl); }
+    void addSwipeNode(const SwipeConfig &sw) { m_swipeNodes.push_back(sw); }
+    void addSmartCastNode(const SmartCastConfig &sc) { m_smartCastNodes.push_back(sc); }
 
     const std::vector<KeyNode>& getTapNodes() const { return m_tapNodes; }
     const DpadConfig& getDpad() const { return m_dpad; }
@@ -114,6 +170,10 @@ private:
     std::vector<KeyNode> m_tapNodes;
     DpadConfig m_dpad;
     std::vector<AimLockNodeConfig> m_aimNodes;
+    std::vector<BurstTapConfig> m_burstNodes;
+    std::vector<FreeLookConfig> m_freeLookNodes;
+    std::vector<SwipeConfig> m_swipeNodes;
+    std::vector<SmartCastConfig> m_smartCastNodes;
 
     std::set<uint32_t> m_heldScanCodes;
     std::set<int32_t> m_activeSlots;
@@ -134,6 +194,38 @@ private:
 
     float m_accumAimX = 0.0f;
     float m_accumAimY = 0.0f;
+
+    // Burst Tap state
+    struct ActiveBurst {
+        BurstTapConfig cfg;
+        int32_t slot = -1;
+        uint32_t lastClickMs = 0;
+        bool isDown = false;
+    };
+    std::unordered_map<uint32_t, ActiveBurst> m_activeBursts;
+
+    // Free Look state
+    bool m_freeLookActive = false;
+    int m_activeFreeLookIndex = -1;
+    int32_t m_activeFreeLookSlot = -1;
+    int32_t m_pendingReleaseFreeLookSlot = -1;
+    float m_accumFreeLookX = 0.0f;
+    float m_accumFreeLookY = 0.0f;
+
+    // Swipe state
+    struct ActiveSwipe {
+        SwipeConfig cfg;
+        int32_t slot = -1;
+        uint32_t startMs = 0;
+    };
+    std::vector<ActiveSwipe> m_activeSwipes;
+
+    // Smart Cast state
+    bool m_smartCasting = false;
+    SmartCastConfig m_activeSmartCast;
+    int32_t m_activeSmartCastSlot = -1;
+    float m_smartCastAccumX = 0.0f;
+    float m_smartCastAccumY = 0.0f;
 };
 
 #endif // INPUT_MAPPER_H

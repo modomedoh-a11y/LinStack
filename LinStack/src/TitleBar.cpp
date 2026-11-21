@@ -22,7 +22,7 @@ void TitleBar::setupUi()
     layout->setContentsMargins(12, 0, 0, 0);
     layout->setSpacing(8);
 
-    // --- Left Section: Branding & Linstack Status ---
+    // --- Left Section: Branding & LinStack Status ---
     // Logo Icon (Custom cyber hexagon badge)
     m_logoIconLabel = new QLabel(this);
     m_logoIconLabel->setFixedSize(22, 22);

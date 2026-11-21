@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Copyright 2023 Linstack -->
+<!-- Copyright 2023 LinStack -->
 <component type="desktop-application">
   <id>id.linstack.linstack</id>
 
-  <name>Linstack</name>
+  <name>LinStack</name>
   <summary>Run Android apps natively alongside desktop programs</summary>
   <summary xml:lang="ru">Запуск Android-приложений рядом с обычными программами</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
-  <developer_name>Linstack</developer_name>
+  <developer_name>LinStack</developer_name>
 
-  <url type="homepage">https://waydro.id/</url>
+  <url type="homepage">https://github.com/</url>
   <url type="bugtracker">https://github.com/linstack/linstack/issues</url>
   <url type="faq">https://docs.waydro.id/faq</url>
-  <url type="help">https://matrix.to/#/#linstack:matrix.org</url>
-  <url type="donation">https://opencollective.com/linstack/donate</url>
-  <url type="contact">https://matrix.to/#/#linstack:matrix.org</url>
+  <url type="help">https://github.com/discussions/#/#linstack:matrix.org</url>
+  <url type="donation">https://github.com/linstack/donate</url>
+  <url type="contact">https://github.com/discussions/#/#linstack:matrix.org</url>
 
   <supports>
     <control>pointing</control>
@@ -27,18 +27,18 @@
 
   <description>
     <p>
-      Linstack is a container-based approach to boot a full Android system on a regular GNU/Linux system. The Android system inside the container has direct access to needed hardware through LXC and the binder interface.
+      LinStack is a container-based approach to boot a full Android system on a regular GNU/Linux system. The Android system inside the container has direct access to needed hardware through LXC and the binder interface.
     </p>
-    <p xml:lang="ru">Linstack запускает полноценную систему Android в контейнере поверх обычной системы GNU/Linux. Android внутри контейнера получает прямой доступ к нужному оборудованию через LXC и интерфейс binder.</p>
+    <p xml:lang="ru">LinStack запускает полноценную систему Android в контейнере поверх обычной системы GNU/Linux. Android внутри контейнера получает прямой доступ к нужному оборудованию через LXC и интерфейс binder.</p>
   </description>
 
   <launchable type="desktop-id">Linstack.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://waydro.id/assets/images/hero/main_landing.jpeg</image>
+      <image>https://github.com/assets/images/hero/main_landing.jpeg</image>
     </screenshot>
     <screenshot>
-      <image>https://waydro.id/assets/images/hero/clean_desktop.jpeg</image>
+      <image>https://github.com/assets/images/hero/clean_desktop.jpeg</image>
     </screenshot>
   </screenshots>
 

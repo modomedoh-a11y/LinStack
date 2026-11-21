@@ -297,7 +297,7 @@ void MainWindow::setupUi()
         }
     }
 
-    // Initialize uinput touch bridge for low-latency Linstack input
+    // Initialize uinput touch bridge for low-latency LinStack input
     m_uinputBridge = new UInputTouchBridge(this);
     m_uinputBridge->initialize(androidRes.width(), androidRes.height());
     m_canvas->setBridge(m_uinputBridge);
@@ -728,7 +728,7 @@ void MainWindow::handleHelp()
     msg.setTextFormat(Qt::RichText);
     msg.setText(
         "<h3 style='color:#00FF66;'>LinStack 1.0 — Cyber Emerald Edition</h3>"
-        "<p>High-performance Linux-native Android emulator inspired by MSI App Player.</p>"
+        "<p>High-performance Linux-native Android emulator.</p>"
         "<p><b>Architecture:</b></p>"
         "<ul>"
         "<li><b>Compositor:</b> Native Wayland & Mesa DRI3 Direct Rendering</li>"

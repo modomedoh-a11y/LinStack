@@ -102,6 +102,13 @@ const AimLockNodeConfig* InputMapper::activeAimNode() const {
     return nullptr;
 }
 
+const FreeLookConfig* InputMapper::activeFreeLookNode() const {
+    if (m_freeLookActive && m_activeFreeLookIndex >= 0 && m_activeFreeLookIndex < static_cast<int>(m_freeLookNodes.size())) {
+        return &m_freeLookNodes[m_activeFreeLookIndex];
+    }
+    return nullptr;
+}
+
 void InputMapper::setAimLockActive(bool active, int nodeIndex) {
     if (active && (nodeIndex < 0 || nodeIndex >= static_cast<int>(m_aimNodes.size()))) {
         return;
@@ -139,7 +146,65 @@ void InputMapper::setAimLockActive(bool active, int nodeIndex) {
     m_activeAimIndex = active ? nodeIndex : -1;
     m_accumAimX = 0.0f;
     m_accumAimY = 0.0f;
+}
 
+void InputMapper::tick(struct wlr_surface *surface) {
+    if (!m_seat || !surface) return;
+    struct wlr_surface *rootSurf = wlr_surface_get_root_surface(surface);
+    if (!rootSurf) rootSurf = surface;
+    uint32_t now = getTimestampMs();
+
+    // 1. Burst Tap
+    for (auto &kv : m_activeBursts) {
+        ActiveBurst &b = kv.second;
+        uint32_t intervalMs = static_cast<uint32_t>(std::max(10, 1000 / std::clamp(b.cfg.burstHz, 1, 100)));
+        if (b.isDown && (now - b.lastClickMs >= intervalMs / 2)) {
+            wlr_seat_touch_notify_up(m_seat, now, b.slot);
+            wlr_seat_touch_notify_frame(m_seat);
+            b.isDown = false;
+        } else if (!b.isDown && (now - b.lastClickMs >= intervalMs)) {
+            double tx = b.cfg.relX * m_androidWidth;
+            double ty = b.cfg.relY * m_androidHeight;
+            wlr_seat_touch_notify_down(m_seat, rootSurf, now, b.slot, tx, ty);
+            wlr_seat_touch_notify_frame(m_seat);
+            b.isDown = true;
+            b.lastClickMs = now;
+        }
+    }
+
+    // 2. Swipe
+    for (auto it = m_activeSwipes.begin(); it != m_activeSwipes.end(); ) {
+        uint32_t elapsed = now - it->startMs;
+        float progress = std::clamp(static_cast<float>(elapsed) / std::max(1, it->cfg.durationMs), 0.0f, 1.0f);
+
+        float rx = 0.0f, ry = 0.0f;
+        if (it->cfg.pathPoints.size() >= 2) {
+            float scaled = progress * (it->cfg.pathPoints.size() - 1);
+            size_t idx0 = std::min(static_cast<size_t>(scaled), it->cfg.pathPoints.size() - 1);
+            size_t idx1 = std::min(idx0 + 1, it->cfg.pathPoints.size() - 1);
+            float localT = scaled - idx0;
+            rx = it->cfg.pathPoints[idx0].first + (it->cfg.pathPoints[idx1].first - it->cfg.pathPoints[idx0].first) * localT;
+            ry = it->cfg.pathPoints[idx0].second + (it->cfg.pathPoints[idx1].second - it->cfg.pathPoints[idx0].second) * localT;
+        } else {
+            rx = it->cfg.startX + (it->cfg.endX - it->cfg.startX) * progress;
+            ry = it->cfg.startY + (it->cfg.endY - it->cfg.startY) * progress;
+        }
+
+        double ax = std::clamp(static_cast<double>(rx * m_androidWidth), 1.0, static_cast<double>(m_androidWidth - 2));
+        double ay = std::clamp(static_cast<double>(ry * m_androidHeight), 1.0, static_cast<double>(m_androidHeight - 2));
+
+        wlr_seat_touch_notify_motion(m_seat, now, it->slot, ax, ay);
+        wlr_seat_touch_notify_frame(m_seat);
+
+        if (progress >= 1.0f) {
+            wlr_seat_touch_notify_up(m_seat, now + 1, it->slot);
+            wlr_seat_touch_notify_frame(m_seat);
+            releaseSlot(it->slot);
+            it = m_activeSwipes.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void InputMapper::updateDpad(struct wlr_surface *surface) {
@@ -195,6 +260,7 @@ void InputMapper::updateDpad(struct wlr_surface *surface) {
     }
 }
 
+
 void InputMapper::sendRecentsCombo(struct wlr_surface *surface) {
     if (!m_seat || !surface) return;
     struct wlr_surface *rootSurf = wlr_surface_get_root_surface(surface);
@@ -208,7 +274,6 @@ void InputMapper::sendRecentsCombo(struct wlr_surface *surface) {
     }
 
     uint32_t now = getTimestampMs();
-    // KEY_LEFTALT = 56, KEY_TAB = 15 (Universal Android Recents / Overview shortcut)
     wlr_seat_keyboard_notify_key(m_seat, now, 56, WL_KEYBOARD_KEY_STATE_PRESSED);
     wlr_seat_keyboard_notify_modifiers(m_seat, nullptr);
     wlr_seat_keyboard_notify_key(m_seat, now + 10, 15, WL_KEYBOARD_KEY_STATE_PRESSED);
@@ -248,9 +313,30 @@ bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surf
         }
     }
 
-    if (scanCode == 9 && m_aimLockActive) {
-        setAimLockActive(false, -1);
-        return true;
+    if (scanCode == 9) {
+        bool handledEsc = false;
+        if (m_aimLockActive) {
+            setAimLockActive(false, -1);
+            handledEsc = true;
+        }
+        if (m_freeLookActive && m_seat) {
+            uint32_t now = getTimestampMs();
+            m_freeLookActive = false;
+            m_activeFreeLookIndex = -1;
+            if (m_pendingReleaseFreeLookSlot >= 0) {
+                wlr_seat_touch_notify_up(m_seat, now, m_pendingReleaseFreeLookSlot);
+                releaseSlot(m_pendingReleaseFreeLookSlot);
+                m_pendingReleaseFreeLookSlot = -1;
+            }
+            if (m_activeFreeLookSlot >= 0) {
+                wlr_seat_touch_notify_up(m_seat, now + 1, m_activeFreeLookSlot);
+                releaseSlot(m_activeFreeLookSlot);
+                m_activeFreeLookSlot = -1;
+            }
+            wlr_seat_touch_notify_frame(m_seat);
+            handledEsc = true;
+        }
+        if (handledEsc) return true;
     }
 
     m_heldScanCodes.insert(scanCode);
@@ -258,14 +344,84 @@ bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surf
     if (scanCode == m_dpad.scanUp || scanCode == m_dpad.scanDown ||
         scanCode == m_dpad.scanLeft || scanCode == m_dpad.scanRight) {
         updateDpad(surface);
-    return true;
-        }
+        return true;
+    }
 
-        if (!m_seat || !surface) return false;
-        struct wlr_surface *rootSurf = wlr_surface_get_root_surface(surface);
+    if (!m_seat || !surface) return false;
+    struct wlr_surface *rootSurf = wlr_surface_get_root_surface(surface);
     if (!rootSurf) rootSurf = surface;
     uint32_t now = getTimestampMs();
 
+    // 1. Free Look
+    for (int i = 0; i < static_cast<int>(m_freeLookNodes.size()); ++i) {
+        if (m_freeLookNodes[i].holdScanCode == scanCode) {
+            if (!m_freeLookActive) {
+                m_freeLookActive = true;
+                m_activeFreeLookIndex = i;
+                m_accumFreeLookX = 0.0f;
+                m_accumFreeLookY = 0.0f;
+            }
+            return true;
+        }
+    }
+
+    // 2. Burst Tap
+    for (const auto &bn : m_burstNodes) {
+        if (bn.scanCode == scanCode) {
+            if (m_activeBursts.find(scanCode) == m_activeBursts.end()) {
+                ActiveBurst ab;
+                ab.cfg = bn;
+                ab.slot = allocateSlot();
+                ab.lastClickMs = now;
+                ab.isDown = true;
+                m_activeBursts[scanCode] = ab;
+
+                double tx = bn.relX * m_androidWidth;
+                double ty = bn.relY * m_androidHeight;
+                wlr_seat_touch_notify_down(m_seat, rootSurf, now, ab.slot, tx, ty);
+                wlr_seat_touch_notify_frame(m_seat);
+            }
+            return true;
+        }
+    }
+
+    // 3. Swipe
+    for (const auto &sw : m_swipeNodes) {
+        if (sw.scanCode == scanCode) {
+            ActiveSwipe as;
+            as.cfg = sw;
+            as.slot = allocateSlot();
+            as.startMs = now;
+            m_activeSwipes.push_back(as);
+
+            double sx = sw.startX * m_androidWidth;
+            double sy = sw.startY * m_androidHeight;
+            wlr_seat_touch_notify_down(m_seat, rootSurf, now, as.slot, sx, sy);
+            wlr_seat_touch_notify_frame(m_seat);
+            return true;
+        }
+    }
+
+    // 4. Smart Cast
+    for (const auto &sc : m_smartCastNodes) {
+        if (sc.scanCode == scanCode) {
+            if (!m_smartCasting) {
+                m_smartCasting = true;
+                m_activeSmartCast = sc;
+                m_activeSmartCastSlot = allocateSlot();
+                m_smartCastAccumX = 0.0f;
+                m_smartCastAccumY = 0.0f;
+
+                double cx = sc.centerX * m_androidWidth;
+                double cy = sc.centerY * m_androidHeight;
+                wlr_seat_touch_notify_down(m_seat, rootSurf, now, m_activeSmartCastSlot, cx, cy);
+                wlr_seat_touch_notify_frame(m_seat);
+            }
+            return true;
+        }
+    }
+
+    // 5. Tap
     for (const auto &node : m_tapNodes) {
         if (node.scanCode == scanCode) {
             if (m_scanCodeToSlot.find(scanCode) != m_scanCodeToSlot.end()) {
@@ -292,11 +448,53 @@ bool InputMapper::handleScanCodeUp(uint32_t scanCode, struct wlr_surface *surfac
     if (scanCode == m_dpad.scanUp || scanCode == m_dpad.scanDown ||
         scanCode == m_dpad.scanLeft || scanCode == m_dpad.scanRight) {
         updateDpad(surface);
-    return true;
-        }
+        return true;
+    }
 
-        if (!m_seat) return false;
-        uint32_t now = getTimestampMs();
+    if (!m_seat) return false;
+    uint32_t now = getTimestampMs();
+    // Free Look release
+    if (m_freeLookActive && m_activeFreeLookIndex >= 0 &&
+        m_freeLookNodes[m_activeFreeLookIndex].holdScanCode == scanCode) {
+        m_freeLookActive = false;
+        m_activeFreeLookIndex = -1;
+        if (m_pendingReleaseFreeLookSlot >= 0) {
+            wlr_seat_touch_notify_up(m_seat, now, m_pendingReleaseFreeLookSlot);
+            releaseSlot(m_pendingReleaseFreeLookSlot);
+            m_pendingReleaseFreeLookSlot = -1;
+        }
+        if (m_activeFreeLookSlot >= 0) {
+            wlr_seat_touch_notify_up(m_seat, now + 1, m_activeFreeLookSlot);
+            releaseSlot(m_activeFreeLookSlot);
+            m_activeFreeLookSlot = -1;
+        }
+        wlr_seat_touch_notify_frame(m_seat);
+        return true;
+    }
+
+    // Burst Tap release
+    auto burstIt = m_activeBursts.find(scanCode);
+    if (burstIt != m_activeBursts.end()) {
+        if (burstIt->second.isDown) {
+            wlr_seat_touch_notify_up(m_seat, now, burstIt->second.slot);
+            wlr_seat_touch_notify_frame(m_seat);
+        }
+        releaseSlot(burstIt->second.slot);
+        m_activeBursts.erase(burstIt);
+        return true;
+    }
+
+    // Smart Cast release
+    if (m_smartCasting && m_activeSmartCast.scanCode == scanCode) {
+        m_smartCasting = false;
+        if (m_activeSmartCastSlot >= 0) {
+            wlr_seat_touch_notify_up(m_seat, now, m_activeSmartCastSlot);
+            wlr_seat_touch_notify_frame(m_seat);
+            releaseSlot(m_activeSmartCastSlot);
+            m_activeSmartCastSlot = -1;
+        }
+        return true;
+    }
 
     auto it = m_scanCodeToSlot.find(scanCode);
     if (it != m_scanCodeToSlot.end()) {
@@ -344,7 +542,6 @@ bool InputMapper::handleMouseDown(int button, int winX, int winY, struct wlr_sur
     return false;
 }
 
-
 bool InputMapper::handleMouseUp(int button, int winX, int winY, struct wlr_surface *surface) {
     (void)winX;
     (void)winY;
@@ -388,6 +585,101 @@ bool InputMapper::handleMouseMove(int winX, int winY, int deltaX, int deltaY, st
     if (!rootSurf) rootSurf = surface;
     uint32_t now = getTimestampMs();
 
+    // 1. Smart Cast
+    if (m_smartCasting && m_activeSmartCastSlot >= 0) {
+        double cx = m_activeSmartCast.centerX * m_androidWidth;
+        double cy = m_activeSmartCast.centerY * m_androidHeight;
+
+        float mx = 0.0f, my = 0.0f;
+        if (m_aimLockActive && (deltaX != 0 || deltaY != 0)) {
+            m_smartCastAccumX += deltaX * 1.5f;
+            m_smartCastAccumY += deltaY * 1.5f;
+            mx = m_smartCastAccumX;
+            my = m_smartCastAccumY;
+        } else {
+            double ax, ay;
+            windowToAndroid(winX, winY, ax, ay);
+            mx = static_cast<float>(ax - cx);
+            my = static_cast<float>(ay - cy);
+        }
+
+        float dist = std::sqrt(mx * mx + my * my);
+        float maxR = m_activeSmartCast.castRadius;
+        if (dist > maxR && dist > 0.001f) {
+            mx = (mx / dist) * maxR;
+            my = (my / dist) * maxR;
+            m_smartCastAccumX = mx;
+            m_smartCastAccumY = my;
+        }
+
+        double tx = std::clamp(cx + mx, 2.0, static_cast<double>(m_androidWidth - 3));
+        double ty = std::clamp(cy + my, 2.0, static_cast<double>(m_androidHeight - 3));
+        wlr_seat_touch_notify_motion(m_seat, now, m_activeSmartCastSlot, tx, ty);
+        wlr_seat_touch_notify_frame(m_seat);
+        return true;
+    }
+
+    // 2. Free Look
+    if (m_freeLookActive && m_activeFreeLookIndex >= 0 && m_activeFreeLookIndex < static_cast<int>(m_freeLookNodes.size())) {
+        const auto &fl = m_freeLookNodes[m_activeFreeLookIndex];
+        if (m_pendingReleaseFreeLookSlot >= 0) {
+            wlr_seat_touch_notify_up(m_seat, now, m_pendingReleaseFreeLookSlot);
+            wlr_seat_touch_notify_frame(m_seat);
+            releaseSlot(m_pendingReleaseFreeLookSlot);
+            m_pendingReleaseFreeLookSlot = -1;
+            now += 1;
+        }
+
+        float effDx = static_cast<float>(deltaX);
+        float effDy = static_cast<float>(deltaY);
+        if (fl.acceleration) {
+            float speed = std::sqrt(effDx * effDx + effDy * effDy);
+            float factor = 1.0f + std::min(speed * 0.02f, 1.5f);
+            effDx *= factor;
+            effDy *= factor;
+        }
+
+        float normDx = (effDx * fl.sensitivityX) / std::max(1, m_viewport.width);
+        float normDy = (effDy * fl.sensitivityY) / std::max(1, m_viewport.height);
+        const float baseX = std::clamp(fl.centerX, 0.05f, 0.95f);
+        const float baseY = std::clamp(fl.centerY, 0.05f, 0.95f);
+
+        if (m_activeFreeLookSlot < 0) {
+            m_activeFreeLookSlot = allocateSlot();
+            m_accumFreeLookX = 0.0f;
+            m_accumFreeLookY = 0.0f;
+            wlr_seat_touch_notify_down(m_seat, rootSurf, now, m_activeFreeLookSlot, baseX * m_androidWidth, baseY * m_androidHeight);
+            wlr_seat_touch_notify_frame(m_seat);
+            now += 1;
+        }
+
+        float nextX = baseX + m_accumFreeLookX + normDx;
+        float nextY = baseY + m_accumFreeLookY + normDy;
+        if (nextX <= 0.04f || nextX >= 0.96f || nextY <= 0.04f || nextY >= 0.96f) {
+            int32_t oldSlot = m_activeFreeLookSlot;
+            int32_t newSlot = allocateSlot();
+            m_accumFreeLookX = normDx;
+            m_accumFreeLookY = normDy;
+            wlr_seat_touch_notify_down(m_seat, rootSurf, now, newSlot, baseX * m_androidWidth, baseY * m_androidHeight);
+            wlr_seat_touch_notify_frame(m_seat);
+            double tx = std::clamp(static_cast<double>((baseX + m_accumFreeLookX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
+            double ty = std::clamp(static_cast<double>((baseY + m_accumFreeLookY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
+            wlr_seat_touch_notify_motion(m_seat, now + 1, newSlot, tx, ty);
+            wlr_seat_touch_notify_frame(m_seat);
+            m_pendingReleaseFreeLookSlot = oldSlot;
+            m_activeFreeLookSlot = newSlot;
+        } else {
+            m_accumFreeLookX += normDx;
+            m_accumFreeLookY += normDy;
+            double tx = std::clamp(static_cast<double>((baseX + m_accumFreeLookX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
+            double ty = std::clamp(static_cast<double>((baseY + m_accumFreeLookY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
+            wlr_seat_touch_notify_motion(m_seat, now, m_activeFreeLookSlot, tx, ty);
+            wlr_seat_touch_notify_frame(m_seat);
+        }
+        return true;
+    }
+
+    // 3. Aim Lock
     const auto *aim = activeAimNode();
     if (aim) {
         if (m_pendingReleaseCameraSlot >= 0) {

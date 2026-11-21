@@ -753,6 +753,18 @@ void AndroidCanvas::initWaylandCompositor()
     });
     m_waylandDispatchTimer->start(50);
 
+    auto *inputTickTimer = new QTimer(this);
+    connect(inputTickTimer, &QTimer::timeout, this, [this]() {
+        struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+        if (m_inputMapper && activeSurface) {
+            m_inputMapper->tick(activeSurface);
+            if (m_compositor->getDisplay()) {
+                wl_display_flush_clients(m_compositor->getDisplay());
+            }
+        }
+    });
+    inputTickTimer->start(10);
+
 
     // ربط دوال دورة حياة السطح
     m_compositor->onClientConnected = [this](struct wl_client *client) {
@@ -1052,6 +1064,13 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
             return;
     }
 
+    if (isKeymapperVisible() && m_inputMapper && activeSurface && m_inputMapper->isSmartCasting()) {
+        m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), 0, 0, activeSurface);
+        if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+        event->accept();
+        return;
+    }
+
     if (m_inputMapper && activeSurface && (event->buttons() & Qt::LeftButton)) {
         m_inputMapper->handleMouseMove(qRound(event->position().x()), qRound(event->position().y()), 0, 0, activeSurface);
         if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
@@ -1095,11 +1114,13 @@ void AndroidCanvas::keyPressEvent(QKeyEvent *event)
         quint32 scanCode = event->nativeScanCode();
         if (m_inputMapper->handleScanCodeDown(scanCode, activeSurface)) {
             if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
-            bool nowLocked = m_inputMapper->isAimLockActive();
+            bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
             if (nowLocked != m_aimModeActive) {
                 QPointF anchor(0.5, 0.5);
                 if (const auto *aim = m_inputMapper->activeAimNode()) {
                     anchor = QPointF(aim->centerX, aim->centerY);
+                } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                    anchor = QPointF(fl->centerX, fl->centerY);
                 }
                 setAimMode(nowLocked, anchor);
             }
@@ -1122,6 +1143,16 @@ void AndroidCanvas::keyReleaseEvent(QKeyEvent *event)
         quint32 scanCode = event->nativeScanCode();
         if (m_inputMapper->handleScanCodeUp(scanCode, activeSurface)) {
             if (m_compositor->getDisplay()) wl_display_flush_clients(m_compositor->getDisplay());
+            bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
+            if (nowLocked != m_aimModeActive) {
+                QPointF anchor(0.5, 0.5);
+                if (const auto *aim = m_inputMapper->activeAimNode()) {
+                    anchor = QPointF(aim->centerX, aim->centerY);
+                } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                    anchor = QPointF(fl->centerX, fl->centerY);
+                }
+                setAimMode(nowLocked, anchor);
+            }
             event->accept();
             return;
         }

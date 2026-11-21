@@ -6,7 +6,7 @@ REPLACEMENTS = {
     "id.Waydro": "id.Linstack",
     "WayDroid": "LinStack",
     "waydroid": "linstack",
-    "Waydroid": "Linstack",
+    "Waydroid": "LinStack",
     "WAYDROID": "LINSTACK"
 }
 

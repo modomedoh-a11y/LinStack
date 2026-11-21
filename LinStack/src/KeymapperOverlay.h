@@ -3,12 +3,14 @@
 
 #include <QWidget>
 #include <QList>
+#include <QVector>
 #include <QString>
 #include <QPointF>
 #include <QPushButton>
 #include <QComboBox>
 #include <QSlider>
 #include <QDoubleSpinBox>
+#include <QSpinBox>
 #include <QCheckBox>
 #include <QLabel>
 #include <QHBoxLayout>
@@ -111,8 +113,16 @@ private:
     bool    m_isResizingDpad     = false;
     QPointF m_dragOffset;
 
+    // Quick creation via click/drag on empty canvas in Edit mode
+    bool             m_isDrawingFreehand = false;
+    QPointF          m_emptyPressPos;
+    QVector<QPointF> m_freehandPoints;
 
-    // Mouse lock state in Play mode (anchored at AimLock node position)
+    // Draggable node settings panel state
+    bool    m_isDraggingSettingsPanel = false;
+    QPointF m_settingsDragOffset;
+
+    // Mouse lock state in Play mode (anchored at AimLock or FreeLook node position)
     QPoint  m_lastMousePos;
     QPointF m_activeAimAnchorNorm = QPointF(0.5, 0.5);
     bool    m_ignoreNextMouseMove = false;
@@ -136,10 +146,8 @@ private:
     QPushButton *m_btnReset         = nullptr;
     QPushButton *m_btnToggleMode    = nullptr;
 
-    // Right-side collapsible Node Catalog panel
+    // Right-side Node Catalog panel (no minimize button)
     QWidget     *m_catalogPanel     = nullptr;
-    bool         m_catalogExpanded  = true;
-    QPushButton *m_btnToggleCatalog = nullptr;
     QPushButton *m_btnAddTap        = nullptr;
     QPushButton *m_btnAddDpad       = nullptr;
     QPushButton *m_btnAddAim        = nullptr;
@@ -147,9 +155,8 @@ private:
     QPushButton *m_btnAddSmartCast  = nullptr;
     QPushButton *m_btnAddBurstTap   = nullptr;
     QPushButton *m_btnAddFreeLook   = nullptr;
-    QPushButton *m_btnAddEdgeScroll = nullptr;
 
-    // Per-node Context Settings Popup (different per node type!)
+    // Draggable Per-node Context Settings Popup
     QWidget        *m_nodeSettingsPanel = nullptr;
     QLabel         *m_settingsTitle     = nullptr;
     QVBoxLayout    *m_settingsBody      = nullptr;
