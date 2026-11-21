@@ -197,11 +197,26 @@ def mount_rootfs(args, images_dir, session):
             search_candidates.append(env_p)
         search_candidates.extend(tools.config.defaults.get("preinstalled_images_paths", []))
 
-        # Check user home paths
+        # Dynamically discover project root and resources directory
+        from pathlib import Path
+        try:
+            core_dir = Path(__file__).resolve().parent.parent.parent
+            for p in [core_dir] + list(core_dir.parents):
+                if (p / ".git").exists() or (p / "install.sh").exists() or (p / "wlroots_engine").exists():
+                    search_candidates.append(str(p / "LinStack" / "resources"))
+                    search_candidates.append(str(p / "resources"))
+                    break
+                if (p / "LinStack" / "resources").exists():
+                    search_candidates.append(str(p / "LinStack" / "resources"))
+                    break
+            search_candidates.append(str(core_dir.parent / "resources"))
+            search_candidates.append(str(core_dir.parent / "LinStack" / "resources"))
+        except Exception:
+            pass
+
         try:
             home = os.path.expanduser("~")
             search_candidates.extend([
-                os.path.join(home, "Downloads/LinStack/LinStack/resources"),
                 os.path.join(home, "LinStack/LinStack/resources"),
                 os.path.join(home, "LinStack/resources"),
             ])

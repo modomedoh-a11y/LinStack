@@ -209,13 +209,15 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 install(TARGETS LinStack
-    RUNTIME DESTINATION .
+    RUNTIME DESTINATION bin
 )
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources")
     install(DIRECTORY resources/
         DESTINATION resources
-        FILES_MATCHING PATTERN "*"
+        PATTERN "*.img" EXCLUDE
+        PATTERN "*.zip" EXCLUDE
+        PATTERN "__pycache__" EXCLUDE
     )
 endif()
 

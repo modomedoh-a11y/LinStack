@@ -14,7 +14,173 @@ import time
 import dbus
 import dbus.service
 import argparse
+import subprocess
+import shutil
+import zipfile
+from pathlib import Path
 from gi.repository import GLib
+
+DEFAULT_SYSTEM_URL = "https://sourceforge.net/projects/waydroid/files/images/system/lineage/waydroid_x86_64/lineage-18.1-20250628-VANILLA-waydroid_x86_64-system.zip/download"
+DEFAULT_VENDOR_URL = "https://sourceforge.net/projects/waydroid/files/images/vendor/waydroid_x86_64/lineage-18.1-20250628-MAINLINE-waydroid_x86_64-vendor.zip/download"
+INFO_NOTE_TEXT = "These are links for Waydroid Lineage OS Android 11 you can put your android images links or you can copy them to LinStack/LinStack/resources as system.img and vendor.img"
+
+def resolve_project_resources():
+    """Dynamically resolve the project root and LinStack/resources directory."""
+    cur = Path(__file__).resolve()
+    for parent in [cur] + list(cur.parents):
+        if (parent / ".git").exists() or (parent / "install.sh").exists() or (parent / "wlroots_engine").exists():
+            res = parent / "LinStack" / "resources"
+            return res
+        if (parent / "LinStack" / "resources").exists() and (parent / "LinStack" / "LinStack_core").exists():
+            return (parent / "LinStack" / "resources").resolve()
+        if (parent / "resources").exists() and (parent / "linstack.py").exists():
+            return (parent / "resources").resolve()
+
+    cwd = Path.cwd().resolve()
+    for parent in [cwd] + list(cwd.parents):
+        if (parent / ".git").exists() or (parent / "install.sh").exists():
+            return (parent / "LinStack" / "resources").resolve()
+        if (parent / "LinStack" / "resources").exists():
+            return (parent / "LinStack" / "resources").resolve()
+
+    return (cur.parents[3] / "resources").resolve()
+
+def download_image_zip(url, target_path, progress_prefix="Downloading"):
+    """Download a zip archive from URL handling redirects cleanly with streaming progress."""
+    logging.info("Connecting to %s...", url)
+    headers = {"User-Agent": "curl/8.6.0"}
+    download_success = False
+
+    try:
+        import requests
+        with requests.get(url, stream=True, allow_redirects=True, headers=headers, timeout=30) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get("content-length", 0))
+            downloaded = 0
+            last_log_time = 0
+            with open(target_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=256 * 1024):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        now = time.time()
+                        if now - last_log_time >= 0.5 or (total_size and downloaded >= total_size):
+                            last_log_time = now
+                            if total_size > 0:
+                                percent = (downloaded / total_size) * 100
+                                mb_done = downloaded / (1024 * 1024)
+                                mb_total = total_size / (1024 * 1024)
+                                sys.stdout.write(f"\r{progress_prefix}: {percent:5.1f}% ({mb_done:6.1f} MB / {mb_total:6.1f} MB)")
+                                sys.stdout.flush()
+                            else:
+                                mb_done = downloaded / (1024 * 1024)
+                                sys.stdout.write(f"\r{progress_prefix}: {mb_done:6.1f} MB")
+                                sys.stdout.flush()
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        download_success = True
+        logging.info("Download completed successfully.")
+    except Exception as e:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        logging.warning("Requests download encountered: %s. Falling back to curl...", e)
+
+    if not download_success:
+        if shutil.which("curl"):
+            cmd = ["curl", "-L", "-f", "--progress-bar", "-o", str(target_path), url]
+            res = subprocess.run(cmd)
+            if res.returncode != 0:
+                raise RuntimeError(f"curl failed to download image from {url}")
+        else:
+            raise RuntimeError(f"Failed to download image from {url} and curl is not available")
+
+def extract_image_from_zip(zip_path, target_img_name, dest_dir):
+    """Extract target image (system.img or vendor.img) from zip archive into dest_dir."""
+    logging.info("Extracting %s into %s...", target_img_name, dest_dir)
+    dest_path = os.path.join(dest_dir, target_img_name)
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        names = zf.namelist()
+        member_to_extract = None
+        for name in names:
+            if os.path.basename(name) == target_img_name:
+                member_to_extract = name
+                break
+        if not member_to_extract:
+            for name in names:
+                if name.endswith(".img"):
+                    member_to_extract = name
+                    break
+
+        if member_to_extract:
+            with zf.open(member_to_extract) as src, open(dest_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+        else:
+            zf.extractall(dest_dir)
+
+    try:
+        if os.path.exists(zip_path):
+            os.remove(zip_path)
+    except Exception as e:
+        logging.debug("Could not remove temp zip %s: %s", zip_path, e)
+
+    try:
+        if os.geteuid() == 0 and os.path.exists(dest_path):
+            dir_st = os.stat(dest_dir)
+            os.chown(dest_path, dir_st.st_uid, dir_st.st_gid)
+    except Exception as e:
+        logging.debug("Could not chown %s: %s", dest_path, e)
+
+    logging.info("Extracted %s successfully.", target_img_name)
+
+def ensure_images_available(args, system_url=None, vendor_url=None):
+    """
+    Smart Initialization Logic:
+      Step A: Check if system.img and vendor.img exist in LinStack/resources/.
+      Step B: If both exist, skip downloading and initialize using local files.
+      Step C: If either is missing, download zip archive(s) and extract them into LinStack/resources/.
+    """
+    res_dir = resolve_project_resources()
+    os.makedirs(res_dir, exist_ok=True)
+
+    system_img_path = os.path.join(res_dir, "system.img")
+    vendor_img_path = os.path.join(res_dir, "vendor.img")
+
+    system_exists = os.path.isfile(system_img_path) and os.path.getsize(system_img_path) > 0
+    vendor_exists = os.path.isfile(vendor_img_path) and os.path.getsize(vendor_img_path) > 0
+
+    if system_exists and vendor_exists:
+        logging.info("Step A/B: Found local system.img and vendor.img in %s.", res_dir)
+        logging.info("Skipping download; initializing container using local images.")
+        args.images_path = str(res_dir)
+        return True
+
+    logging.info("Step A: Checking local files in %s...", res_dir)
+    if not system_exists:
+        logging.info("system.img is missing in %s", res_dir)
+    if not vendor_exists:
+        logging.info("vendor.img is missing in %s", res_dir)
+
+    sys_url = (system_url or getattr(args, "system_channel", None) or "").strip()
+    if not sys_url:
+        sys_url = DEFAULT_SYSTEM_URL
+    vnd_url = (vendor_url or getattr(args, "vendor_channel", None) or "").strip()
+    if not vnd_url:
+        vnd_url = DEFAULT_VENDOR_URL
+
+    if not system_exists:
+        logging.info("Step C: Downloading system image archive from: %s", sys_url)
+        temp_system_zip = os.path.join(res_dir, "temp_system_download.zip")
+        download_image_zip(sys_url, temp_system_zip, progress_prefix="Downloading system image")
+        extract_image_from_zip(temp_system_zip, "system.img", res_dir)
+
+    if not vendor_exists:
+        logging.info("Step C: Downloading vendor image archive from: %s", vnd_url)
+        temp_vendor_zip = os.path.join(res_dir, "temp_vendor_download.zip")
+        download_image_zip(vnd_url, temp_vendor_zip, progress_prefix="Downloading vendor image")
+        extract_image_from_zip(temp_vendor_zip, "vendor.img", res_dir)
+
+    args.images_path = str(res_dir)
+    return True
 
 def is_initialized(args):
     return os.path.isfile(args.config) and os.path.isdir(tools.config.defaults["rootfs"])
@@ -135,6 +301,8 @@ def init(args):
     already_init = is_initialized(args)
     if already_init and not args.force:
         logging.info("Already initialized. Re-verifying configuration with local images...")
+
+    ensure_images_available(args, getattr(args, "system_channel", None), getattr(args, "vendor_channel", None))
 
     if not setup_config(args):
         return
@@ -321,29 +489,46 @@ def remote_init_client(args):
             super().__init__(title="Initialize Linstack")
             channels_cfg = tools.config.load_channels()
 
-            self.set_default_size(600, 250)
+            self.set_default_size(720, 440)
             self.set_icon_name("linstack")
 
-            grid = Gtk.Grid(row_spacing=6, column_spacing=6, margin=10, column_homogeneous=True)
+            grid = Gtk.Grid(row_spacing=8, column_spacing=8, margin=14, column_homogeneous=False)
             grid.set_hexpand(True)
             grid.set_vexpand(True)
             self.add(grid)
 
-            sysOtaLabel = Gtk.Label("System OTA")
+            sys_val = channels_cfg["channels"].get("system_channel") or DEFAULT_SYSTEM_URL
+            vnd_val = channels_cfg["channels"].get("vendor_channel") or DEFAULT_VENDOR_URL
+
+            sysOtaLabel = Gtk.Label(label="System Image URL")
+            sysOtaLabel.set_xalign(0.0)
             sysOtaEntry = Gtk.Entry()
-            sysOtaEntry.set_text(channels_cfg["channels"]["system_channel"])
+            sysOtaEntry.set_hexpand(True)
+            sysOtaEntry.set_text(sys_val)
             grid.attach(sysOtaLabel, 0, 0, 1, 1)
-            grid.attach_next_to(sysOtaEntry ,sysOtaLabel, Gtk.PositionType.RIGHT, 2, 1)
+            grid.attach_next_to(sysOtaEntry, sysOtaLabel, Gtk.PositionType.RIGHT, 2, 1)
             self.sysOta = sysOtaEntry.get_buffer()
 
-            vndOtaLabel = Gtk.Label("Vendor OTA")
+            vndOtaLabel = Gtk.Label(label="Vendor Image URL")
+            vndOtaLabel.set_xalign(0.0)
             vndOtaEntry = Gtk.Entry()
-            vndOtaEntry.set_text(channels_cfg["channels"]["vendor_channel"])
+            vndOtaEntry.set_hexpand(True)
+            vndOtaEntry.set_text(vnd_val)
             grid.attach(vndOtaLabel, 0, 1, 1, 1)
             grid.attach_next_to(vndOtaEntry, vndOtaLabel, Gtk.PositionType.RIGHT, 2, 1)
             self.vndOta = vndOtaEntry.get_buffer()
 
-            sysTypeLabel = Gtk.Label("Android Type")
+            # Informational Note Label
+            infoLabel = Gtk.Label(label=INFO_NOTE_TEXT)
+            infoLabel.set_line_wrap(True)
+            infoLabel.set_max_width_chars(75)
+            infoLabel.set_xalign(0.0)
+            infoLabel.set_margin_top(4)
+            infoLabel.set_margin_bottom(6)
+            grid.attach(infoLabel, 0, 2, 3, 1)
+
+            sysTypeLabel = Gtk.Label(label="Android Type")
+            sysTypeLabel.set_xalign(0.0)
             sysTypesStore = Gtk.ListStore(str, str)
             sysTypesStore.append(["VANILLA", "Minimal Android"])
             sysTypesStore.append(["GAPPS", "Android with Google Apps"])
@@ -353,16 +538,16 @@ def remote_init_client(args):
             sysTypeCombo.pack_start(renderer_text, True)
             sysTypeCombo.add_attribute(renderer_text, "text", 1)
             sysTypeCombo.set_active(0)
-            grid.attach(sysTypeLabel, 0, 2, 1, 1)
+            grid.attach(sysTypeLabel, 0, 3, 1, 1)
             grid.attach_next_to(sysTypeCombo, sysTypeLabel, Gtk.PositionType.RIGHT, 2, 1)
             self.sysType = sysTypeCombo
 
-            downloadBtn = Gtk.Button("Download")
+            downloadBtn = Gtk.Button(label="Init")
             downloadBtn.connect("clicked", self.on_download_btn_clicked)
-            grid.attach(downloadBtn, 1,3,1,1)
+            grid.attach(downloadBtn, 1, 4, 1, 1)
             self.downloadBtn = downloadBtn
 
-            doneBtn = Gtk.Button("Done")
+            doneBtn = Gtk.Button(label="Done")
             doneBtn.connect("clicked", lambda x: self.destroy())
             doneBtn.get_style_context().add_class('suggested-action')
             grid.attach_next_to(doneBtn, downloadBtn, Gtk.PositionType.RIGHT, 1, 1)
@@ -375,7 +560,7 @@ def remote_init_client(args):
             outTextView.set_property('editable', False)
             outTextView.set_property('cursor-visible', False)
             outScrolledWindow.add(outTextView)
-            grid.attach(outScrolledWindow, 0, 4, 3, 1)
+            grid.attach(outScrolledWindow, 0, 5, 3, 1)
             self.outScrolledWindow = outScrolledWindow
             self.outTextView = outTextView
             self.outBuffer = outTextView.get_buffer()
@@ -394,7 +579,7 @@ def remote_init_client(args):
             self.doneBtn.hide()
             self.outTextView.show()
             sysType = self.sysType.get_model()[self.sysType.get_active_iter()][0]
-            self.run_init(self.sysOta.get_text(), self.vndOta.get_text(), sysType)
+            self.run_init(self.sysOta.get_text().strip(), self.vndOta.get_text().strip(), sysType)
 
         def draw(self, s):
             if s.startswith('\r'):
@@ -421,11 +606,19 @@ def remote_init_client(args):
             self.downloadBtn.set_sensitive(True)
 
         def on_bus_error(self, e):
-            if e.get_dbus_name() == "org.freedesktop.DBus.Python.PermissionError":
+            err_str = str(e)
+            if hasattr(e, "get_dbus_name") and e.get_dbus_name() == "org.freedesktop.DBus.Python.PermissionError":
                 self.draw(e.get_dbus_message().splitlines()[-1] + "\n")
+            elif "org.freedesktop.DBus.Error.ServiceUnknown" in err_str or "not provided" in err_str or "Connection refused" in err_str:
+                self.draw("Container service is not currently active.\n"
+                          "Please start the service with:\n"
+                          "  sudo systemctl start linstack-container\n"
+                          "Or run container initialization directly in terminal:\n"
+                          "  sudo linstack init\n")
             else:
-                self.draw(str(e))
+                self.draw(err_str + "\n")
             self.downloadBtn.set_sensitive(True)
+            self.initializing = False
 
         def on_destroy(self, _):
             if self.initializing:
@@ -460,6 +653,8 @@ def remote_init_client(args):
                 self.on_bus_error(e)
             except Exception as e:
                 self.draw(f"{e}\n")
+                self.downloadBtn.set_sensitive(True)
+                self.initializing = False
 
     GLib.set_prgname("Linstack")
     win = LinstackInitWindow()

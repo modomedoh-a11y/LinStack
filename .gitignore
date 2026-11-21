@@ -45,7 +45,40 @@ CTestTestfile.cmake
 .qtcreator/
 .vscode/
 .idea/
+*.bak
+
+# Large images and archives
+*.img
+*.zip
+*.iso
+*.tar.gz
+*.tar.xz
+*.7z
+LinStack/resources/*.img
+LinStack/resources/*.zip
+resources/*.img
+resources/*.zip
+!LinStack/resources/.gitkeep
+!resources/.gitkeep
+
+# Container work directories & runtime overlays
+work/
+LinStack/work/
+rootfs/
+overlay/
+overlay_rw/
+overlay_work/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.pytest_cache/
 
 # Project Specific Builds
 LinStack/build/
 build/
+wlroots_engine/build/

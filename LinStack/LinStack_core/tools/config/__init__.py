@@ -28,6 +28,9 @@ config_keys = ["arch",
 from pathlib import Path
 import os
 
+DEFAULT_SYSTEM_URL = "https://sourceforge.net/projects/waydroid/files/images/system/lineage/waydroid_x86_64/lineage-18.1-20250628-VANILLA-waydroid_x86_64-system.zip/download"
+DEFAULT_VENDOR_URL = "https://sourceforge.net/projects/waydroid/files/images/vendor/waydroid_x86_64/lineage-18.1-20250628-MAINLINE-waydroid_x86_64-vendor.zip/download"
+
 def _get_preinstalled_images_paths():
     paths = [
         "/var/lib/linstack/images",
@@ -42,18 +45,33 @@ def _get_preinstalled_images_paths():
     # 1. Check relative to project root / portable build directories & user homes
     try:
         core_dir = Path(__file__).resolve().parent.parent.parent
-        home = Path.home()
-        candidates = [
-            core_dir / "resources",
+        proj_root = None
+        for p in [core_dir] + list(core_dir.parents):
+            if (p / ".git").exists() or (p / "install.sh").exists() or (p / "wlroots_engine").exists():
+                proj_root = p
+                break
+            if (p / "LinStack" / "resources").exists() and (p / "LinStack" / "LinStack_core").exists():
+                proj_root = p
+                break
+
+        candidates = []
+        if proj_root:
+            candidates.append(proj_root / "LinStack" / "resources")
+            candidates.append(proj_root / "resources")
+        candidates.extend([
             core_dir.parent / "resources",
             core_dir.parent / "LinStack" / "resources",
-            core_dir / "LinStack" / "resources",
+            core_dir / "resources",
+            Path.cwd() / "LinStack" / "resources",
             Path.cwd() / "resources",
+            Path.cwd().parent / "LinStack" / "resources",
             Path.cwd().parent / "resources",
-            home / "Downloads" / "LinStack" / "LinStack" / "resources",
+        ])
+        home = Path.home()
+        candidates.extend([
             home / "LinStack" / "LinStack" / "resources",
             home / "LinStack" / "resources",
-        ]
+        ])
         for c in candidates:
             c_resolved = str(c.resolve()) if c.exists() else str(c)
             if c.is_dir() and (c / "system.img").exists() and c_resolved not in paths:
@@ -79,7 +97,7 @@ def _get_preinstalled_images_paths():
 # overridden on the commandline)
 defaults = {
     "arch": "arm64",
-    "work": "/var/lib/linstack",
+    "work": os.environ.get("LINSTACK_WORK_DIR", "/var/lib/linstack"),
     "vendor_type": "MAINLINE",
     "system_datetime": "0",
     "vendor_datetime": "0",
@@ -121,8 +139,8 @@ if session_defaults["pulse_runtime_path"] == "None":
 
 channels_defaults = {
     "config_path": "/usr/share/linstack-extra/channels.cfg",
-    "system_channel": "",
-    "vendor_channel": "",
+    "system_channel": DEFAULT_SYSTEM_URL,
+    "vendor_channel": DEFAULT_VENDOR_URL,
     "rom_type": "lineage",
     "system_type": "VANILLA"
 }
