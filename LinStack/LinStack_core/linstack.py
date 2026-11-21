@@ -11,6 +11,8 @@ _current_dir = Path(__file__).resolve().parent
 _possible_tools_paths = [
     _current_dir,
     _current_dir / "tools",
+    Path("/opt/linstack/LinStack_core"),
+    Path("/opt/linstack"),
     Path("/usr/lib/linstack"),
     Path("/usr/share/linstack"),
     Path("/usr/local/lib/linstack"),

@@ -81,6 +81,7 @@ def _get_preinstalled_images_paths():
 
     # 2. Standard system installation paths
     system_paths = [
+        "/opt/linstack/resources",
         "/usr/share/linstack/resources",
         "/usr/local/share/linstack/resources",
         "/usr/share/linstack/images",

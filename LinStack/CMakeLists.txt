@@ -153,6 +153,8 @@ set(SOURCES
     src/AndroidCanvas.cpp
     src/SettingsDialog.h
     src/SettingsDialog.cpp
+    src/InitializationDialog.h
+    src/InitializationDialog.cpp
     src/MainWindow.h
     src/MainWindow.cpp
     src/LinstackService.h

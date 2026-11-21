@@ -4,6 +4,7 @@
 #include <QSurfaceFormat>
 #include "MainWindow.h"
 #include "SettingsDialog.h"
+#include "InitializationDialog.h"
 #include "AndroidCanvas.h"
 #include "KeymapperOverlay.h"
 #include "Theme.h"
@@ -69,6 +70,28 @@ int main(int argc, char *argv[])
     // Apply global stylesheet
     app.setStyleSheet(Theme::cyberEmeraldStyleSheet());
 
+    // Support CLI screenshot flags for headless validation and standalone dialog preview
+    for (int i = 1; i < argc; ++i) {
+        if (QString(argv[i]) == "--screenshot-init" && i + 1 < argc) {
+            QString path = argv[i + 1];
+            InitializationDialog dlg;
+            dlg.show();
+            app.processEvents();
+            QPixmap pix = dlg.grab();
+            pix.save(path);
+            return 0;
+        }
+        if (QString(argv[i]) == "--screenshot-settings" && i + 1 < argc) {
+            QString path = argv[i + 1];
+            SettingsDialog dlg;
+            dlg.show();
+            app.processEvents();
+            QPixmap pix = dlg.grab();
+            pix.save(path);
+            return 0;
+        }
+    }
+
     MainWindow window;
     window.show();
 
@@ -107,6 +130,15 @@ int main(int argc, char *argv[])
             }
             app.processEvents();
             QPixmap pix = window.grab();
+            pix.save(path);
+            return 0;
+        }
+        if (QString(argv[i]) == "--screenshot-init" && i + 1 < argc) {
+            QString path = argv[i + 1];
+            InitializationDialog dlg;
+            dlg.show();
+            app.processEvents();
+            QPixmap pix = dlg.grab();
             pix.save(path);
             return 0;
         }

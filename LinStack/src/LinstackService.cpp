@@ -8,12 +8,29 @@
 #include <QRegularExpression>
 #include <QDateTime>
 #include <QThread>
+#include <QCoreApplication>
 
 LinstackService::LinstackService(QObject *parent)
     : QObject(parent)
 {
-    // User data location follows XDG via PathResolver
-    m_scriptsPath = PathResolver::userDataDir() + "/linstack_script";
+    // User data location follows XDG via PathResolver, prioritizing bundled scripts
+    QString appDir = QCoreApplication::applicationDirPath();
+    QStringList candidateScriptDirs = {
+        "/opt/linstack/LinStack_Scripts",
+        appDir + "/../LinStack_Scripts",
+        appDir + "/../../LinStack_Scripts",
+        QDir::currentPath() + "/LinStack_Scripts",
+        PathResolver::userDataDir() + "/linstack_script"
+    };
+    for (const QString &d : candidateScriptDirs) {
+        if (QFileInfo::exists(d + "/main.py")) {
+            m_scriptsPath = QDir::cleanPath(d);
+            break;
+        }
+    }
+    if (m_scriptsPath.isEmpty()) {
+        m_scriptsPath = PathResolver::userDataDir() + "/linstack_script";
+    }
 
     // Initialize predefined gaming profiles for unlocking high refresh rates
     m_profiles.insert("ROG Phone 5", DeviceProfileInfo{

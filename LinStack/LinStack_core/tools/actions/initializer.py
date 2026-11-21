@@ -26,6 +26,9 @@ INFO_NOTE_TEXT = "These are links for Waydroid Lineage OS Android 11 you can put
 
 def resolve_project_resources():
     """Dynamically resolve the project root and LinStack/resources directory."""
+    if Path("/opt/linstack/resources").is_dir():
+        return Path("/opt/linstack/resources").resolve()
+
     cur = Path(__file__).resolve()
     for parent in [cur] + list(cur.parents):
         if (parent / ".git").exists() or (parent / "install.sh").exists() or (parent / "wlroots_engine").exists():

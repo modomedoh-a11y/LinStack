@@ -26,6 +26,7 @@ QString PathResolver::resolveResourcesDir()
         QDir::currentPath() + "/resources",
         QDir::currentPath() + "/../resources",
         // 2. Standard system installation directories
+        "/opt/linstack/resources",
         QString(LIN_STACK_DATADIR) + "/resources",
         "/usr/share/linstack/resources",
         "/usr/local/share/linstack/resources",
@@ -117,6 +118,8 @@ QString PathResolver::resolveLinstackExecutable()
         QDir::currentPath() + "/LinStack_core/linstack.py",
         QDir::currentPath() + "/../LinStack_core/linstack.py",
         // 2. Standard system installation directories
+        "/opt/linstack/LinStack_core/linstack.py",
+        "/opt/linstack/bin/LinStack",
         QString(LIN_STACK_INSTALL_PREFIX) + "/bin/linstack",
         "/usr/local/bin/linstack",
         "/usr/bin/linstack"
@@ -148,6 +151,8 @@ QString PathResolver::resolveToolsDir()
         QDir::currentPath() + "/tools",
         QDir::currentPath() + "/LinStack_core/tools",
         QString(LIN_STACK_DATADIR) + "/tools",
+        "/opt/linstack/LinStack_core/tools",
+        "/opt/linstack/tools",
         "/usr/lib/linstack/tools",
         "/usr/share/linstack/tools"
     };
@@ -167,6 +172,7 @@ QString PathResolver::resolveCoreDir()
         appDir + "/LinStack_core",
         appDir + "/../LinStack_core",
         appDir + "/../../LinStack_core",
+        "/opt/linstack/LinStack_core",
         QDir::currentPath() + "/LinStack_core",
         QDir::currentPath() + "/../LinStack_core",
     };

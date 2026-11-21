@@ -51,6 +51,8 @@ private slots:
 
 private:
     void setupUi();
+    bool isContainerInitialized() const;
+    void promptFirstTimeInitialization();
     QSize calculateNetViewportSize() const;
     void checkEdgeResize(const QPoint &pos);
     Qt::Edges calculateEdges(const QPoint &pos);

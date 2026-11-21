@@ -3,6 +3,7 @@
 #include "SideToolBar.h"
 #include "AndroidCanvas.h"
 #include "SettingsDialog.h"
+#include "InitializationDialog.h"
 #include "LinstackService.h"
 #include "UInputTouchBridge.h"
 #include "KeymapperOverlay.h"
@@ -378,14 +379,59 @@ void MainWindow::setupUi()
         }
     });
 
-    // بدء جلسة الأندرويد فوراً دون تأخير، وتشغيل الفحص التشخيصي في الخلفية بعد 3 ثوانٍ
-    if (m_service && m_service->sessionState() == LinstackService::SessionState::Idle) {
-        m_service->startSession();
+    // First-run container check: if container is not initialized, show native Qt wizard
+    if (!isContainerInitialized()) {
+        LOG_INFO("Core", "First-run: LinStack container is not initialized. Launching native Qt Initialization Wizard...");
+        QTimer::singleShot(250, this, &MainWindow::promptFirstTimeInitialization);
+    } else {
+        // Start Android container session immediately if already initialized
+        if (m_service && m_service->sessionState() == LinstackService::SessionState::Idle) {
+            m_service->startSession();
+        }
+        QTimer::singleShot(3500, this, [this]() {
+            LOG_INFO("Core", "Initiating background diagnostic check...");
+            m_healer->startDiagnosticsAsync(true, this);
+        });
     }
-    QTimer::singleShot(3500, this, [this]() {
-        LOG_INFO("Core", "Initiating background diagnostic check...");
-        m_healer->startDiagnosticsAsync(true, this);
-    });
+}
+
+bool MainWindow::isContainerInitialized() const
+{
+    // Container is initialized when /var/lib/linstack/linstack.cfg exists AND system.img & vendor.img exist
+    if (!QFileInfo::exists("/var/lib/linstack/linstack.cfg")) {
+        return false;
+    }
+
+    bool sysVar = QFileInfo::exists("/var/lib/linstack/images/system.img") && QFileInfo("/var/lib/linstack/images/system.img").size() > 0;
+    bool vndVar = QFileInfo::exists("/var/lib/linstack/images/vendor.img") && QFileInfo("/var/lib/linstack/images/vendor.img").size() > 0;
+    if (sysVar && vndVar) {
+        return true;
+    }
+
+    QString resDir = PathResolver::resolveResourcesDir();
+    bool sysRes = QFileInfo::exists(resDir + "/system.img") && QFileInfo(resDir + "/system.img").size() > 0;
+    bool vndRes = QFileInfo::exists(resDir + "/vendor.img") && QFileInfo(resDir + "/vendor.img").size() > 0;
+    return (sysRes && vndRes);
+}
+
+void MainWindow::promptFirstTimeInitialization()
+{
+    InitializationDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        LOG_INFO("Core", "First-run container initialization completed successfully. Booting Android session...");
+        m_canvas->showToast("Initialization complete. Booting LinStack...", 3000);
+        if (m_service && m_service->sessionState() == LinstackService::SessionState::Idle) {
+            m_service->startSession();
+        }
+        QTimer::singleShot(4000, this, [this]() {
+            if (m_healer) {
+                m_healer->startDiagnosticsAsync(true, this);
+            }
+        });
+    } else {
+        m_canvas->showToast("Container not initialized. Android session cannot boot.", 5000);
+        m_titleBar->setEngineStatus("Initialization Required", false);
+    }
 }
 
 void MainWindow::handleWindowDrag(const QPoint &delta)

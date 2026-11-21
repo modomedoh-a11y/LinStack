@@ -21,10 +21,8 @@
 │   │   │   │   ├── config_base
 │   │   │   │   └── linstack.seccomp
 │   │   │   ├── id.linstack.linstack.metainfo.xml
-│   │   │   ├── linstack.app.install.desktop
 │   │   │   ├── Linstack.desktop
 │   │   │   ├── linstack.directory
-│   │   │   ├── linstack.market.desktop
 │   │   │   ├── linstack.menu
 │   │   │   └── scripts
 │   │   │       ├── linstack-net.sh
@@ -107,6 +105,8 @@
 │       ├── CMakeLists.txt
 │       ├── DiagnosticsEngine.cpp
 │       ├── DiagnosticsEngine.h
+│       ├── InitializationDialog.cpp
+│       ├── InitializationDialog.h
 │       ├── InputTranslator.cpp
 │       ├── InputTranslator.h
 │       ├── KeymapperOverlay.cpp
@@ -136,10 +136,8 @@
 │       ├── TitleBar.h
 │       ├── UInputTouchBridge.cpp
 │       └── UInputTouchBridge.h
-├── README.md
-├── rebrand.py
-├── structure.sh
-├── waydroid_script
+├── linstack_context.txt
+├── LinStack_Scripts
 │   ├── assets
 │   │   ├── 1.png
 │   │   ├── 2.png
@@ -193,6 +191,9 @@
 │       ├── helper.py
 │       ├── images.py
 │       └── logger.py
+├── README.md
+├── rebrand.py
+├── structure.sh
 └── wlroots_engine
     ├── CMakeLists.txt
     ├── include
@@ -213,4 +214,4 @@
         ├── main.cpp
         └── WaylandSurfaceRenderer.cpp
 
-34 directories, 180 files
+34 directories, 181 files
