@@ -92,13 +92,45 @@ def start(args, session, unlocked_cb=None):
 
     # Creates, deletes, or updates desktop file
     def updateDesktopFile(appInfo):
-        # Do not sync per-app Android desktop entries to host ~/.local/share/applications/
-        if appInfo:
-            packageName = appInfo.get("packageName", "")
-            if packageName:
-                desktop_file_path = apps_dir / f"linstack.{packageName}.desktop"
-                desktop_file_path.unlink(missing_ok=True)
-        return
+        if appInfo is None:
+            return
+
+        packageName = appInfo.get("packageName", "")
+        if not packageName:
+            return
+
+        desktop_file_path = apps_dir / f"linstack.{packageName}.desktop"
+
+        showApp = False
+        for cat in appInfo.get("categories", []):
+            if cat.strip() == "android.intent.category.LAUNCHER":
+                showApp = True
+                break
+
+        if not showApp:
+            desktop_file_path.unlink(missing_ok=True)
+            return
+
+        desktop_file = GLib.KeyFile()
+        with suppress(GLib.GError):
+            flags = GLib.KeyFileFlags.KEEP_COMMENTS | GLib.KeyFileFlags.KEEP_TRANSLATIONS
+            desktop_file.load_from_file(str(desktop_file_path), flags)
+
+        desktop_file.set_string("Desktop Entry", "Type", "Application")
+        desktop_file.set_string("Desktop Entry", "Name", appInfo.get("name", packageName))
+        desktop_file.set_string("Desktop Entry", "Exec", f"/usr/local/bin/LinStack --launch {packageName}")
+        desktop_file.set_string("Desktop Entry", "Icon", str(linstack_data_icons_dir / f"{packageName}.png"))
+        glib_key_file_prepend_string_list(desktop_file, "Desktop Entry", "Categories", ["LinStack", "X-LinStack-App"])
+        desktop_file.set_string_list("Desktop Entry", "X-Purism-FormFactor", ["Workstation", "Mobile"])
+        glib_key_file_prepend_string_list(desktop_file, "Desktop Entry", "Actions", ["app-settings"])
+        if packageName in system_apps and not glib_key_file_has_value(desktop_file, "Desktop Entry", "NoDisplay"):
+            desktop_file.set_boolean("Desktop Entry", "NoDisplay", True)
+
+        desktop_file.set_string("Desktop Action app-settings", "Name", "App Settings")
+        desktop_file.set_string("Desktop Action app-settings", "Exec", f"linstack app intent android.settings.APPLICATION_DETAILS_SETTINGS package:{packageName}")
+        desktop_file.set_string("Desktop Action app-settings", "Icon", str(linstack_data_icons_dir / "com.android.settings.png"))
+
+        desktop_file.save_to_file(str(desktop_file_path))
 
     def userUnlocked(uid):
         cfg = tools.config.load(args)
@@ -116,7 +148,8 @@ def start(args, session, unlocked_cb=None):
             for app in appsList:
                 updateDesktopFile(app)
             for existing in apps_dir.glob("linstack.*.desktop"):
-                existing.unlink(missing_ok=True)
+                if existing.name not in map(lambda a: f"linstack.{a.get('packageName', '')}.desktop", appsList):
+                    existing.unlink(missing_ok=True)
         if unlocked_cb:
             unlocked_cb()
 

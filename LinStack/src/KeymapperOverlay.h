@@ -43,6 +43,9 @@ public:
     void setMode(Mode mode);
     Mode mode() const { return m_mode; }
 
+    void setKeymappingActive(bool active);
+    bool isKeymappingActive() const { return m_keymappingActive; }
+
     void setCurrentAppId(const QString &appId);
     QString currentAppId() const { return m_appId; }
 
@@ -95,6 +98,7 @@ private:
     void positionEditorBar();
 
     Mode m_mode = Mode::Play;
+    bool m_keymappingActive = false;
     qreal m_opacity = 0.85;
     QString m_appId = "default";
     QString m_currentProfileName = "Default";

@@ -71,7 +71,7 @@ static QString scanCodeToLabel(quint32 scanCode, int fallbackQtKey = 0)
 KeymapperOverlay::KeymapperOverlay(QWidget *parent)
 : QWidget(parent)
 {
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
     setMouseTracking(true);
 
     m_translator = new InputTranslator(nullptr, this);
@@ -918,6 +918,25 @@ void KeymapperOverlay::setMode(Mode mode)
     update();
 }
 
+void KeymapperOverlay::setKeymappingActive(bool active)
+{
+    m_keymappingActive = active;
+    if (!active) {
+        clearFocus();
+        setFocusPolicy(Qt::NoFocus);
+        if (m_mode == Mode::Edit) {
+            setMode(Mode::Play);
+        }
+        hide();
+    } else {
+        setFocusPolicy(Qt::StrongFocus);
+        show();
+        raise();
+        setFocus(Qt::OtherFocusReason);
+    }
+    update();
+}
+
 void KeymapperOverlay::setOverlayOpacity(qreal opacity)
 {
     m_opacity = qBound(0.1, opacity, 1.0);
@@ -1336,6 +1355,10 @@ void KeymapperOverlay::resizeEvent(QResizeEvent *event)
 
 void KeymapperOverlay::wheelEvent(QWheelEvent *event)
 {
+    if (!m_keymappingActive) {
+        event->ignore();
+        return;
+    }
     if (m_mode == Mode::Edit && m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
         int delta = event->angleDelta().y() > 0 ? 4 : -4;
         auto &node = m_nodes[m_selectedNodeIndex];
@@ -1354,6 +1377,11 @@ void KeymapperOverlay::wheelEvent(QWheelEvent *event)
 
 void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
 {
+    if (!m_keymappingActive) {
+        event->ignore();
+        return;
+    }
+
     if (m_mode == Mode::Edit) {
         if (event->button() == Qt::LeftButton) {
             // 1. التحقق من سحب لوحة خيارات الـ Keymapping نفسها لتحريكها بحرية
@@ -1464,6 +1492,11 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
 
 void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
 {
+    if (!m_keymappingActive) {
+        event->ignore();
+        return;
+    }
+
     if (m_mode == Mode::Edit) {
         // تحريك نافذة الإعدادات بسلاسة
         if (m_isDraggingSettingsPanel && m_nodeSettingsPanel) {
@@ -1559,6 +1592,11 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
 
 void KeymapperOverlay::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (!m_keymappingActive) {
+        event->ignore();
+        return;
+    }
+
     if (m_mode == Mode::Edit) {
         if (event->button() == Qt::LeftButton) {
             if (m_isDraggingSettingsPanel) {
@@ -1634,6 +1672,11 @@ void KeymapperOverlay::mouseReleaseEvent(QMouseEvent *event)
 
 void KeymapperOverlay::keyPressEvent(QKeyEvent *event)
 {
+    if (!m_keymappingActive) {
+        event->ignore();
+        return;
+    }
+
     if (event->isAutoRepeat()) {
         event->accept();
         return;
@@ -1685,6 +1728,11 @@ void KeymapperOverlay::keyPressEvent(QKeyEvent *event)
 
 void KeymapperOverlay::keyReleaseEvent(QKeyEvent *event)
 {
+    if (!m_keymappingActive) {
+        event->ignore();
+        return;
+    }
+
     if (event->isAutoRepeat()) {
         event->accept();
         return;
@@ -1704,6 +1752,10 @@ void KeymapperOverlay::keyReleaseEvent(QKeyEvent *event)
 
 void KeymapperOverlay::paintEvent(QPaintEvent *event)
 {
+    if (!m_keymappingActive) {
+        return;
+    }
+
     Q_UNUSED(event);
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);

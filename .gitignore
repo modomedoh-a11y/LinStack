@@ -84,6 +84,9 @@ build/
 wlroots_engine/build/
 build_test/
 
-# Generated context and dumps
+# Generated context, dumps, and local helper scripts
 *context.txt
-LinStack/LinStack_core/folder_structure.txt
+folder_structure.txt
+bundle.py
+structure.sh
+rebrand.py

@@ -862,10 +862,7 @@ void AndroidCanvas::showToast(const QString &message, int durationMs)
 void AndroidCanvas::setKeymapperVisible(bool visible)
 {
     if (m_keymapperOverlay) {
-        m_keymapperOverlay->setVisible(visible);
-        if (visible) {
-            m_keymapperOverlay->raise();
-        }
+        m_keymapperOverlay->setKeymappingActive(visible);
     }
 }
 
@@ -1110,20 +1107,31 @@ void AndroidCanvas::keyPressEvent(QKeyEvent *event)
     }
 
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
-    if (isKeymapperVisible() && m_inputMapper && activeSurface) {
-        quint32 scanCode = event->nativeScanCode();
-        if (m_inputMapper->handleScanCodeDown(scanCode, activeSurface)) {
-            if (m_compositor) m_compositor->flush();
-            bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
-            if (nowLocked != m_aimModeActive) {
-                QPointF anchor(0.5, 0.5);
-                if (const auto *aim = m_inputMapper->activeAimNode()) {
-                    anchor = QPointF(aim->centerX, aim->centerY);
-                } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
-                    anchor = QPointF(fl->centerX, fl->centerY);
+    if (isKeymapperVisible()) {
+        if (m_inputMapper && activeSurface) {
+            quint32 scanCode = event->nativeScanCode();
+            if (m_inputMapper->handleScanCodeDown(scanCode, activeSurface)) {
+                if (m_compositor) m_compositor->flush();
+                bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
+                if (nowLocked != m_aimModeActive) {
+                    QPointF anchor(0.5, 0.5);
+                    if (const auto *aim = m_inputMapper->activeAimNode()) {
+                        anchor = QPointF(aim->centerX, aim->centerY);
+                    } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                        anchor = QPointF(fl->centerX, fl->centerY);
+                    }
+                    setAimMode(nowLocked, anchor);
                 }
-                setAimMode(nowLocked, anchor);
+                event->accept();
+                return;
             }
+        }
+    } else {
+        // When Keymapping is OFF, forward 100% of native keyPressEvent to Wayland wl_keyboard
+        if (m_inputMapper && activeSurface) {
+            quint32 scanCode = event->nativeScanCode();
+            m_inputMapper->forwardNativeKey(scanCode, true, activeSurface);
+            if (m_compositor) m_compositor->flush();
             event->accept();
             return;
         }
@@ -1139,20 +1147,31 @@ void AndroidCanvas::keyReleaseEvent(QKeyEvent *event)
     }
 
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
-    if (isKeymapperVisible() && m_inputMapper && activeSurface) {
-        quint32 scanCode = event->nativeScanCode();
-        if (m_inputMapper->handleScanCodeUp(scanCode, activeSurface)) {
-            if (m_compositor) m_compositor->flush();
-            bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
-            if (nowLocked != m_aimModeActive) {
-                QPointF anchor(0.5, 0.5);
-                if (const auto *aim = m_inputMapper->activeAimNode()) {
-                    anchor = QPointF(aim->centerX, aim->centerY);
-                } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
-                    anchor = QPointF(fl->centerX, fl->centerY);
+    if (isKeymapperVisible()) {
+        if (m_inputMapper && activeSurface) {
+            quint32 scanCode = event->nativeScanCode();
+            if (m_inputMapper->handleScanCodeUp(scanCode, activeSurface)) {
+                if (m_compositor) m_compositor->flush();
+                bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
+                if (nowLocked != m_aimModeActive) {
+                    QPointF anchor(0.5, 0.5);
+                    if (const auto *aim = m_inputMapper->activeAimNode()) {
+                        anchor = QPointF(aim->centerX, aim->centerY);
+                    } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                        anchor = QPointF(fl->centerX, fl->centerY);
+                    }
+                    setAimMode(nowLocked, anchor);
                 }
-                setAimMode(nowLocked, anchor);
+                event->accept();
+                return;
             }
+        }
+    } else {
+        // When Keymapping is OFF, forward 100% of native keyReleaseEvent to Wayland wl_keyboard
+        if (m_inputMapper && activeSurface) {
+            quint32 scanCode = event->nativeScanCode();
+            m_inputMapper->forwardNativeKey(scanCode, false, activeSurface);
+            if (m_compositor) m_compositor->flush();
             event->accept();
             return;
         }

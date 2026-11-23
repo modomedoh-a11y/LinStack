@@ -73,6 +73,7 @@ public:
     void setBridge(UInputTouchBridge *bridge);
 
     QString activeAppPackage() const { return m_activePackage; }
+    void launchAndEmbedApp(const QString &packageName, const QString &displayName);
 
     void initWaylandCompositor();
     void sendWaylandSystemKey(uint32_t evdevKeyCode);
@@ -124,7 +125,6 @@ private:
     void rebuildAppsGrid();
     QWidget *createAppCard(const AndroidAppEntry &app);
     void updateCanvasGeometry();
-    void launchAndEmbedApp(const QString &packageName, const QString &displayName);
 
     std::unique_ptr<EmbeddedCompositor> m_compositor;
     std::unique_ptr<WaylandSurfaceRenderer> m_surfaceRenderer;

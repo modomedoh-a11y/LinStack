@@ -353,7 +353,12 @@ void wlr_bridge_seat_keyboard_notify_key(struct wlr_seat *seat, uint32_t time_ms
 
 void wlr_bridge_seat_keyboard_notify_modifiers(struct wlr_seat *seat) {
     if (seat) {
-        wlr_seat_keyboard_notify_modifiers(seat, NULL);
+        struct wlr_keyboard *kbd = wlr_seat_get_keyboard(seat);
+        if (kbd) {
+            wlr_seat_keyboard_notify_modifiers(seat, &kbd->modifiers);
+        } else {
+            wlr_seat_keyboard_notify_modifiers(seat, NULL);
+        }
     }
 }
 

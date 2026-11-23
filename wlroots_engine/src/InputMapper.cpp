@@ -289,6 +289,19 @@ void InputMapper::sendSystemKey(uint32_t evdevKeyCode, struct wlr_surface *surfa
     wlr_bridge_seat_keyboard_notify_key(m_seat, now + 15, evdevKeyCode, 0);
 }
 
+void InputMapper::forwardNativeKey(uint32_t scanCode, bool pressed, struct wlr_surface *surface) {
+    if (!m_seat || !surface || scanCode == 0) return;
+    struct wlr_surface *rootSurf = wlr_bridge_surface_get_root_surface(surface);
+    if (!rootSurf) rootSurf = surface;
+
+    wlr_bridge_seat_keyboard_enter(m_seat, rootSurf);
+
+    uint32_t now = getTimestampMs();
+    uint32_t evdevKey = (scanCode >= 8) ? (scanCode - 8) : scanCode;
+    wlr_bridge_seat_keyboard_notify_key(m_seat, now, evdevKey, pressed ? 1 : 0);
+    wlr_bridge_seat_keyboard_notify_modifiers(m_seat);
+}
+
 bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surface) {
     if (scanCode == 0) return false;
 

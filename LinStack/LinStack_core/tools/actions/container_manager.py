@@ -215,6 +215,24 @@ def do_start(args, session):
 
     helpers.protocol.set_aidl_version(args)
 
+    # Mount verification before lxc-start: verify system.img / vendor.img are mounted
+    # and /var/lib/linstack/rootfs/dev exists so lxc-start never fails with "No such file or directory"
+    rootfs_dev = os.path.join(tools.config.defaults["rootfs"], "dev")
+    rootfs_vendor = os.path.join(tools.config.defaults["rootfs"], "vendor")
+    is_sys_mounted = helpers.mount.ismount(tools.config.defaults["rootfs"])
+    is_vnd_mounted = helpers.mount.ismount(rootfs_vendor)
+
+    if not is_sys_mounted or not is_vnd_mounted or not os.path.exists(rootfs_dev):
+        logging.warning("Container mount verification: mounts or dev directory missing (sys=%s, vnd=%s, dev=%s). Re-invoking mount_rootfs...",
+                        is_sys_mounted, is_vnd_mounted, os.path.exists(rootfs_dev))
+        helpers.images.mount_rootfs(args, cfg["linstack"]["images_path"], session)
+
+    if not os.path.exists(rootfs_dev):
+        try:
+            os.makedirs(rootfs_dev, exist_ok=True)
+        except Exception as e:
+            logging.warning("Could not create %s: %s", rootfs_dev, e)
+
     helpers.lxc.start(args)
     services.hardware_manager.start(args)
 

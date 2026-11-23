@@ -2,6 +2,9 @@
 #include <QStyleFactory>
 #include <QPalette>
 #include <QSurfaceFormat>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QTimer>
 #include "MainWindow.h"
 #include "SettingsDialog.h"
 #include "InitializationDialog.h"
@@ -41,10 +44,35 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.0.0");
     app.setOrganizationName("LinStack Project");
 
+    bool isScreenshotMode = false;
+    QString launchPackage;
     for (int i = 1; i < argc; ++i) {
-        if (QString(argv[i]).startsWith("--screenshot")) {
-            break;
+        QString arg = argv[i];
+        if (arg.startsWith("--screenshot")) {
+            isScreenshotMode = true;
+        } else if (arg == "--launch" && i + 1 < argc) {
+            launchPackage = argv[i + 1];
         }
+    }
+
+    if (!isScreenshotMode) {
+        QString serverName = "LinStack_IPC_" + QString::fromLocal8Bit(qgetenv("USER"));
+        if (serverName == "LinStack_IPC_") {
+            serverName = "LinStack_IPC_default";
+        }
+
+        QLocalSocket clientSocket;
+        clientSocket.connectToServer(serverName);
+        if (clientSocket.waitForConnected(400)) {
+            LOG_INFO("Core", "LinStack is already running. Forwarding launch command via IPC...");
+            QString msg = launchPackage.isEmpty() ? "ACTIVATE" : ("LAUNCH:" + launchPackage);
+            clientSocket.write(msg.toUtf8() + "\n");
+            clientSocket.waitForBytesWritten(1000);
+            clientSocket.disconnectFromServer();
+            return 0;
+        }
+
+        QLocalServer::removeServer(serverName);
     }
 
     // Fast non-session pre-flight diagnostic check (kernel binder / modules)
@@ -93,7 +121,40 @@ int main(int argc, char *argv[])
     }
 
     MainWindow window;
+
+    if (!isScreenshotMode) {
+        QString serverName = "LinStack_IPC_" + QString::fromLocal8Bit(qgetenv("USER"));
+        if (serverName == "LinStack_IPC_") {
+            serverName = "LinStack_IPC_default";
+        }
+        auto *ipcServer = new QLocalServer(&app);
+        if (ipcServer->listen(serverName)) {
+            QObject::connect(ipcServer, &QLocalServer::newConnection, [ipcServer, &window]() {
+                while (QLocalSocket *client = ipcServer->nextPendingConnection()) {
+                    QObject::connect(client, &QLocalSocket::readyRead, [client, &window]() {
+                        QByteArray data = client->readAll();
+                        QString msg = QString::fromUtf8(data).trimmed();
+                        if (msg.startsWith("LAUNCH:")) {
+                            QString pkg = msg.mid(7).trimmed();
+                            LOG_INFO("Core", "IPC launch requested for package: " + pkg);
+                            window.bringToFront();
+                            window.launchApp(pkg);
+                        } else if (msg == "ACTIVATE") {
+                            window.bringToFront();
+                        }
+                    });
+                }
+            });
+        }
+    }
+
     window.show();
+
+    if (!launchPackage.isEmpty()) {
+        QTimer::singleShot(400, [&window, launchPackage]() {
+            window.launchApp(launchPackage);
+        });
+    }
 
     // Support CLI screenshot flags for headless validation and UI preview
     for (int i = 1; i < argc; ++i) {

@@ -21,6 +21,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+    void launchApp(const QString &packageName);
+    void bringToFront();
+
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -28,6 +31,7 @@ protected:
     void changeEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -71,6 +75,8 @@ private:
     QRect m_dragStartGeometry;
     QPoint m_dragStartMousePos;
     const int m_resizeBorderWidth = 8;
+
+    QString m_pendingLaunchPackage;
 };
 
 #endif // MAINWINDOW_H

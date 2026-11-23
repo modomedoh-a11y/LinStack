@@ -491,14 +491,14 @@ void LinstackService::launchFullUi()
         m_uiProcess->start();
     }
 
-    // Start 2-second retry timer if not already active and first frame not yet committed
+    // Start 4-second retry timer if not already active and first frame not yet committed
     if (!m_hasFirstFrame) {
         if (!m_uiRetryTimer) {
             m_uiRetryTimer = new QTimer(this);
             connect(m_uiRetryTimer, &QTimer::timeout, this, &LinstackService::retryFullUi);
         }
         if (!m_uiRetryTimer->isActive()) {
-            m_uiRetryTimer->start(2000);
+            m_uiRetryTimer->start(4000);
         }
     }
 }
@@ -516,19 +516,30 @@ void LinstackService::retryFullUi()
     }
 
     m_uiRetryCount++;
-    int maxRetries = m_wasAlreadyRunning ? 3 : 10;
+    // First-boot grace period: 15 retries (~60s at 4s intervals) so dex2oat is never killed prematurely
+    int maxRetries = 15;
     if (m_uiRetryCount >= maxRetries) {
-        // الجلسة السابقة مرتبطة بمقبس Wayland قديم مغلق -> نعيد تشغيل الجلسة للارتباط بالمقبس الجديد
-        LOG_WARN("UI", "Stale session detected (no frames after 4 retries). Rebinding session to new Wayland socket...");
+        LOG_WARN("UI", "First boot wait or stale session detected (no frames after 15 retries / ~60s). Checking Wayland socket...");
+
+        QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+        if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
+        QString socketPath = runtimeDir + "/wayland-linstack-0";
+
+        if (!QFileInfo::exists(socketPath)) {
+            LOG_WARN("UI", QString("Wayland socket missing at %1 -> requesting compositor restart before rebinding session...").arg(socketPath));
+            emit waylandCompositorRestartRequested();
+        }
+
+        LOG_WARN("UI", "Rebinding session to Wayland socket...");
         m_uiRetryCount = 0;
         if (m_uiRetryTimer) m_uiRetryTimer->stop();
         stopSession();
-        QTimer::singleShot(1500, this, &LinstackService::startSession);
+        QTimer::singleShot(2000, this, &LinstackService::startSession);
         return;
     }
 
     if (!m_uiProcess || m_uiProcess->state() == QProcess::NotRunning) {
-        LOG_INFO("UI", "Retrying show-full-ui (waiting for first surface frame)...");
+        LOG_INFO("UI", QString("Retrying show-full-ui [%1/%2] (waiting for Android first surface frame)...").arg(m_uiRetryCount).arg(maxRetries));
         launchFullUi();
     }
 }
@@ -935,25 +946,16 @@ void LinstackService::installApk(const QString &apkFilePath)
     }
 
     emit apkInstallStarted(apkFilePath);
-    emit logMessage("ADB Install", QString("Preparing installation for: %1 (%2 MB)")
+    emit logMessage("LinStack Install", QString("Preparing installation for: %1 (%2 MB)")
                     .arg(fi.fileName()).arg(fi.size() / (1024.0 * 1024.0), 0, 'f', 1));
 
-    executeAdbInstallProcess(apkFilePath);
+    executeInstallProcess(apkFilePath);
 }
 
-void LinstackService::executeAdbInstallProcess(const QString &apkPath)
+void LinstackService::executeInstallProcess(const QString &apkPath)
 {
     auto *proc = new QProcess(this);
     QString fileName = QFileInfo(apkPath).fileName();
-
-    QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
-    if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
-
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("XDG_RUNTIME_DIR", runtimeDir);
-    env.insert("WAYLAND_DISPLAY", "wayland-linstack-0");
-    env.insert("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
-    proc->setProcessEnvironment(env);
 
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, proc, apkPath, fileName]() {
         QString text = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
@@ -989,7 +991,18 @@ void LinstackService::executeAdbInstallProcess(const QString &apkPath)
         proc->deleteLater();
     });
 
-    // التثبيت الأصلي المباشر عبر محرك LinStack بدون الحاجة لـ adb
+    // Native installation via linstack app install resolved through PathResolver
+    // Passing arguments as QStringList safely preserves filepaths containing spaces
     PathResolver::configureProcess(proc, QStringList() << "app" << "install" << apkPath);
+
+    // Ensure session environment variables (XDG_RUNTIME_DIR, WAYLAND_DISPLAY) are active
+    QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
+    QProcessEnvironment env = proc->processEnvironment();
+    env.insert("XDG_RUNTIME_DIR", runtimeDir);
+    env.insert("WAYLAND_DISPLAY", "wayland-linstack-0");
+    env.insert("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
+    proc->setProcessEnvironment(env);
+
     proc->start();
 }

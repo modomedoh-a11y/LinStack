@@ -105,6 +105,7 @@ public:
     void stopSession();
     void launchFullUi();
     bool isSessionRunning() const;
+    bool isSessionActive() const { return m_sessionState == SessionState::Active; }
     SessionState sessionState() const { return m_sessionState; }
     void setHasFirstFrame(bool hasFrame);
     bool hasFirstFrame() const { return m_hasFirstFrame; }
@@ -137,6 +138,7 @@ signals:
     void containerStateChanged(LinstackService::ContainerState state);
     void sessionStateChanged(LinstackService::SessionState state);
     void adbConnectionStatusChanged(bool connected);
+    void waylandCompositorRestartRequested();
 
     // Error & Diagnostics
     void errorOccurred(LinstackService::ServiceError error, const QString &message, const QStringList &remediation);
@@ -170,7 +172,8 @@ private:
     void setContainerState(ContainerState state);
     void setSessionState(SessionState state);
     void executeScriptCommand(const QString &operationName, const QStringList &scriptArgs);
-    void executeAdbInstallProcess(const QString &apkPath);
+    void executeInstallProcess(const QString &apkPath);
+    void executeAdbInstallProcess(const QString &apkPath) { executeInstallProcess(apkPath); }
     QString findPythonInterpreter() const;
 
     ContainerState m_containerState = ContainerState::Stopped;

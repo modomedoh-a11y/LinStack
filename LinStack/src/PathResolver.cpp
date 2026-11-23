@@ -119,9 +119,8 @@ QString PathResolver::resolveLinstackExecutable()
         QDir::currentPath() + "/../LinStack_core/linstack.py",
         // 2. Standard system installation directories
         "/opt/linstack/LinStack_core/linstack.py",
-        "/opt/linstack/bin/LinStack",
-        QString(LIN_STACK_INSTALL_PREFIX) + "/bin/linstack",
         "/usr/local/bin/linstack",
+        QString(LIN_STACK_INSTALL_PREFIX) + "/bin/linstack",
         "/usr/bin/linstack"
     };
 

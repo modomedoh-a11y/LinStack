@@ -351,6 +351,15 @@ void InitializationDialog::handleProcessFinished(int exitCode, QProcess::ExitSta
         m_progressBar->setValue(100);
         m_lblStatus->setText("Container initialized successfully!");
         appendLog("LinStack container initialization completed successfully.", "#00FF66");
+
+        // Enable and start linstack-container.service immediately after first-run init
+        appendLog("Activating container daemon: systemctl enable --now linstack-container.service...", "#34D399");
+        if (!QStandardPaths::findExecutable("pkexec").isEmpty()) {
+            QProcess::execute("pkexec", QStringList() << "systemctl" << "enable" << "--now" << "linstack-container.service");
+        } else {
+            QProcess::execute("systemctl", QStringList() << "enable" << "--now" << "linstack-container.service");
+        }
+
         emit initializationSucceeded();
 
         QTimer::singleShot(800, this, &QDialog::accept);

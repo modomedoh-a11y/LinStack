@@ -256,6 +256,11 @@ void MainWindow::setupUi()
         if (m_service) {
             m_service->setHasFirstFrame(true);
         }
+        if (!m_pendingLaunchPackage.isEmpty()) {
+            QString pkg = m_pendingLaunchPackage;
+            m_pendingLaunchPackage.clear();
+            m_canvas->launchAndEmbedApp(pkg, pkg);
+        }
     });
 
     connect(m_canvas, &AndroidCanvas::waylandClientConnected, this, [this]() {
@@ -268,7 +273,7 @@ void MainWindow::setupUi()
             m_service->setDesiredResolution(scr.width(), scr.height());
             // تنفيذ أوامر linstack prop set الآن بعد جاهزية waydroidplatform
             // تأخير بسيط (1.5 ثانية) حتى يستقر SurfaceFlinger قبل تحديث الخصائص عبر Binder
-            QTimer::singleShot(1500, this, [scr]() {
+            QTimer::singleShot(1500, this, [this, scr]() {
                 QString widthStr = QString::number(scr.width());
                 QString heightStr = QString::number(scr.height());
 
@@ -276,6 +281,12 @@ void MainWindow::setupUi()
                 PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.linstack.height" << heightStr);
                 PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.waydroid.width" << widthStr);
                 PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.waydroid.height" << heightStr);
+
+                if (!m_pendingLaunchPackage.isEmpty()) {
+                    QString pkg = m_pendingLaunchPackage;
+                    m_pendingLaunchPackage.clear();
+                    m_canvas->launchAndEmbedApp(pkg, pkg);
+                }
             });
             m_service->launchFullUi();
         }
@@ -335,6 +346,13 @@ void MainWindow::setupUi()
     connect(m_service, &LinstackService::adbConnectionStatusChanged, this, [this](bool connected) {
         if (connected) {
             m_canvas->showToast("ADB Bridge Active: Connected to 127.0.0.1:5555");
+        }
+    });
+
+    connect(m_service, &LinstackService::waylandCompositorRestartRequested, this, [this]() {
+        LOG_WARN("MainWindow", "Service requested Wayland compositor restart -> reinitializing Wayland socket...");
+        if (m_canvas) {
+            m_canvas->initWaylandCompositor();
         }
     });
 
@@ -536,10 +554,13 @@ void MainWindow::handleKeymapperToggle(bool active)
     m_canvas->setKeymapperVisible(active);
     if (active && m_canvas->keymapperOverlay()) {
         m_canvas->keymapperOverlay()->setMode(KeymapperOverlay::Mode::Play);
-        m_canvas->keymapperOverlay()->raise();
-        m_canvas->keymapperOverlay()->setFocus(Qt::OtherFocusReason);
+        m_canvas->keymapperOverlay()->setKeymappingActive(true);
         m_canvas->showToast("⌨ Keymapping Enabled (Right-click icon or press Shortcut to edit)", 2500);
     } else {
+        if (m_canvas->keymapperOverlay()) {
+            m_canvas->keymapperOverlay()->setKeymappingActive(false);
+        }
+        m_canvas->setFocusPolicy(Qt::StrongFocus);
         m_canvas->setFocus(Qt::OtherFocusReason);
         m_canvas->showToast("⌨ Keymapping Disabled", 2000);
     }
@@ -1058,7 +1079,55 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
             }
         }
 
+        if (m_canvas && !m_sideToolBar->isKeymapperActive()) {
+            QCoreApplication::sendEvent(m_canvas, event);
+            if (event->isAccepted()) {
+                return;
+            }
+        }
+
         QMainWindow::keyPressEvent(event);
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent *event)
+{
+    if (m_canvas && !m_sideToolBar->isKeymapperActive()) {
+        QCoreApplication::sendEvent(m_canvas, event);
+        if (event->isAccepted()) {
+            return;
+        }
+    }
+    QMainWindow::keyReleaseEvent(event);
+}
+
+void MainWindow::bringToFront()
+{
+    setWindowState((windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+    show();
+    raise();
+    activateWindow();
+}
+
+void MainWindow::launchApp(const QString &packageName)
+{
+    if (packageName.isEmpty()) return;
+
+    bringToFront();
+
+    if (!isContainerInitialized()) {
+        m_pendingLaunchPackage = packageName;
+        promptFirstTimeInitialization();
+        return;
+    }
+
+    if (m_canvas && m_service && m_service->isSessionActive()) {
+        m_canvas->launchAndEmbedApp(packageName, packageName);
+    } else {
+        m_pendingLaunchPackage = packageName;
+        if (m_service && !m_service->isSessionActive()) {
+            m_service->startSession();
+        }
+    }
 }
 
 void MainWindow::paintEvent(QPaintEvent *event)
