@@ -262,7 +262,7 @@ During container initialization, LinStack invokes `pkexec` to run elevated setup
   ```bash
   sudo linstack init
   ```
-
+# Some features are not working till now and it is still under development but usable.
 ---
 
 ## Uninstallation
