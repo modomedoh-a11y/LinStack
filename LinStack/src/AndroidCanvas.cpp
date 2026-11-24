@@ -50,6 +50,7 @@ extern "C" {
 #include "PathResolver.h"
 #include "Logger.h"
 
+#include "wlr_c_bridge.h"
 #include "EmbeddedCompositor.h"
 #include "WaylandSurfaceRenderer.h"
 #include "AspectRatioWindow.h"
@@ -775,16 +776,8 @@ void AndroidCanvas::initWaylandCompositor()
     m_compositor->onSurfaceMapped = [this](struct wlr_surface *surface) {
         Q_UNUSED(surface);
         QMetaObject::invokeMethod(this, [this]() {
-            LOG_INFO("AndroidCanvas", ">>> Android Container surface mapped to native OpenGL viewport <<<");
+            LOG_INFO("AndroidCanvas", ">>> Android Container surface mapped (waiting for first buffer) <<<");
             m_simulatedActive = true;
-            if (!m_hasFirstFrame) {
-                m_hasFirstFrame = true;
-                emit firstFrameRendered();
-            }
-            if (m_stack) {
-                m_stack->hide();
-            }
-            showToast("LinStack Android 13 Display Surface Active", 3000);
             update();
         }, Qt::QueuedConnection);
     };
@@ -803,7 +796,7 @@ void AndroidCanvas::initWaylandCompositor()
         if (m_compositor && surface != m_compositor->getRenderableSurface()) {
             return;
         }
-        if (!m_hasFirstFrame) {
+        if (!m_hasFirstFrame && wlr_bridge_surface_has_buffer(surface)) {
             m_hasFirstFrame = true;
             QMetaObject::invokeMethod(this, [this]() {
                 LOG_INFO("AndroidCanvas", ">>> First Android surface buffer committed — signalling firstFrameRendered <<<");
@@ -1127,6 +1120,11 @@ void AndroidCanvas::keyPressEvent(QKeyEvent *event)
             }
         }
     } else {
+        if ((event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
+            event->key() == Qt::Key_F11) {
+            event->ignore();
+            return;
+        }
         // When Keymapping is OFF, forward 100% of native keyPressEvent to Wayland wl_keyboard
         if (m_inputMapper && activeSurface) {
             quint32 scanCode = event->nativeScanCode();
@@ -1167,6 +1165,11 @@ void AndroidCanvas::keyReleaseEvent(QKeyEvent *event)
             }
         }
     } else {
+        if ((event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
+            event->key() == Qt::Key_F11) {
+            event->ignore();
+            return;
+        }
         // When Keymapping is OFF, forward 100% of native keyReleaseEvent to Wayland wl_keyboard
         if (m_inputMapper && activeSurface) {
             quint32 scanCode = event->nativeScanCode();

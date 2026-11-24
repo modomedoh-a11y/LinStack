@@ -365,13 +365,22 @@ void LinstackService::startSession()
         return;
     }
 
-    // If session is already active or running, immediately trigger show-full-ui without hanging on session start
+    // If session is already running: display it immediately first, and only rebind if no frame arrives after 8s
     m_wasAlreadyRunning = isSessionRunning();
     if (m_wasAlreadyRunning) {
         LOG_INFO("Session", "Active LinStack container session detected (RUNNING). Immediately triggering show-full-ui on wayland-linstack-0...");
         emit logMessage("Session", "Active session running. Triggering show-full-ui immediately...");
         setSessionState(SessionState::Active);
         launchFullUi();
+
+        QTimer::singleShot(8000, this, [this]() {
+            if (!m_hasFirstFrame && !m_isStopping && m_wasAlreadyRunning) {
+                LOG_WARN("Session", "Pre-existing RUNNING session produced no frames after 8s (orphaned socket). Rebinding session...");
+                m_wasAlreadyRunning = false;
+                stopSession();
+                QTimer::singleShot(1500, this, &LinstackService::startSession);
+            }
+        });
         return;
     }
 
@@ -426,11 +435,6 @@ void LinstackService::checkSessionStartupStatus()
         // Resolution already written to container config before boot
         emit logMessage("Session", "LinStack session is confirmed RUNNING. Launching UI...");
         LOG_INFO("Session", "LinStack session is confirmed RUNNING. Launching UI...");
-        launchFullUi();
-    } else if (m_sessionPollCount >= 30) {
-        if (m_sessionPollTimer) m_sessionPollTimer->stop();
-        emit logMessage("Session", "Session status poll timed out after 12s. Attempting show-full-ui fallback...");
-        LOG_WARN("Session", "Session status poll timed out after 12s. Attempting show-full-ui fallback...");
         launchFullUi();
     }
 }
@@ -516,30 +520,8 @@ void LinstackService::retryFullUi()
     }
 
     m_uiRetryCount++;
-    // First-boot grace period: 15 retries (~60s at 4s intervals) so dex2oat is never killed prematurely
-    int maxRetries = 15;
-    if (m_uiRetryCount >= maxRetries) {
-        LOG_WARN("UI", "First boot wait or stale session detected (no frames after 15 retries / ~60s). Checking Wayland socket...");
-
-        QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
-        if (runtimeDir.isEmpty()) runtimeDir = "/tmp";
-        QString socketPath = runtimeDir + "/wayland-linstack-0";
-
-        if (!QFileInfo::exists(socketPath)) {
-            LOG_WARN("UI", QString("Wayland socket missing at %1 -> requesting compositor restart before rebinding session...").arg(socketPath));
-            emit waylandCompositorRestartRequested();
-        }
-
-        LOG_WARN("UI", "Rebinding session to Wayland socket...");
-        m_uiRetryCount = 0;
-        if (m_uiRetryTimer) m_uiRetryTimer->stop();
-        stopSession();
-        QTimer::singleShot(2000, this, &LinstackService::startSession);
-        return;
-    }
-
     if (!m_uiProcess || m_uiProcess->state() == QProcess::NotRunning) {
-        LOG_INFO("UI", QString("Retrying show-full-ui [%1/%2] (waiting for Android first surface frame)...").arg(m_uiRetryCount).arg(maxRetries));
+        LOG_INFO("UI", QString("Waiting for Android first surface frame (attempt %1)...").arg(m_uiRetryCount));
         launchFullUi();
     }
 }

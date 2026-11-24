@@ -826,6 +826,76 @@ void MainWindow::handleDiagnostics()
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (event->type() == QEvent::KeyPress && isActiveWindow()) {
+        // تجاهل الاختصارات إذا كان المستخدم يكتب في مربع نص أو داخل نافذة حوار منبثقة
+        if (!qobject_cast<QLineEdit*>(QApplication::focusWidget()) && !QApplication::activeModalWidget()) {
+            auto *ke = static_cast<QKeyEvent*>(event);
+            int key = ke->key();
+            if (key != Qt::Key_Control && key != Qt::Key_Shift && key != Qt::Key_Alt && key != Qt::Key_Meta) {
+                QKeySequence pressedSeq(QKeyCombination(ke->modifiers(), static_cast<Qt::Key>(key)));
+                QSettings settings("LinStack", "LinStack");
+                auto matchesShortcut = [&](const QString &id, const QString &defSeq) {
+                    QString saved = settings.value("shortcuts/" + id, defSeq).toString();
+                    return !saved.isEmpty() && QKeySequence::fromString(saved, QKeySequence::PortableText) == pressedSeq;
+                };
+
+                if (matchesShortcut("keymapper_toggle", "Ctrl+Shift+M")) {
+                    bool nextActive = !m_sideToolBar->isKeymapperActive();
+                    m_sideToolBar->setKeymapperActive(nextActive);
+                    handleKeymapperToggle(nextActive);
+                    return true;
+                }
+                if (matchesShortcut("keymapper", "Ctrl+Shift+K")) {
+                    handleKeymapperEdit();
+                    return true;
+                }
+                if (matchesShortcut("eco_mode", "Ctrl+Shift+E")) {
+                    bool eco = !m_sideToolBar->isEcoModeActive();
+                    m_sideToolBar->setEcoModeActive(eco);
+                    handleEcoModeToggle(eco);
+                    return true;
+                }
+                if (matchesShortcut("screenshot", "Ctrl+Shift+S")) {
+                    handleScreenshot();
+                    return true;
+                }
+                if (matchesShortcut("boss_key", "Ctrl+Shift+H")) {
+                    showMinimized();
+                    return true;
+                }
+                if (matchesShortcut("fullscreen", "F11")) {
+                    handleFullscreenToggle();
+                    return true;
+                }
+                if (matchesShortcut("aim_lock", "Ctrl+Alt") ||
+                    ((ke->modifiers() & Qt::ControlModifier) && (ke->modifiers() & Qt::AltModifier))) {
+                    if (m_canvas->keymapperOverlay() && m_canvas->keymapperOverlay()->translator()) {
+                        auto *tr = m_canvas->keymapperOverlay()->translator();
+                        tr->setAimLockActive(!tr->isAimLockActive());
+                    }
+                    return true;
+                }
+                if ((ke->modifiers() & Qt::ControlModifier) && (ke->modifiers() & Qt::ShiftModifier) && key == Qt::Key_D) {
+                    if (m_healer) {
+                        HealthReport rep = m_healer->engine()->latestReport();
+                        if (rep.checks.isEmpty()) {
+                            m_healer->startDiagnosticsAsync(false, this);
+                        } else {
+                            m_healer->showRecoveryDialog(rep, this);
+                        }
+                    }
+                    return true;
+                }
+                if (key == Qt::Key_Escape && isFullScreen()) {
+                    showNormal();
+                    m_titleBar->show();
+                    m_sideToolBar->show();
+                    return true;
+                }
+            }
+        }
+    }
+
     if (!m_resizing && !isMaximized() && !isFullScreen()) {
         if (event->type() == QEvent::Leave && watched == this) {
             setCursor(Qt::ArrowCursor);
@@ -1079,8 +1149,11 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
             }
         }
 
-        if (m_canvas && !m_sideToolBar->isKeymapperActive()) {
+        static bool s_forwardingPress = false;
+        if (!s_forwardingPress && m_canvas && !m_sideToolBar->isKeymapperActive()) {
+            s_forwardingPress = true;
             QCoreApplication::sendEvent(m_canvas, event);
+            s_forwardingPress = false;
             if (event->isAccepted()) {
                 return;
             }
@@ -1091,8 +1164,11 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event)
 {
-    if (m_canvas && !m_sideToolBar->isKeymapperActive()) {
+    static bool s_forwardingRelease = false;
+    if (!s_forwardingRelease && m_canvas && !m_sideToolBar->isKeymapperActive()) {
+        s_forwardingRelease = true;
         QCoreApplication::sendEvent(m_canvas, event);
+        s_forwardingRelease = false;
         if (event->isAccepted()) {
             return;
         }
