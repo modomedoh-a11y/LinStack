@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(LinStack
     VERSION 1.0.0
-    DESCRIPTION "High-performance Linux-native Android emulator inspired by MSI App Player"
+    DESCRIPTION "High-performance Linux-native Android emulator"
     LANGUAGES C CXX
 )
 
