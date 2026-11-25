@@ -1,5 +1,5 @@
 <img align="left" src="LinStack/LinStack_core/data/AppIcon.png" width="64">
-# LinStack
+ LinStack
 
 LinStack is a high-performance, Linux-native Android emulation and containerized gaming environment. It integrates an embedded **wlroots** Wayland compositor, zero-copy DMA-BUF OpenGL ES hardware rendering, an ultra-low latency `uinput` touch and keymapping bridge, and a modern Qt desktop UI.
 
