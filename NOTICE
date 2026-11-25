@@ -1,0 +1,69 @@
+LinStack - Native Android Gaming Environment for Linux
+Copyright (C) 2026 modomedoh-a11y and LinStack Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+========================================================================
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+========================================================================
+
+LinStack incorporates, builds upon, or interfaces with the following
+open-source software components. Original copyrights and licenses
+remain with their respective authors:
+
+1. Waydroid (LinStack_core)
+   - Description: Container-based approach to boot a full Android system
+     on a regular GNU/Linux system.
+   - Copyright: (C) 2021-2026 Erfan Abdi, Oliver Smith, Alessandro Astone,
+     and the Waydroid Project Contributors.
+   - Website: https://github.com/waydroid/waydroid
+   - License: GNU General Public License v3.0 (GPL-3.0-or-later)
+   - Modifications: Rebranded and adapted container management, D-Bus
+     interfaces, and LXC configurations for LinStack integration.
+
+2. Waydroid Extras Script (LinStack_Scripts)
+   - Description: Helper scripts for installing optional extensions and
+     translation layers into the container.
+   - Copyright: (C) 2022-2025 casualsnek and contributors.
+   - Website: https://github.com/casualsnek/waydroid_script
+   - License: GNU General Public License v3.0 (GPL-3.0)
+
+3. wlroots & Wayland Protocols (wlroots_engine)
+   - Description: Modular Wayland compositor library used for embedded
+     headless surface composition and zero-copy DMA-BUF rendering.
+   - Copyright: (C) 2017-2026 Drew DeVault and wlroots contributors.
+   - Website: https://gitlab.freedesktop.org/wlroots/wlroots
+   - License: MIT License
+
+4. nlohmann/json (wlroots_engine/include/nlohmann/json.hpp)
+   - Description: JSON for Modern C++.
+   - Copyright: (C) 2013-2026 Niels Lohmann.
+   - Website: https://github.com/nlohmann/json
+   - License: MIT License
+
+5. Qt 6 Framework (LinStack UI)
+   - Description: Cross-platform C++ application and UI framework.
+   - Copyright: (C) The Qt Company Ltd.
+   - Website: https://www.qt.io/
+   - License: GNU Lesser General Public License v3.0 (LGPL-3.0) / GPL-3.0
+
+6. libevdev & Linux uinput
+   - Description: Wrapper library for evdev devices and kernel virtual
+     multi-touch event injection.
+   - Copyright: (C) Red Hat, Inc. and Linux Kernel Contributors.
+   - License: MIT License / GPL-2.0-only (Linux-syscall-note)
+
+========================================================================
+TRADEMARK & EXTERNAL IMAGES DISCLAIMER
+========================================================================
+
+- "Android" and "LineageOS" are trademarks of their respective owners.
+  LinStack is an independent open-source project and is not affiliated
+  with, endorsed by, or sponsored by Google LLC or the LineageOS Project.
+- System and vendor images (LineageOS), Google Play Services (GApps /
+  MicroG), and binary translation layers (libndk / libhoudini) are NOT
+  bundled with or distributed by LinStack. Users download these components
+  directly from their respective third-party sources at runtime.
