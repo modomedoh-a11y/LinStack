@@ -30,6 +30,7 @@ struct KeyNode {
     float relX = 0.5f;
     float relY = 0.5f;
     int32_t touchSlot = 3;
+    int mouseButton = 0;
 };
 
 struct DpadConfig {
@@ -46,6 +47,7 @@ struct DpadConfig {
 struct AimLockNodeConfig {
     std::string id;
     uint32_t toggleScanCode = 67; // F1 (evdev 59 + 8)
+    int toggleMouseButton = 0;
     float centerX = 0.50f;
     float centerY = 0.50f;
     float fireX = 0.82f;
@@ -61,6 +63,7 @@ struct AimLockNodeConfig {
 struct BurstTapConfig {
     std::string id;
     uint32_t scanCode = 0;
+    int mouseButton = 0;
     float relX = 0.5f;
     float relY = 0.5f;
     int burstHz = 10;
@@ -69,6 +72,7 @@ struct BurstTapConfig {
 struct FreeLookConfig {
     std::string id;
     uint32_t holdScanCode = 0;
+    int holdMouseButton = 0;
     float centerX = 0.5f;
     float centerY = 0.5f;
     float sensitivityX = 1.2f;
@@ -79,6 +83,7 @@ struct FreeLookConfig {
 struct SwipeConfig {
     std::string id;
     uint32_t scanCode = 0;
+    int mouseButton = 0;
     float startX = 0.5f;
     float startY = 0.7f;
     float endX = 0.5f;
@@ -90,6 +95,7 @@ struct SwipeConfig {
 struct SmartCastConfig {
     std::string id;
     uint32_t scanCode = 0;
+    int mouseButton = 0;
     float centerX = 0.75f;
     float centerY = 0.75f;
     float castRadius = 160.0f;
@@ -111,13 +117,15 @@ public:
     // Hardware Scancode Event Handlers (works across all keyboard languages)
     bool handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surface);
     bool handleScanCodeUp(uint32_t scanCode, struct wlr_surface *surface);
+    bool handleMappedMouseDown(int button, struct wlr_surface *surface);
+    bool handleMappedMouseUp(int button, struct wlr_surface *surface);
     void forwardNativeKey(uint32_t scanCode, bool pressed, struct wlr_surface *surface);
     void sendSystemKey(uint32_t evdevKeyCode, struct wlr_surface *surface);
     void sendRecentsCombo(struct wlr_surface *surface);
 
     bool handleMouseDown(int button, int winX, int winY, struct wlr_surface *surface);
     bool handleMouseUp(int button, int winX, int winY, struct wlr_surface *surface);
-    bool handleMouseMove(int winX, int winY, int deltaX, int deltaY, struct wlr_surface *surface);
+    bool handleMouseMove(int winX, int winY, float deltaX, float deltaY, struct wlr_surface *surface);
 
     // Periodic tick for BurstTap and Swipe animations
     void tick(struct wlr_surface *surface);
@@ -178,23 +186,30 @@ private:
 
     std::set<uint32_t> m_heldScanCodes;
     std::set<int32_t> m_activeSlots;
-    std::unordered_map<uint32_t, int32_t> m_scanCodeToSlot;
+    std::unordered_map<uint32_t, std::vector<int32_t>> m_scanCodeToSlots;
 
     bool m_dpadActive = false;
     int32_t m_activeDpadSlot = -1;
 
     bool m_aimLockActive = false;
+    bool m_aimSuspendedByFreeLook = false;
+    int m_suspendedAimIndex = -1;
     int m_activeAimIndex = -1;
     int32_t m_activeAimCameraSlot = -1;
     int32_t m_pendingReleaseCameraSlot = -1;
+    bool m_aimNeedsTouchDown = true;
+    float m_smoothAimDx = 0.0f;
+    float m_smoothAimDy = 0.0f;
     int32_t m_activeAimFireSlot = -1;
     bool m_firing = false;
+    std::unordered_map<int, std::vector<int32_t>> m_mouseBtnToSlots;
 
     bool m_isTouching = false;
     int32_t m_activeMouseSlot = -1;
 
     float m_accumAimX = 0.0f;
     float m_accumAimY = 0.0f;
+    uint32_t m_lastAimMoveMs = 0;
 
     // Burst Tap state
     struct ActiveBurst {
@@ -203,7 +218,7 @@ private:
         uint32_t lastClickMs = 0;
         bool isDown = false;
     };
-    std::unordered_map<uint32_t, ActiveBurst> m_activeBursts;
+    std::unordered_map<uint32_t, std::vector<ActiveBurst>> m_activeBursts;
 
     // Free Look state
     bool m_freeLookActive = false;
@@ -221,12 +236,15 @@ private:
     };
     std::vector<ActiveSwipe> m_activeSwipes;
 
-    // Smart Cast state
+    // Smart Cast state (supports multiple Smart Cast buttons bound to the same key)
+    struct ActiveSmartCast {
+        SmartCastConfig cfg;
+        int32_t slot = -1;
+        float accumX = 0.0f;
+        float accumY = 0.0f;
+    };
     bool m_smartCasting = false;
-    SmartCastConfig m_activeSmartCast;
-    int32_t m_activeSmartCastSlot = -1;
-    float m_smartCastAccumX = 0.0f;
-    float m_smartCastAccumY = 0.0f;
+    std::vector<ActiveSmartCast> m_activeSmartCasts;
 };
 
 #endif // INPUT_MAPPER_H

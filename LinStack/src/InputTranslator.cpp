@@ -1,5 +1,6 @@
 #include "InputTranslator.h"
 #include "UInputTouchBridge.h"
+#include "ScriptEngine.h"
 #include <cmath>
 #include <algorithm>
 
@@ -34,7 +35,7 @@ void InputTranslator::setScreenGeometry(int width, int height)
 void InputTranslator::setNodes(const QList<KeyBindingNode> &nodes)
 {
     m_nodes = nodes;
-    // تصفير D-Pad و FreeLook أولاً حتى لا يعملا إذا قام المستخدم بحذفهما
+    // Reset D-Pad and FreeLook states first so they do not trigger if deleted by the user
     m_dpadNode = KeyBindingNode();
     m_dpadNode.scanUp = 0; m_dpadNode.scanDown = 0; m_dpadNode.scanLeft = 0; m_dpadNode.scanRight = 0;
     m_freeLookNode = KeyBindingNode();
@@ -187,6 +188,18 @@ bool InputTranslator::handleScanCodePress(quint32 scanCode, int fallbackKey)
                     emit smartCastAimUpdated(node.id, QPointF(cx, cy), QPointF(cx, cy));
                     return true;
                 }
+                if (node.type == KeyNodeType::Macro) {
+                    if (!node.macroScript.trimmed().isEmpty()) {
+                        if (!m_scriptEngine && m_bridge) {
+                            m_scriptEngine = new ScriptEngine(m_bridge, this);
+                        }
+                        if (m_scriptEngine) {
+                            m_scriptEngine->loadScript(node.macroScript);
+                            m_scriptEngine->execute();
+                        }
+                    }
+                    return true;
+                }
                 if (node.type == KeyNodeType::Tap) {
                     int slot = -1;
                     for (int s = 5; s < 10; ++s) {
@@ -216,7 +229,7 @@ bool InputTranslator::handleScanCodeRelease(quint32 scanCode, int fallbackKey)
     if (scanCode == 0) return false;
     m_heldScanCodes.remove(scanCode);
 
-    // تحرير Free Look فور رفع اليد عن الزر
+    // Release Free Look immediately upon key release
     if (m_freeLookActive && m_freeLookNode.primaryScanCode == scanCode) {
         m_freeLookActive = false;
         if (m_bridge) m_bridge->touchUp(6);
@@ -326,7 +339,7 @@ void InputTranslator::processSwipeStep()
     int currentX = 0;
     int currentY = 0;
 
-    // إذا كان للزر مسار حر مرسوم يدوياً (Freehand Swipe)، نتتبع نقاط المسار بدقة
+    // If the node has a custom freehand path, interpolate accurately along waypoints
     if (m_activeSwipeNode.pathPoints.size() >= 2) {
         const auto &pts = m_activeSwipeNode.pathPoints;
         qreal scaledPos = progress * (pts.size() - 1);
@@ -360,7 +373,7 @@ bool InputTranslator::handleMouseMove(int deltaX, int deltaY, const QPoint &glob
 {
     m_lastMousePos = globalPos;
 
-    // 1. Smart Cast: يحرك نقطة الإلقاء نحو مؤشر الماوس (أو بالإزاحة النسبية إذا كان المؤشر مقفلاً)
+    // 1. Smart Cast: move cast point toward mouse cursor (or via relative delta when pointer is locked)
     if (m_smartCasting) {
         int cx = static_cast<int>(m_activeSmartCastNode.relX * m_screenWidth);
         int cy = static_cast<int>(m_activeSmartCastNode.relY * m_screenHeight);
@@ -397,7 +410,7 @@ bool InputTranslator::handleMouseMove(int deltaX, int deltaY, const QPoint &glob
         return true;
     }
 
-    // 2. Free Look (يعمل أثناء الضغط المستمر على الزر فقط)
+    // 2. Free Look (active only while hold key is pressed)
     if (m_freeLookActive) {
         int cx = static_cast<int>(m_freeLookNode.relX * m_screenWidth);
         int cy = static_cast<int>(m_freeLookNode.relY * m_screenHeight);
@@ -432,7 +445,7 @@ bool InputTranslator::handleMouseMove(int deltaX, int deltaY, const QPoint &glob
         return true;
     }
 
-    // 3. Aim Lock (تبديل بالضغط)
+    // 3. Aim Lock (toggle on press)
     if (m_aimLockActive && m_activeAimIndex >= 0 && m_activeAimIndex < m_nodes.size()) {
         const auto &aim = m_nodes[m_activeAimIndex];
         int cx = static_cast<int>(aim.relX * m_screenWidth);
@@ -512,11 +525,11 @@ void InputTranslator::startBurstTap(const KeyBindingNode &node)
     const int px = static_cast<int>(node.relX * m_screenWidth);
     const int py = static_cast<int>(node.relY * m_screenHeight);
 
-    // سرعة الضغط من 1 إلى 100 ضغطة في الثانية
+    // Click rate from 1 to 100 clicks per second
     const int hz = qBound(1, node.burstHz, 100);
     const int intervalMs = qMax(10, 1000 / hz);
 
-    // تنفيذ أول ضغطة فوراً دون انتظار
+    // Execute first tap immediately without delay
     if (m_bridge) {
         m_bridge->touchDown(slot, px, py);
         m_bridge->touchUp(slot);

@@ -21,19 +21,16 @@ public:
     void setKeymapperActive(bool active);
 
 signals:
-    // 15 Action buttons
+    // Action buttons
     void fullscreenClicked();
     void volumeUpClicked();
     void volumeDownClicked();
     void keymapperToggled(bool active);
     void keymapperEditRequested();
-    void macroClicked();
-    void rotateClicked();
     void ecoModeToggled(bool active);
     void installApkClicked();
     void screenshotClicked();
     void fileManagerClicked();
-    void ramTrimClicked();
     void multiInstanceClicked();
     void settingsClicked();
 
@@ -49,18 +46,15 @@ private:
     void setupUi();
     QPushButton *createToolButton(const QString &tooltip, Theme::IconType iconType, const char *slot = nullptr);
 
-    // 15 Buttons
+    // Tool buttons
     QPushButton *m_btnFullscreen = nullptr;
     QPushButton *m_btnVolumeUp = nullptr;
     QPushButton *m_btnVolumeDown = nullptr;
     QPushButton *m_btnKeymapper = nullptr;
-    QPushButton *m_btnMacro = nullptr;
-    QPushButton *m_btnRotate = nullptr;
     QPushButton *m_btnEcoMode = nullptr;
     QPushButton *m_btnInstallApk = nullptr;
     QPushButton *m_btnScreenshot = nullptr;
     QPushButton *m_btnFileManager = nullptr;
-    QPushButton *m_btnRamTrim = nullptr;
     QPushButton *m_btnMultiInstance = nullptr;
     QPushButton *m_btnSettings = nullptr;
 

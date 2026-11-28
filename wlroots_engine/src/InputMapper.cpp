@@ -146,6 +146,13 @@ void InputMapper::setAimLockActive(bool active, int nodeIndex) {
     m_activeAimIndex = active ? nodeIndex : -1;
     m_accumAimX = 0.0f;
     m_accumAimY = 0.0f;
+    m_lastAimMoveMs = 0;
+    m_smoothAimDx = 0.0f;
+    m_smoothAimDy = 0.0f;
+    m_aimNeedsTouchDown = true;
+    if (!active && !m_aimSuspendedByFreeLook) {
+        m_suspendedAimIndex = -1;
+    }
 }
 
 void InputMapper::tick(struct wlr_surface *surface) {
@@ -154,21 +161,35 @@ void InputMapper::tick(struct wlr_surface *surface) {
     if (!rootSurf) rootSurf = surface;
     uint32_t now = getTimestampMs();
 
-    // 1. Burst Tap
+    // 0. Aim Lock Idle Reset: silently reset touch point to anchor after 450ms of mouse idle
+    if (m_aimLockActive && !m_freeLookActive && m_activeAimCameraSlot >= 0 && m_lastAimMoveMs > 0) {
+        if (now - m_lastAimMoveMs >= 450) {
+            wlr_bridge_seat_touch_notify_up(m_seat, now, m_activeAimCameraSlot);
+            wlr_bridge_seat_touch_notify_frame(m_seat);
+            releaseSlot(m_activeAimCameraSlot);
+            m_activeAimCameraSlot = -1;
+            m_accumAimX = 0.0f;
+            m_accumAimY = 0.0f;
+            m_lastAimMoveMs = 0;
+        }
+    }
+
+    // 1. Burst Tap (supports triggering multiple Burst buttons simultaneously)
     for (auto &kv : m_activeBursts) {
-        ActiveBurst &b = kv.second;
-        uint32_t intervalMs = static_cast<uint32_t>(std::max(10, 1000 / std::clamp(b.cfg.burstHz, 1, 100)));
-        if (b.isDown && (now - b.lastClickMs >= intervalMs / 2)) {
-            wlr_bridge_seat_touch_notify_up(m_seat, now, b.slot);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            b.isDown = false;
-        } else if (!b.isDown && (now - b.lastClickMs >= intervalMs)) {
-            double tx = b.cfg.relX * m_androidWidth;
-            double ty = b.cfg.relY * m_androidHeight;
-            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, b.slot, tx, ty);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            b.isDown = true;
-            b.lastClickMs = now;
+        for (ActiveBurst &b : kv.second) {
+            uint32_t intervalMs = static_cast<uint32_t>(std::max(10, 1000 / std::clamp(b.cfg.burstHz, 1, 100)));
+            if (b.isDown && (now - b.lastClickMs >= intervalMs / 2)) {
+                wlr_bridge_seat_touch_notify_up(m_seat, now, b.slot);
+                wlr_bridge_seat_touch_notify_frame(m_seat);
+                b.isDown = false;
+            } else if (!b.isDown && (now - b.lastClickMs >= intervalMs)) {
+                double tx = b.cfg.relX * m_androidWidth;
+                double ty = b.cfg.relY * m_androidHeight;
+                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, b.slot, tx, ty);
+                wlr_bridge_seat_touch_notify_frame(m_seat);
+                b.isDown = true;
+                b.lastClickMs = now;
+            }
         }
     }
 
@@ -343,14 +364,15 @@ bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surf
     }
 
     m_heldScanCodes.insert(scanCode);
+    bool handled = false;
 
     if (scanCode == m_dpad.scanUp || scanCode == m_dpad.scanDown ||
         scanCode == m_dpad.scanLeft || scanCode == m_dpad.scanRight) {
         updateDpad(surface);
-        return true;
+        handled = true;
     }
 
-    if (!m_seat || !surface) return false;
+    if (!m_seat || !surface) return handled;
     struct wlr_surface *rootSurf = wlr_bridge_surface_get_root_surface(surface);
     if (!rootSurf) rootSurf = surface;
     uint32_t now = getTimestampMs();
@@ -359,36 +381,50 @@ bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surf
     for (int i = 0; i < static_cast<int>(m_freeLookNodes.size()); ++i) {
         if (m_freeLookNodes[i].holdScanCode == scanCode) {
             if (!m_freeLookActive) {
+                if (m_aimLockActive) {
+                    m_aimSuspendedByFreeLook = true;
+                    m_suspendedAimIndex = m_activeAimIndex;
+                    setAimLockActive(false, -1);
+                    m_aimSuspendedByFreeLook = true;
+                }
                 m_freeLookActive = true;
                 m_activeFreeLookIndex = i;
                 m_accumFreeLookX = 0.0f;
                 m_accumFreeLookY = 0.0f;
             }
-            return true;
+            handled = true;
+            break;
         }
     }
 
-    // 2. Burst Tap
-    for (const auto &bn : m_burstNodes) {
-        if (bn.scanCode == scanCode) {
-            if (m_activeBursts.find(scanCode) == m_activeBursts.end()) {
+    // 2. Burst Tap (trigger all Burst buttons bound to this key simultaneously)
+    if (m_activeBursts.find(scanCode) == m_activeBursts.end()) {
+        std::vector<ActiveBurst> bursts;
+        for (const auto &bn : m_burstNodes) {
+            if (bn.scanCode == scanCode) {
                 ActiveBurst ab;
                 ab.cfg = bn;
                 ab.slot = allocateSlot();
                 ab.lastClickMs = now;
                 ab.isDown = true;
-                m_activeBursts[scanCode] = ab;
+                bursts.push_back(ab);
 
                 double tx = bn.relX * m_androidWidth;
                 double ty = bn.relY * m_androidHeight;
                 wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, ab.slot, tx, ty);
-                wlr_bridge_seat_touch_notify_frame(m_seat);
             }
-            return true;
         }
+        if (!bursts.empty()) {
+            wlr_bridge_seat_touch_notify_frame(m_seat);
+            m_activeBursts[scanCode] = std::move(bursts);
+            handled = true;
+        }
+    } else {
+        handled = true;
     }
 
-    // 3. Swipe
+    // 3. Swipe (trigger all Swipe paths bound to this key simultaneously)
+    bool anySwipe = false;
     for (const auto &sw : m_swipeNodes) {
         if (sw.scanCode == scanCode) {
             ActiveSwipe as;
@@ -400,62 +436,85 @@ bool InputMapper::handleScanCodeDown(uint32_t scanCode, struct wlr_surface *surf
             double sx = sw.startX * m_androidWidth;
             double sy = sw.startY * m_androidHeight;
             wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, as.slot, sx, sy);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            return true;
+            anySwipe = true;
         }
     }
+    if (anySwipe) {
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+        handled = true;
+    }
 
-    // 4. Smart Cast
+    // 4. Smart Cast (trigger all Smart Cast buttons bound to this key simultaneously)
+    bool anySmartCast = false;
     for (const auto &sc : m_smartCastNodes) {
         if (sc.scanCode == scanCode) {
-            if (!m_smartCasting) {
-                m_smartCasting = true;
-                m_activeSmartCast = sc;
-                m_activeSmartCastSlot = allocateSlot();
-                m_smartCastAccumX = 0.0f;
-                m_smartCastAccumY = 0.0f;
+            bool alreadyActive = false;
+            for (const auto &asc : m_activeSmartCasts) {
+                if (asc.cfg.id == sc.id && asc.cfg.scanCode == scanCode) {
+                    alreadyActive = true;
+                    break;
+                }
+            }
+            if (!alreadyActive) {
+                ActiveSmartCast asc;
+                asc.cfg = sc;
+                asc.slot = allocateSlot();
+                asc.accumX = 0.0f;
+                asc.accumY = 0.0f;
+                m_activeSmartCasts.push_back(asc);
 
                 double cx = sc.centerX * m_androidWidth;
                 double cy = sc.centerY * m_androidHeight;
-                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, m_activeSmartCastSlot, cx, cy);
-                wlr_bridge_seat_touch_notify_frame(m_seat);
+                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, asc.slot, cx, cy);
+                anySmartCast = true;
             }
-            return true;
+            handled = true;
         }
     }
+    if (anySmartCast) {
+        m_smartCasting = true;
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+    }
 
-    // 5. Tap
-    for (const auto &node : m_tapNodes) {
-        if (node.scanCode == scanCode) {
-            if (m_scanCodeToSlot.find(scanCode) != m_scanCodeToSlot.end()) {
-                return true;
+    // 5. Tap (trigger all Tap buttons bound to this key simultaneously)
+    if (m_scanCodeToSlots.find(scanCode) == m_scanCodeToSlots.end()) {
+        std::vector<int32_t> slots;
+        for (const auto &node : m_tapNodes) {
+            if (node.scanCode == scanCode) {
+                int32_t slot = allocateSlot();
+                slots.push_back(slot);
+
+                double tx = node.relX * m_androidWidth;
+                double ty = node.relY * m_androidHeight;
+                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, slot, tx, ty);
             }
-            int32_t slot = allocateSlot();
-            m_scanCodeToSlot[scanCode] = slot;
-
-            double tx = node.relX * m_androidWidth;
-            double ty = node.relY * m_androidHeight;
-            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, slot, tx, ty);
+        }
+        if (!slots.empty()) {
             wlr_bridge_seat_touch_notify_frame(m_seat);
-            return true;
+            m_scanCodeToSlots[scanCode] = std::move(slots);
+            handled = true;
         }
+    } else {
+        handled = true;
     }
 
-    return false;
+    return handled;
 }
 
 bool InputMapper::handleScanCodeUp(uint32_t scanCode, struct wlr_surface *surface) {
     if (scanCode == 0) return false;
     m_heldScanCodes.erase(scanCode);
 
+    bool handled = false;
     if (scanCode == m_dpad.scanUp || scanCode == m_dpad.scanDown ||
         scanCode == m_dpad.scanLeft || scanCode == m_dpad.scanRight) {
         updateDpad(surface);
-        return true;
+        handled = true;
     }
 
-    if (!m_seat) return false;
+    if (!m_seat) return handled;
     uint32_t now = getTimestampMs();
+
     // Free Look release
     if (m_freeLookActive && m_activeFreeLookIndex >= 0 &&
         m_freeLookNodes[m_activeFreeLookIndex].holdScanCode == scanCode) {
@@ -472,44 +531,251 @@ bool InputMapper::handleScanCodeUp(uint32_t scanCode, struct wlr_surface *surfac
             m_activeFreeLookSlot = -1;
         }
         wlr_bridge_seat_touch_notify_frame(m_seat);
-        return true;
+        if (m_aimSuspendedByFreeLook && m_suspendedAimIndex >= 0) {
+            int restoreIdx = m_suspendedAimIndex;
+            m_aimSuspendedByFreeLook = false;
+            m_suspendedAimIndex = -1;
+            setAimLockActive(true, restoreIdx);
+        }
+        handled = true;
     }
 
-    // Burst Tap release
+    // Burst Tap release (release all Burst buttons bound to this key)
     auto burstIt = m_activeBursts.find(scanCode);
     if (burstIt != m_activeBursts.end()) {
-        if (burstIt->second.isDown) {
-            wlr_bridge_seat_touch_notify_up(m_seat, now, burstIt->second.slot);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
+        bool anyUp = false;
+        for (const auto &b : burstIt->second) {
+            if (b.isDown) {
+                wlr_bridge_seat_touch_notify_up(m_seat, now, b.slot);
+                anyUp = true;
+            }
+            releaseSlot(b.slot);
         }
-        releaseSlot(burstIt->second.slot);
+        if (anyUp) wlr_bridge_seat_touch_notify_frame(m_seat);
         m_activeBursts.erase(burstIt);
-        return true;
+        handled = true;
     }
 
-    // Smart Cast release
-    if (m_smartCasting && m_activeSmartCast.scanCode == scanCode) {
-        m_smartCasting = false;
-        if (m_activeSmartCastSlot >= 0) {
-            wlr_bridge_seat_touch_notify_up(m_seat, now, m_activeSmartCastSlot);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            releaseSlot(m_activeSmartCastSlot);
-            m_activeSmartCastSlot = -1;
+    // Smart Cast release (release all Smart Cast buttons bound to this key)
+    bool anyScUp = false;
+    for (auto it = m_activeSmartCasts.begin(); it != m_activeSmartCasts.end(); ) {
+        if (it->cfg.scanCode == scanCode) {
+            if (it->slot >= 0) {
+                wlr_bridge_seat_touch_notify_up(m_seat, now, it->slot);
+                releaseSlot(it->slot);
+                anyScUp = true;
+            }
+            it = m_activeSmartCasts.erase(it);
+            handled = true;
+        } else {
+            ++it;
         }
-        return true;
     }
-
-    auto it = m_scanCodeToSlot.find(scanCode);
-    if (it != m_scanCodeToSlot.end()) {
-        int32_t slot = it->second;
-        m_scanCodeToSlot.erase(it);
-        wlr_bridge_seat_touch_notify_up(m_seat, now, slot);
+    if (anyScUp) {
         wlr_bridge_seat_touch_notify_frame(m_seat);
-        releaseSlot(slot);
-        return true;
+    }
+    m_smartCasting = !m_activeSmartCasts.empty();
+
+    // Tap release (release all Tap buttons bound to this key)
+    auto it = m_scanCodeToSlots.find(scanCode);
+    if (it != m_scanCodeToSlots.end()) {
+        for (int32_t slot : it->second) {
+            wlr_bridge_seat_touch_notify_up(m_seat, now, slot);
+            releaseSlot(slot);
+        }
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+        m_scanCodeToSlots.erase(it);
+        handled = true;
     }
 
-    return false;
+    return handled;
+}
+
+bool InputMapper::handleMappedMouseDown(int button, struct wlr_surface *surface) {
+    if (button <= 1 || !m_seat || !surface) return false;
+    struct wlr_surface *rootSurf = wlr_bridge_surface_get_root_surface(surface);
+    if (!rootSurf) rootSurf = surface;
+    uint32_t now = getTimestampMs();
+
+    for (int i = 0; i < static_cast<int>(m_aimNodes.size()); ++i) {
+        if (m_aimNodes[i].toggleMouseButton == button) {
+            if (m_aimLockActive && m_activeAimIndex == i) setAimLockActive(false, -1);
+            else setAimLockActive(true, i);
+            return true;
+        }
+    }
+    for (int i = 0; i < static_cast<int>(m_freeLookNodes.size()); ++i) {
+        if (m_freeLookNodes[i].holdMouseButton == button) {
+            if (!m_freeLookActive) {
+                if (m_aimLockActive) {
+                    m_aimSuspendedByFreeLook = true;
+                    m_suspendedAimIndex = m_activeAimIndex;
+                    setAimLockActive(false, -1);
+                    m_aimSuspendedByFreeLook = true;
+                }
+                m_freeLookActive = true;
+                m_activeFreeLookIndex = i;
+                m_accumFreeLookX = 0.0f;
+                m_accumFreeLookY = 0.0f;
+            }
+            return true;
+        }
+    }
+    bool handled = false;
+    uint32_t pseudoKey = 0x10000 + button;
+
+    if (m_activeBursts.find(pseudoKey) == m_activeBursts.end()) {
+        std::vector<ActiveBurst> bursts;
+        for (const auto &bn : m_burstNodes) {
+            if (bn.mouseButton == button) {
+                ActiveBurst ab{bn, allocateSlot(), now, true};
+                bursts.push_back(ab);
+                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, ab.slot, bn.relX * m_androidWidth, bn.relY * m_androidHeight);
+            }
+        }
+        if (!bursts.empty()) {
+            wlr_bridge_seat_touch_notify_frame(m_seat);
+            m_activeBursts[pseudoKey] = std::move(bursts);
+            handled = true;
+        }
+    } else {
+        handled = true;
+    }
+
+    bool anySwipe = false;
+    for (const auto &sw : m_swipeNodes) {
+        if (sw.mouseButton == button) {
+            ActiveSwipe as{sw, allocateSlot(), now};
+            m_activeSwipes.push_back(as);
+            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, as.slot, sw.startX * m_androidWidth, sw.startY * m_androidHeight);
+            anySwipe = true;
+        }
+    }
+    if (anySwipe) {
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+        handled = true;
+    }
+
+    bool anySc = false;
+    for (const auto &sc : m_smartCastNodes) {
+        if (sc.mouseButton == button) {
+            bool alreadyActive = false;
+            for (const auto &asc : m_activeSmartCasts) {
+                if (asc.cfg.id == sc.id && asc.cfg.mouseButton == button) {
+                    alreadyActive = true;
+                    break;
+                }
+            }
+            if (!alreadyActive) {
+                ActiveSmartCast asc{sc, allocateSlot(), 0.0f, 0.0f};
+                m_activeSmartCasts.push_back(asc);
+                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, asc.slot, sc.centerX * m_androidWidth, sc.centerY * m_androidHeight);
+                anySc = true;
+            }
+            handled = true;
+        }
+    }
+    if (anySc) {
+        m_smartCasting = true;
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+    }
+
+    if (m_mouseBtnToSlots.find(button) == m_mouseBtnToSlots.end()) {
+        std::vector<int32_t> slots;
+        for (const auto &node : m_tapNodes) {
+            if (node.mouseButton == button) {
+                int32_t slot = allocateSlot();
+                slots.push_back(slot);
+                wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, slot, node.relX * m_androidWidth, node.relY * m_androidHeight);
+            }
+        }
+        if (!slots.empty()) {
+            wlr_bridge_seat_touch_notify_frame(m_seat);
+            m_mouseBtnToSlots[button] = std::move(slots);
+            handled = true;
+        }
+    } else {
+        handled = true;
+    }
+
+    return handled;
+}
+
+bool InputMapper::handleMappedMouseUp(int button, struct wlr_surface *surface) {
+    (void)surface;
+    if (button <= 1 || !m_seat) return false;
+    uint32_t now = getTimestampMs();
+    bool handled = false;
+
+    if (m_freeLookActive && m_activeFreeLookIndex >= 0 &&
+        m_freeLookNodes[m_activeFreeLookIndex].holdMouseButton == button) {
+        m_freeLookActive = false;
+        m_activeFreeLookIndex = -1;
+        if (m_pendingReleaseFreeLookSlot >= 0) {
+            wlr_bridge_seat_touch_notify_up(m_seat, now, m_pendingReleaseFreeLookSlot);
+            releaseSlot(m_pendingReleaseFreeLookSlot);
+            m_pendingReleaseFreeLookSlot = -1;
+        }
+        if (m_activeFreeLookSlot >= 0) {
+            wlr_bridge_seat_touch_notify_up(m_seat, now + 1, m_activeFreeLookSlot);
+            releaseSlot(m_activeFreeLookSlot);
+            m_activeFreeLookSlot = -1;
+        }
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+        if (m_aimSuspendedByFreeLook && m_suspendedAimIndex >= 0) {
+            int restoreIdx = m_suspendedAimIndex;
+            m_aimSuspendedByFreeLook = false;
+            m_suspendedAimIndex = -1;
+            setAimLockActive(true, restoreIdx);
+        }
+        handled = true;
+    }
+
+    uint32_t pseudoKey = 0x10000 + button;
+    auto burstIt = m_activeBursts.find(pseudoKey);
+    if (burstIt != m_activeBursts.end()) {
+        bool anyUp = false;
+        for (const auto &b : burstIt->second) {
+            if (b.isDown) {
+                wlr_bridge_seat_touch_notify_up(m_seat, now, b.slot);
+                anyUp = true;
+            }
+            releaseSlot(b.slot);
+        }
+        if (anyUp) wlr_bridge_seat_touch_notify_frame(m_seat);
+        m_activeBursts.erase(burstIt);
+        handled = true;
+    }
+
+    bool anyScUp = false;
+    for (auto it = m_activeSmartCasts.begin(); it != m_activeSmartCasts.end(); ) {
+        if (it->cfg.mouseButton == button) {
+            if (it->slot >= 0) {
+                wlr_bridge_seat_touch_notify_up(m_seat, now, it->slot);
+                releaseSlot(it->slot);
+                anyScUp = true;
+            }
+            it = m_activeSmartCasts.erase(it);
+            handled = true;
+        } else {
+            ++it;
+        }
+    }
+    if (anyScUp) wlr_bridge_seat_touch_notify_frame(m_seat);
+    m_smartCasting = !m_activeSmartCasts.empty();
+
+    auto it = m_mouseBtnToSlots.find(button);
+    if (it != m_mouseBtnToSlots.end()) {
+        for (int32_t slot : it->second) {
+            wlr_bridge_seat_touch_notify_up(m_seat, now, slot);
+            releaseSlot(slot);
+        }
+        wlr_bridge_seat_touch_notify_frame(m_seat);
+        m_mouseBtnToSlots.erase(it);
+        handled = true;
+    }
+
+    return handled;
 }
 
 bool InputMapper::handleMouseDown(int button, int winX, int winY, struct wlr_surface *surface) {
@@ -517,6 +783,10 @@ bool InputMapper::handleMouseDown(int button, int winX, int winY, struct wlr_sur
     struct wlr_surface *rootSurf = wlr_bridge_surface_get_root_surface(surface);
     if (!rootSurf) rootSurf = surface;
     uint32_t now = getTimestampMs();
+
+    if (button > 1 && handleMappedMouseDown(button, surface)) {
+        return true;
+    }
 
     const auto *aim = activeAimNode();
     if (aim) {
@@ -553,6 +823,10 @@ bool InputMapper::handleMouseUp(int button, int winX, int winY, struct wlr_surfa
     if (!m_seat) return false;
     uint32_t now = getTimestampMs();
 
+    if (button > 1 && handleMappedMouseUp(button, surface)) {
+        return true;
+    }
+
     const auto *aim = activeAimNode();
     if (aim) {
         if (button == 1 && m_firing) {
@@ -582,175 +856,117 @@ bool InputMapper::handleMouseUp(int button, int winX, int winY, struct wlr_surfa
     return false;
 }
 
-bool InputMapper::handleMouseMove(int winX, int winY, int deltaX, int deltaY, struct wlr_surface *surface) {
+bool InputMapper::handleMouseMove(int winX, int winY, float deltaX, float deltaY, struct wlr_surface *surface) {
     if (!m_seat || !surface) return false;
     struct wlr_surface *rootSurf = wlr_bridge_surface_get_root_surface(surface);
     if (!rootSurf) rootSurf = surface;
     uint32_t now = getTimestampMs();
 
-    // 1. Smart Cast
-    if (m_smartCasting && m_activeSmartCastSlot >= 0) {
-        double cx = m_activeSmartCast.centerX * m_androidWidth;
-        double cy = m_activeSmartCast.centerY * m_androidHeight;
+    // 1. Smart Cast (move all active Smart Cast nodes simultaneously)
+    if (m_smartCasting && !m_activeSmartCasts.empty()) {
+        for (auto &asc : m_activeSmartCasts) {
+            if (asc.slot < 0) continue;
+            double cx = asc.cfg.centerX * m_androidWidth;
+            double cy = asc.cfg.centerY * m_androidHeight;
 
-        float mx = 0.0f, my = 0.0f;
-        if (m_aimLockActive && (deltaX != 0 || deltaY != 0)) {
-            m_smartCastAccumX += deltaX * 1.5f;
-            m_smartCastAccumY += deltaY * 1.5f;
-            mx = m_smartCastAccumX;
-            my = m_smartCastAccumY;
-        } else {
-            double ax, ay;
-            windowToAndroid(winX, winY, ax, ay);
-            mx = static_cast<float>(ax - cx);
-            my = static_cast<float>(ay - cy);
+            float mx = 0.0f, my = 0.0f;
+            if (m_aimLockActive && (deltaX != 0 || deltaY != 0)) {
+                asc.accumX += deltaX * 1.5f;
+                asc.accumY += deltaY * 1.5f;
+                mx = asc.accumX;
+                my = asc.accumY;
+            } else {
+                double ax, ay;
+                windowToAndroid(winX, winY, ax, ay);
+                mx = static_cast<float>(ax - cx);
+                my = static_cast<float>(ay - cy);
+            }
+
+            float dist = std::sqrt(mx * mx + my * my);
+            float maxR = asc.cfg.castRadius;
+            if (dist > maxR && dist > 0.001f) {
+                mx = (mx / dist) * maxR;
+                my = (my / dist) * maxR;
+                asc.accumX = mx;
+                asc.accumY = my;
+            }
+
+            double tx = std::clamp(cx + mx, 2.0, static_cast<double>(m_androidWidth - 3));
+            double ty = std::clamp(cy + my, 2.0, static_cast<double>(m_androidHeight - 3));
+            wlr_bridge_seat_touch_notify_motion(m_seat, now, asc.slot, tx, ty);
         }
-
-        float dist = std::sqrt(mx * mx + my * my);
-        float maxR = m_activeSmartCast.castRadius;
-        if (dist > maxR && dist > 0.001f) {
-            mx = (mx / dist) * maxR;
-            my = (my / dist) * maxR;
-            m_smartCastAccumX = mx;
-            m_smartCastAccumY = my;
-        }
-
-        double tx = std::clamp(cx + mx, 2.0, static_cast<double>(m_androidWidth - 3));
-        double ty = std::clamp(cy + my, 2.0, static_cast<double>(m_androidHeight - 3));
-        wlr_bridge_seat_touch_notify_motion(m_seat, now, m_activeSmartCastSlot, tx, ty);
         wlr_bridge_seat_touch_notify_frame(m_seat);
         return true;
     }
 
-    // 2. Free Look
+    // 2. Infinite Unbounded Free Look (1:1 Linear, Zero Acceleration, Zero Drift, No Limits)
     if (m_freeLookActive && m_activeFreeLookIndex >= 0 && m_activeFreeLookIndex < static_cast<int>(m_freeLookNodes.size())) {
         const auto &fl = m_freeLookNodes[m_activeFreeLookIndex];
-        if (m_pendingReleaseFreeLookSlot >= 0) {
-            wlr_bridge_seat_touch_notify_up(m_seat, now, m_pendingReleaseFreeLookSlot);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            releaseSlot(m_pendingReleaseFreeLookSlot);
-            m_pendingReleaseFreeLookSlot = -1;
-            now += 1;
-        }
+        float rawDx = deltaX;
+        float rawDy = deltaY;
+        if (rawDx == 0.0f && rawDy == 0.0f) return true;
 
-        float effDx = static_cast<float>(deltaX);
-        float effDy = static_cast<float>(deltaY);
-        if (fl.acceleration) {
-            float speed = std::sqrt(effDx * effDx + effDy * effDy);
-            float factor = 1.0f + std::min(speed * 0.02f, 1.5f);
-            effDx *= factor;
-            effDy *= factor;
-        }
+        const float refScale = static_cast<float>(std::max(1, m_viewport.height));
+        float pixelDx = (rawDx * fl.sensitivityX) * (static_cast<float>(m_androidHeight) / refScale);
+        float pixelDy = (rawDy * fl.sensitivityY) * (static_cast<float>(m_androidHeight) / refScale);
 
-        float normDx = (effDx * fl.sensitivityX) / std::max(1, m_viewport.width);
-        float normDy = (effDy * fl.sensitivityY) / std::max(1, m_viewport.height);
-        const float baseX = std::clamp(fl.centerX, 0.05f, 0.95f);
-        const float baseY = std::clamp(fl.centerY, 0.05f, 0.95f);
+        const double startX = std::clamp(static_cast<double>(fl.centerX * m_androidWidth), m_androidWidth * 0.05, m_androidWidth * 0.95);
+        const double startY = std::clamp(static_cast<double>(fl.centerY * m_androidHeight), m_androidHeight * 0.05, m_androidHeight * 0.95);
 
         if (m_activeFreeLookSlot < 0) {
             m_activeFreeLookSlot = allocateSlot();
-            m_accumFreeLookX = 0.0f;
-            m_accumFreeLookY = 0.0f;
-            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, m_activeFreeLookSlot, baseX * m_androidWidth, baseY * m_androidHeight);
+            m_accumFreeLookX = static_cast<float>(startX);
+            m_accumFreeLookY = static_cast<float>(startY);
+            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, m_activeFreeLookSlot, startX, startY);
             wlr_bridge_seat_touch_notify_frame(m_seat);
-            now += 1;
         }
 
-        float nextX = baseX + m_accumFreeLookX + normDx;
-        float nextY = baseY + m_accumFreeLookY + normDy;
-        if (nextX <= 0.04f || nextX >= 0.96f || nextY <= 0.04f || nextY >= 0.96f) {
-            int32_t oldSlot = m_activeFreeLookSlot;
-            int32_t newSlot = allocateSlot();
-            m_accumFreeLookX = normDx;
-            m_accumFreeLookY = normDy;
-            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, newSlot, baseX * m_androidWidth, baseY * m_androidHeight);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            double tx = std::clamp(static_cast<double>((baseX + m_accumFreeLookX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
-            double ty = std::clamp(static_cast<double>((baseY + m_accumFreeLookY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
-            wlr_bridge_seat_touch_notify_motion(m_seat, now + 1, newSlot, tx, ty);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            m_pendingReleaseFreeLookSlot = oldSlot;
-            m_activeFreeLookSlot = newSlot;
-        } else {
-            m_accumFreeLookX += normDx;
-            m_accumFreeLookY += normDy;
-            double tx = std::clamp(static_cast<double>((baseX + m_accumFreeLookX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
-            double ty = std::clamp(static_cast<double>((baseY + m_accumFreeLookY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
-            wlr_bridge_seat_touch_notify_motion(m_seat, now, m_activeFreeLookSlot, tx, ty);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-        }
+        m_accumFreeLookX += pixelDx;
+        m_accumFreeLookY += pixelDy;
+        wlr_bridge_seat_touch_notify_motion(m_seat, now, m_activeFreeLookSlot, m_accumFreeLookX, m_accumFreeLookY);
+        wlr_bridge_seat_touch_notify_frame(m_seat);
         return true;
     }
 
-    // 3. Aim Lock
+    // 3. Pure 1:1 Linear Aim Lock (Zero Acceleration, Zero Drift, ±10,000px + 450ms Idle Reset)
     const auto *aim = activeAimNode();
-    if (aim) {
-        if (m_pendingReleaseCameraSlot >= 0) {
-            wlr_bridge_seat_touch_notify_up(m_seat, now, m_pendingReleaseCameraSlot);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            releaseSlot(m_pendingReleaseCameraSlot);
-            m_pendingReleaseCameraSlot = -1;
-            now += 1;
-        }
+    if (aim && !m_freeLookActive) {
+        float rawDx = deltaX;
+        float rawDy = deltaY;
+        if (rawDx == 0.0f && rawDy == 0.0f) return true;
 
-        float effDx = static_cast<float>(deltaX);
-        float effDy = static_cast<float>(deltaY);
+        m_lastAimMoveMs = now;
 
-        if (aim->acceleration) {
-            float speed = std::sqrt(effDx * effDx + effDy * effDy);
-            float factor = 1.0f + std::min(speed * 0.02f, 1.5f);
-            effDx *= factor;
-            effDy *= factor;
-        }
+        const float refScale = static_cast<float>(std::max(1, m_viewport.height));
+        float pixelDx = (rawDx * aim->sensitivityX) * (static_cast<float>(m_androidHeight) / refScale);
+        float pixelDy = (rawDy * aim->sensitivityY) * (static_cast<float>(m_androidHeight) / refScale);
 
-        float normDx = (effDx * aim->sensitivityX) / std::max(1, m_viewport.width);
-        float normDy = (effDy * aim->sensitivityY) / std::max(1, m_viewport.height);
-
-        const float baseCenterX = std::clamp(aim->centerX, 0.05f, 0.95f);
-        const float baseCenterY = std::clamp(aim->centerY, 0.05f, 0.95f);
+        const double startX = std::clamp(static_cast<double>(aim->centerX * m_androidWidth), m_androidWidth * 0.55, m_androidWidth * 0.85);
+        const double startY = std::clamp(static_cast<double>(aim->centerY * m_androidHeight), m_androidHeight * 0.25, m_androidHeight * 0.75);
 
         if (m_activeAimCameraSlot < 0) {
             m_activeAimCameraSlot = allocateSlot();
+            m_accumAimX = static_cast<float>(startX);
+            m_accumAimY = static_cast<float>(startY);
+            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, m_activeAimCameraSlot, startX, startY);
+            wlr_bridge_seat_touch_notify_frame(m_seat);
+        }
+
+        m_accumAimX += pixelDx;
+        m_accumAimY += pixelDy;
+
+        if (std::abs(m_accumAimX - startX) >= 10000.0 || std::abs(m_accumAimY - startY) >= 10000.0) {
+            wlr_bridge_seat_touch_notify_up(m_seat, now, m_activeAimCameraSlot);
+            wlr_bridge_seat_touch_notify_frame(m_seat);
+            releaseSlot(m_activeAimCameraSlot);
+            m_activeAimCameraSlot = -1;
             m_accumAimX = 0.0f;
             m_accumAimY = 0.0f;
-            double cx = baseCenterX * m_androidWidth;
-            double cy = baseCenterY * m_androidHeight;
-            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, m_activeAimCameraSlot, cx, cy);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-            now += 1;
+            return true;
         }
 
-        float nextX = baseCenterX + m_accumAimX + normDx;
-        float nextY = baseCenterY + m_accumAimY + normDy;
-
-        if (nextX <= 0.04f || nextX >= 0.96f || nextY <= 0.04f || nextY >= 0.96f) {
-            int32_t oldSlot = m_activeAimCameraSlot;
-            int32_t newSlot = allocateSlot();
-
-            m_accumAimX = normDx;
-            m_accumAimY = normDy;
-
-            double cx = baseCenterX * m_androidWidth;
-            double cy = baseCenterY * m_androidHeight;
-
-            wlr_bridge_seat_touch_notify_down(m_seat, rootSurf, now, newSlot, cx, cy);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-
-            double tx = std::clamp(static_cast<double>((baseCenterX + m_accumAimX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
-            double ty = std::clamp(static_cast<double>((baseCenterY + m_accumAimY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
-            wlr_bridge_seat_touch_notify_motion(m_seat, now + 1, newSlot, tx, ty);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-
-            m_pendingReleaseCameraSlot = oldSlot;
-            m_activeAimCameraSlot = newSlot;
-        } else {
-            m_accumAimX += normDx;
-            m_accumAimY += normDy;
-            double targetX = std::clamp(static_cast<double>((baseCenterX + m_accumAimX) * m_androidWidth), 2.0, static_cast<double>(m_androidWidth - 3));
-            double targetY = std::clamp(static_cast<double>((baseCenterY + m_accumAimY) * m_androidHeight), 2.0, static_cast<double>(m_androidHeight - 3));
-            wlr_bridge_seat_touch_notify_motion(m_seat, now, m_activeAimCameraSlot, targetX, targetY);
-            wlr_bridge_seat_touch_notify_frame(m_seat);
-        }
+        wlr_bridge_seat_touch_notify_motion(m_seat, now, m_activeAimCameraSlot, m_accumAimX, m_accumAimY);
+        wlr_bridge_seat_touch_notify_frame(m_seat);
         return true;
     }
 

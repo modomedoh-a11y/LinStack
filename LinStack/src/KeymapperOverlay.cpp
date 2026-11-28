@@ -23,6 +23,7 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QInputDialog>
+#include <QPlainTextEdit>
 #include <QSettings>
 #include <QCursor>
 #include <QCoreApplication>
@@ -150,11 +151,9 @@ void KeymapperOverlay::setBridge(UInputTouchBridge *bridge)
             QCursor::setPos(globalAnchor);
             m_lastMousePos = globalAnchor;
             m_ignoreNextMouseMove = true;
-            emit toastRequested("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)");
-        } else {
+                    } else {
             setCursor(Qt::ArrowCursor);
-            emit toastRequested("Aim Lock Released");
-        }
+                    }
         emit aimLockAnchorChanged(active, anchorNorm);
         update();
     });
@@ -474,7 +473,7 @@ void KeymapperOverlay::setupNodeCatalogPanel()
     sep->setFrameShape(QFrame::HLine);
     sep->setStyleSheet("color: #1F2937; background: #1F2937; border: none; max-height: 1px; margin: 2px 0;");
     panelLayout->addWidget(sep);
-    // 1. Tap Spot + علامة تنبيه عند الـ Hover
+    // 1. Tap Spot with hover tooltip hint
     m_btnAddTap = new QPushButton("👆  Tap Spot          ⓘ", m_catalogPanel);
     m_btnAddTap->setToolTip("Tip: Click anywhere on an empty spot on the screen to instantly create a Tap button!");
     connect(m_btnAddTap, &QPushButton::clicked, this, [this]() {
@@ -493,7 +492,6 @@ void KeymapperOverlay::setupNodeCatalogPanel()
 
     // 2. Burst Tap
     m_btnAddBurstTap = new QPushButton("🔥  Burst Tap", m_catalogPanel);
-    m_btnAddBurstTap->setToolTip("ضغط متتالي سريع (من 1 إلى 100 ضغطة/ثانية)");
     connect(m_btnAddBurstTap, &QPushButton::clicked, this, [this]() {
         KeyBindingNode bt;
         bt.id              = QString("burst_%1").arg(m_nodes.size() + 1);
@@ -552,9 +550,8 @@ void KeymapperOverlay::setupNodeCatalogPanel()
     });
     panelLayout->addWidget(m_btnAddAim);
 
-    // 5. Free Look (يعمل أثناء الضغط المستمر فقط)
+    // 5. Free Look (active only while held down)
     m_btnAddFreeLook = new QPushButton("👁  Free Look", m_catalogPanel);
-    m_btnAddFreeLook->setToolTip("قفل المؤشر وتدوير الكاميرا 360° أثناء الضغط المستمر على الزر فقط");
     connect(m_btnAddFreeLook, &QPushButton::clicked, this, [this]() {
         KeyBindingNode fl;
         fl.id              = QString("freelook_%1").arg(m_nodes.size() + 1);
@@ -570,7 +567,7 @@ void KeymapperOverlay::setupNodeCatalogPanel()
     });
     panelLayout->addWidget(m_btnAddFreeLook);
 
-    // 6. Swipe + علامة تنبيه عند الـ Hover
+    // 6. Swipe with hover tooltip hint
     m_btnAddSwipe = new QPushButton("💨  Swipe              ⓘ", m_catalogPanel);
     m_btnAddSwipe->setToolTip("Tip: Click and drag anywhere on an empty spot to draw a custom green Swipe path!");
     connect(m_btnAddSwipe, &QPushButton::clicked, this, [this]() {
@@ -592,7 +589,6 @@ void KeymapperOverlay::setupNodeCatalogPanel()
 
     // 7. Smart Cast
     m_btnAddSmartCast = new QPushButton("⚡  Smart Cast", m_catalogPanel);
-    m_btnAddSmartCast->setToolTip("توجيه المهارات نحو مؤشر الماوس أثناء الضغط وإطلاقها عند الإفلات");
     connect(m_btnAddSmartCast, &QPushButton::clicked, this, [this]() {
         KeyBindingNode sc;
         sc.id              = QString("smart_cast_%1").arg(m_nodes.size() + 1);
@@ -607,6 +603,25 @@ void KeymapperOverlay::setupNodeCatalogPanel()
         addNode(sc);
     });
     panelLayout->addWidget(m_btnAddSmartCast);
+
+    // 8. Macro
+    m_btnAddMacro = new QPushButton("⏺  Macro", m_catalogPanel);
+    m_btnAddMacro->setToolTip("Automate multi-action macro script sequence on key press");
+    connect(m_btnAddMacro, &QPushButton::clicked, this, [this]() {
+        KeyBindingNode macro;
+        macro.id              = QString("macro_%1").arg(m_nodes.size() + 1);
+        macro.type            = KeyNodeType::Macro;
+        macro.label           = "M";
+        macro.action          = "Macro";
+        macro.primaryKey      = Qt::Key_M;
+        macro.primaryScanCode = 58;
+        macro.relX            = 0.70;
+        macro.relY            = 0.60;
+        macro.radius          = 24.0;
+        macro.macroScript     = QString("tap 540 960\nwait 150\ntap 540 960");
+        addNode(macro);
+    });
+    panelLayout->addWidget(m_btnAddMacro);
 
     panelLayout->addStretch(1);
 }
@@ -667,7 +682,8 @@ bool KeymapperOverlay::hasNodeSettings(KeyNodeType type) const
             type == KeyNodeType::BurstTap ||
             type == KeyNodeType::Swipe ||
             type == KeyNodeType::FreeLook ||
-            type == KeyNodeType::SmartCast);
+            type == KeyNodeType::SmartCast ||
+            type == KeyNodeType::Macro);
 }
 
 void KeymapperOverlay::updateNodeSettingsPanel()
@@ -868,6 +884,56 @@ void KeymapperOverlay::updateNodeSettingsPanel()
         rowCast->addWidget(sliderCast);
         rowCast->addWidget(lblCast);
         m_settingsBody->addLayout(rowCast);
+
+    } else if (node.type == KeyNodeType::Macro) {
+        m_settingsTitle->setText("⏺ Macro Script Settings");
+
+        auto *lblHelp = new QLabel("Macro commands: tap X Y, swipe X1 Y1 X2 Y2 Dur, wait Ms, loop N ... loopEnd", m_nodeSettingsPanel);
+        lblHelp->setStyleSheet("color: #9CA3AF; font-size: 9px;");
+        lblHelp->setWordWrap(true);
+        m_settingsBody->addWidget(lblHelp);
+
+        auto *scriptEdit = new QPlainTextEdit(m_nodeSettingsPanel);
+        scriptEdit->setFixedHeight(120);
+        scriptEdit->setStyleSheet(
+            "QPlainTextEdit {"
+            "  background-color: #0D121D;"
+            "  color: #00FF66;"
+            "  font-family: monospace;"
+            "  font-size: 11px;"
+            "  border: 1px solid #1F2937;"
+            "  border-radius: 4px;"
+            "  padding: 4px;"
+            "}"
+            "QPlainTextEdit:focus { border: 1px solid #10B981; }"
+        );
+        scriptEdit->setPlainText(node.macroScript);
+        connect(scriptEdit, &QPlainTextEdit::textChanged, this, [this, scriptEdit]() {
+            if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+                m_nodes[m_selectedNodeIndex].macroScript = scriptEdit->toPlainText();
+                syncTranslatorNodes();
+            }
+        });
+        m_settingsBody->addWidget(scriptEdit);
+
+        auto *btnTemplate = new QPushButton("Insert Default Template", m_nodeSettingsPanel);
+        btnTemplate->setStyleSheet(
+            "QPushButton {"
+            "  background: #161F30;"
+            "  color: #10B981;"
+            "  border: 1px solid #10B981;"
+            "  border-radius: 4px;"
+            "  padding: 4px;"
+            "  font-size: 10px;"
+            "  font-weight: 600;"
+            "}"
+            "QPushButton:hover { background: rgba(16, 185, 129, 0.2); }"
+        );
+        connect(btnTemplate, &QPushButton::clicked, this, [this, scriptEdit]() {
+            QString tpl = "tap 540 960\nwait 200\nswipe 200 800 200 400 300\nloop 2\n  tap 540 960\n  wait 100\nloopEnd";
+            scriptEdit->setPlainText(tpl);
+        });
+        m_settingsBody->addWidget(btnTemplate);
     }
 
     m_nodeSettingsPanel->adjustSize();
@@ -892,6 +958,7 @@ void KeymapperOverlay::setMode(Mode mode)
     if (m_nodeSettingsPanel) m_nodeSettingsPanel->hide();
 
     if (m_mode == Mode::Edit) {
+        setAttribute(Qt::WA_TransparentForMouseEvents, false);
         if (m_translator && m_translator->isAimLockActive()) {
             m_translator->setAimLockActive(false, -1);
         }
@@ -903,6 +970,7 @@ void KeymapperOverlay::setMode(Mode mode)
         setCursor(Qt::ArrowCursor);
         emit toastRequested("⌨ Edit Mode: Click empty space to add Tap, drag to draw Swipe, or click ⚙ for settings.");
     } else {
+        setAttribute(Qt::WA_TransparentForMouseEvents, true);
         m_editorBar->hide();
         m_catalogPanel->hide();
         setCursor(Qt::ArrowCursor);
@@ -974,6 +1042,7 @@ void KeymapperOverlay::syncTranslatorNodes()
                 kn.id = node.id.toStdString();
                 kn.type = WlrKeyNodeType::Tap;
                 kn.scanCode = node.primaryScanCode;
+                kn.mouseButton = node.primaryMouseButton;
                 kn.relX = static_cast<float>(node.relX);
                 kn.relY = static_cast<float>(node.relY);
                 m_inputMapper->addTapNode(kn);
@@ -981,6 +1050,7 @@ void KeymapperOverlay::syncTranslatorNodes()
                 BurstTapConfig bt;
                 bt.id = node.id.toStdString();
                 bt.scanCode = node.primaryScanCode;
+                bt.mouseButton = node.primaryMouseButton;
                 bt.relX = static_cast<float>(node.relX);
                 bt.relY = static_cast<float>(node.relY);
                 bt.burstHz = node.burstHz;
@@ -999,6 +1069,7 @@ void KeymapperOverlay::syncTranslatorNodes()
                 AimLockNodeConfig aim;
                 aim.id = node.id.toStdString();
                 aim.toggleScanCode = node.primaryScanCode;
+                aim.toggleMouseButton = node.primaryMouseButton;
                 aim.centerX = static_cast<float>(node.relX);
                 aim.centerY = static_cast<float>(node.relY);
                 aim.fireX = static_cast<float>(node.fireRelX);
@@ -1011,6 +1082,7 @@ void KeymapperOverlay::syncTranslatorNodes()
                 FreeLookConfig fl;
                 fl.id = node.id.toStdString();
                 fl.holdScanCode = node.primaryScanCode;
+                fl.holdMouseButton = node.primaryMouseButton;
                 fl.centerX = static_cast<float>(node.relX);
                 fl.centerY = static_cast<float>(node.relY);
                 fl.sensitivityX = static_cast<float>(node.sensitivityX);
@@ -1021,6 +1093,7 @@ void KeymapperOverlay::syncTranslatorNodes()
                 SwipeConfig sw;
                 sw.id = node.id.toStdString();
                 sw.scanCode = node.primaryScanCode;
+                sw.mouseButton = node.primaryMouseButton;
                 sw.startX = static_cast<float>(node.relX);
                 sw.startY = static_cast<float>(node.relY);
                 sw.endX = static_cast<float>(node.endRelX);
@@ -1034,6 +1107,7 @@ void KeymapperOverlay::syncTranslatorNodes()
                 SmartCastConfig sc;
                 sc.id = node.id.toStdString();
                 sc.scanCode = node.primaryScanCode;
+                sc.mouseButton = node.primaryMouseButton;
                 sc.centerX = static_cast<float>(node.relX);
                 sc.centerY = static_cast<float>(node.relY);
                 sc.castRadius = static_cast<float>(node.castRadius);
@@ -1130,8 +1204,9 @@ bool KeymapperOverlay::saveProfileByName(const QString &profileName)
         c["radius"]    = node.radius;
         c["label"]     = node.label;
         c["action"]    = node.action;
-        c["key"]       = node.primaryKey;
-        c["scan_code"] = static_cast<qint64>(node.primaryScanCode);
+        c["key"]          = node.primaryKey;
+        c["scan_code"]    = static_cast<qint64>(node.primaryScanCode);
+        c["mouse_button"] = node.primaryMouseButton;
 
         switch (node.type) {
             case KeyNodeType::Dpad:
@@ -1179,6 +1254,10 @@ bool KeymapperOverlay::saveProfileByName(const QString &profileName)
                 c["type"]        = "smart_cast";
                 c["cast_radius"] = node.castRadius;
                 break;
+            case KeyNodeType::Macro:
+                c["type"]         = "macro";
+                c["macro_script"] = node.macroScript;
+                break;
             case KeyNodeType::Tap:
             default:
                 c["type"] = "tap";
@@ -1225,8 +1304,9 @@ bool KeymapperOverlay::loadProfileByName(const QString &profileName)
         node.radius          = c["radius"].toDouble(24.0);
         node.label           = c["label"].toString();
         node.action          = c["action"].toString();
-        node.primaryKey      = c["key"].toInt(0);
-        node.primaryScanCode = static_cast<quint32>(c["scan_code"].toInteger(0));
+        node.primaryKey         = c["key"].toInt(0);
+        node.primaryScanCode    = static_cast<quint32>(c["scan_code"].toInteger(0));
+        node.primaryMouseButton = c["mouse_button"].toInt(0);
 
         if (typeStr == "dpad") {
             node.type      = KeyNodeType::Dpad;
@@ -1265,6 +1345,9 @@ bool KeymapperOverlay::loadProfileByName(const QString &profileName)
         } else if (typeStr == "smart_cast") {
             node.type       = KeyNodeType::SmartCast;
             node.castRadius = c["cast_radius"].toDouble(160.0);
+        } else if (typeStr == "macro") {
+            node.type        = KeyNodeType::Macro;
+            node.macroScript = c["macro_script"].toString();
         } else {
             node.type = KeyNodeType::Tap;
         }
@@ -1383,8 +1466,35 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
     }
 
     if (m_mode == Mode::Edit) {
+        if (event->button() != Qt::LeftButton &&
+            m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_nodes.size()) {
+            auto &node = m_nodes[m_selectedNodeIndex];
+            if (node.type != KeyNodeType::Dpad) {
+                int mappedBtn = 0;
+                QString btnLabel;
+                if (event->button() == Qt::RightButton) { mappedBtn = 3; btnLabel = "RMB"; }
+                else if (event->button() == Qt::MiddleButton) { mappedBtn = 2; btnLabel = "MMB"; }
+                else if (event->button() == Qt::BackButton || event->button() == Qt::XButton1) { mappedBtn = 4; btnLabel = "MB4"; }
+                else if (event->button() == Qt::ForwardButton || event->button() == Qt::XButton2) { mappedBtn = 5; btnLabel = "MB5"; }
+                if (mappedBtn > 0) {
+                    node.primaryMouseButton = mappedBtn;
+                    node.primaryScanCode = 0;
+                    node.primaryKey = 0;
+                    node.label = btnLabel;
+                    m_selectedNodeIndex = -1;
+                    m_settingsOpen = false;
+                    updateNodeSettingsPanel();
+                    syncTranslatorNodes();
+                    update();
+                    emit toastRequested(QString("Rebound control to mouse button: %1").arg(btnLabel));
+                    event->accept();
+                    return;
+                }
+            }
+        }
+
         if (event->button() == Qt::LeftButton) {
-            // 1. التحقق من سحب لوحة خيارات الـ Keymapping نفسها لتحريكها بحرية
+            // 1. Allow dragging the Keymapping settings panel freely
             if (m_nodeSettingsPanel && m_nodeSettingsPanel->isVisible() &&
                 m_nodeSettingsPanel->geometry().contains(event->position().toPoint())) {
                 m_isDraggingSettingsPanel = true;
@@ -1465,7 +1575,7 @@ void KeymapperOverlay::mousePressEvent(QMouseEvent *event)
                 event->accept();
                 return;
             } else {
-                // الضغط في مكان فارغ: تجهيز الإنشاء السريع (نقر = Tap Spot، سحب = Freehand Swipe بالخط الأخضر)
+                // Click on empty space: prepare quick creation (click = Tap Spot, drag = Freehand Swipe)
                 m_selectedNodeIndex = -1;
                 m_settingsOpen = false;
                 updateNodeSettingsPanel();
@@ -1498,7 +1608,7 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_mode == Mode::Edit) {
-        // تحريك نافذة الإعدادات بسلاسة
+        // Move settings panel smoothly
         if (m_isDraggingSettingsPanel && m_nodeSettingsPanel) {
             QPointF targetPos = event->position() - m_settingsDragOffset;
             int nx = qBound(8, qRound(targetPos.x()), width() - m_nodeSettingsPanel->width() - 8);
@@ -1508,7 +1618,7 @@ void KeymapperOverlay::mouseMoveEvent(QMouseEvent *event)
             return;
         }
 
-        // تتبع حركة السحب بالماوس في مكان فارغ لرسم الخط الأخضر
+        // Track mouse drag on empty canvas to draw freehand swipe path
         if (m_isDrawingFreehand) {
             if (m_freehandPoints.isEmpty() ||
                 std::hypot(event->position().x() - m_freehandPoints.last().x(),
@@ -1694,6 +1804,7 @@ void KeymapperOverlay::keyPressEvent(QKeyEvent *event)
                 quint32 sc = event->nativeScanCode();
                 if (sc != 0) {
                     node.primaryScanCode = sc;
+                    node.primaryMouseButton = 0;
                     node.primaryKey = event->key();
                     node.label = scanCodeToLabel(sc, event->key());
                     m_selectedNodeIndex = -1;
@@ -1770,7 +1881,7 @@ void KeymapperOverlay::paintEvent(QPaintEvent *event)
         for (int x = 0; x < w; x += gridSize) p.drawLine(x, 0, x, h);
         for (int y = 0; y < h; y += gridSize) p.drawLine(0, y, w, y);
 
-        // رسم الخط الأخضر المتوهج أثناء سحب الماوس لإنشاء Swipe مخصص
+        // Render glowing green path while dragging to create a custom Swipe
         if (m_isDrawingFreehand && m_freehandPoints.size() >= 2) {
             QPainterPath path;
             path.moveTo(m_freehandPoints.first());
@@ -1910,6 +2021,23 @@ void KeymapperOverlay::paintEvent(QPaintEvent *event)
                 QFont f = p.font(); f.setPointSize(9); f.setBold(true); p.setFont(f);
                 p.drawText(QRectF(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2),
                            Qt::AlignCenter, node.label);
+                break;
+            }
+
+            case KeyNodeType::Macro: {
+                QRectF nodeRect(cx - node.radius, cy - node.radius, node.radius * 2, node.radius * 2);
+                p.setBrush(QColor(17, 24, 39, isSelected ? 230 : 190));
+                p.setPen(QPen(QColor("#EC4899"), isSelected ? 2.5 : 1.5));
+                p.drawEllipse(nodeRect);
+
+                p.setPen(Theme::ColorTextPrimary);
+                QFont lf = p.font(); lf.setPointSize(node.radius > 24 ? 9 : 8); lf.setBold(true); p.setFont(lf);
+                p.drawText(nodeRect, Qt::AlignCenter, node.label);
+
+                QRectF subRect(cx - 45, cy + node.radius + 2, 90, 14);
+                p.setPen(QColor("#F472B6"));
+                QFont sf = p.font(); sf.setPointSize(7); sf.setBold(false); p.setFont(sf);
+                p.drawText(subRect, Qt::AlignCenter, "⏺ Macro");
                 break;
             }
 

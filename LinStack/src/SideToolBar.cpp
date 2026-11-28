@@ -72,16 +72,7 @@ void SideToolBar::setupUi()
     });
     layout->addWidget(m_btnKeymapper);
 
-
-    // 5. Macro
-    m_btnMacro = createToolButton("Macro Recorder / Script Automation", Theme::IconType::Macro, SIGNAL(macroClicked()));
-    layout->addWidget(m_btnMacro);
-
-    // 6. Screen Rotation
-    m_btnRotate = createToolButton("Screen Rotation: Landscape / Portrait", Theme::IconType::Rotate, SIGNAL(rotateClicked()));
-    layout->addWidget(m_btnRotate);
-
-    // 7. Eco Mode (Ctrl+Shift+E)
+    // Eco Mode (Ctrl+Shift+E)
     m_btnEcoMode = createToolButton("Eco Mode: Lock 1 FPS in Background (Ctrl+Shift+E)", Theme::IconType::EcoMode);
     connect(m_btnEcoMode, &QPushButton::clicked, this, [this]() {
         setEcoModeActive(!m_ecoModeActive);
@@ -89,27 +80,23 @@ void SideToolBar::setupUi()
     });
     layout->addWidget(m_btnEcoMode);
 
-    // 8. APK Drop & Install (Ctrl+Shift+B)
+    // APK Drop & Install (Ctrl+Shift+B)
     m_btnInstallApk = createToolButton("Install APK (Ctrl+Shift+B)", Theme::IconType::InstallApk, SIGNAL(installApkClicked()));
     layout->addWidget(m_btnInstallApk);
 
-    // 9. Screenshot (Ctrl+Shift+S)
+    // Screenshot (Ctrl+Shift+S)
     m_btnScreenshot = createToolButton("Take Screenshot (Ctrl+Shift+S)", Theme::IconType::Screenshot, SIGNAL(screenshotClicked()));
     layout->addWidget(m_btnScreenshot);
 
-    // 10. File Manager
+    // File Manager
     m_btnFileManager = createToolButton("Android File Manager & Shared Storage", Theme::IconType::FileManager, SIGNAL(fileManagerClicked()));
     layout->addWidget(m_btnFileManager);
 
-    // 11. Trim Memory (RAM Trimmer)
-    m_btnRamTrim = createToolButton("Trim Memory: Free Cached RAM (madvise)", Theme::IconType::RamTrim, SIGNAL(ramTrimClicked()));
-    layout->addWidget(m_btnRamTrim);
-
-    // 12. Multi-Instance Manager
+    // Multi-Instance Manager
     m_btnMultiInstance = createToolButton("Multi-Instance Manager (LXC Containers)", Theme::IconType::MultiInstance, SIGNAL(multiInstanceClicked()));
     layout->addWidget(m_btnMultiInstance);
 
-    // 13. Settings (Gear Icon)
+    // Settings (Gear Icon)
     m_btnSettings = createToolButton("Settings (Ctrl+Shift+I)", Theme::IconType::Settings, SIGNAL(settingsClicked()));
     layout->addWidget(m_btnSettings);
 

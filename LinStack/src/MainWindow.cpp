@@ -55,23 +55,23 @@ MainWindow::MainWindow(QWidget *parent)
         availRect = scr->availableGeometry();
     }
 
-    // قراءة الأبعاد الفعلية للشريط الجانبي والعلوي + 2px للإطار الخارجي
+    // Read actual dimensions of side and top toolbars plus 2px outer border
     const int sideW = (m_sideToolBar && m_sideToolBar->width() > 0) ? m_sideToolBar->width() : 46;
     const int topH  = (m_titleBar && m_titleBar->height() > 0) ? m_titleBar->height() : 48;
     const int chromeW = sideW + 2;
     const int chromeH = topH + 2;
     const double scrAr = static_cast<double>(scrSize.width()) / static_cast<double>(scrSize.height());
 
-    // 1. حد تصغير النافذة = نصف أبعاد شاشة المستخدم (1/2) للعرض الصافي + أبعاد الشريطين
+    // 1. Minimum window size = half of user screen dimensions (1/2) for net viewport + toolbars
     int minNetW = scrSize.width() / 2;
     int minNetH = qRound(minNetW / scrAr);
     setMinimumSize(minNetW + chromeW, minNetH + chromeH);
 
-    // 2. حجم الإقلاع الابتدائي = ثلثي أبعاد شاشة المستخدم (2/3) للعرض الصافي (Android Canvas)
+    // 2. Initial startup size = two-thirds of user screen dimensions (2/3) for net Android Canvas
     int targetNetW = (scrSize.width() * 2) / 3;
     int targetNetH = qRound(targetNetW / scrAr);
 
-    // التأكد من أن (العرض الصافي + الشريطين) لا يتجاوز المساحة المتاحة من سطح المكتب حتى لا يضغطه مدير النوافذ
+    // Ensure (net viewport + toolbars) fits within desktop available geometry to avoid WM clamping
     int maxAllowedNetW = availRect.width() - chromeW;
     int maxAllowedNetH = availRect.height() - chromeH;
     if (targetNetW > maxAllowedNetW) {
@@ -83,7 +83,7 @@ MainWindow::MainWindow(QWidget *parent)
         targetNetW = qRound(targetNetH * scrAr);
     }
 
-    // الحجم الإجمالي للنافذة = أبعاد الأندرويد الصافية + أبعاد الشريط العلوي والجانبي
+    // Total window size = net Android dimensions + top and side toolbars
     int targetW = targetNetW + chromeW;
     int targetH = targetNetH + chromeH;
 
@@ -91,7 +91,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     QTimer::singleShot(50, this, [this, scrSize, scrAr, availRect]() {
         if (!isFullScreen() && !isMaximized()) {
-            // إعادة القراءة الفعلية بعد اكتمال رسم التخطيط لضمان دقة البكسل
+            // Re-read actual dimensions after layout pass for pixel-accurate geometry
             int realChromeW = (m_sideToolBar ? m_sideToolBar->width() : 46) + 2;
             int realChromeH = (m_titleBar ? m_titleBar->height() : 48) + 2;
 
@@ -186,7 +186,6 @@ void MainWindow::setupUi()
     connect(m_titleBar, &TitleBar::closeRequested, this, &MainWindow::close);
     connect(m_titleBar, &TitleBar::windowDragged, this, &MainWindow::handleWindowDrag);
     connect(m_titleBar, &TitleBar::helpRequested, this, &MainWindow::handleHelp);
-    connect(m_titleBar, &TitleBar::searchTriggered, this, &MainWindow::handleSearch);
     connect(m_titleBar, &TitleBar::restartSessionRequested, this, [this]() {
         if (m_service) {
             m_canvas->showToast("🔄 Restarting LinStack session...", 3000);
@@ -215,16 +214,10 @@ void MainWindow::setupUi()
     });
     connect(m_sideToolBar, &SideToolBar::keymapperToggled, this, &MainWindow::handleKeymapperToggle);
     connect(m_sideToolBar, &SideToolBar::keymapperEditRequested, this, &MainWindow::handleKeymapperEdit);
-    connect(m_sideToolBar, &SideToolBar::macroClicked, this, [this]() {
-
-        m_canvas->showToast("⏺ Macro Automation: Recording gameplay action sequence...");
-    });
-    connect(m_sideToolBar, &SideToolBar::rotateClicked, this, &MainWindow::handleRotate);
     connect(m_sideToolBar, &SideToolBar::ecoModeToggled, this, &MainWindow::handleEcoModeToggle);
     connect(m_sideToolBar, &SideToolBar::installApkClicked, this, &MainWindow::handleInstallApk);
     connect(m_sideToolBar, &SideToolBar::screenshotClicked, this, &MainWindow::handleScreenshot);
     connect(m_sideToolBar, &SideToolBar::fileManagerClicked, this, &MainWindow::handleSharedStorage);
-    connect(m_sideToolBar, &SideToolBar::ramTrimClicked, this, &MainWindow::handleRamTrim);
     connect(m_sideToolBar, &SideToolBar::multiInstanceClicked, this, [this]() {
         m_canvas->showToast("📑 Multi-Instance Manager: Managing LXC LinStack clones...");
     });
@@ -271,8 +264,8 @@ void MainWindow::setupUi()
                 if (s->size().width() > 0 && s->size().height() > 0) scr = s->size();
             }
             m_service->setDesiredResolution(scr.width(), scr.height());
-            // تنفيذ أوامر linstack prop set الآن بعد جاهزية waydroidplatform
-            // تأخير بسيط (1.5 ثانية) حتى يستقر SurfaceFlinger قبل تحديث الخصائص عبر Binder
+            // Apply linstack prop set commands now that waydroidplatform is ready
+            // Short delay (1.5s) for SurfaceFlinger to stabilize before updating properties via Binder
             QTimer::singleShot(1500, this, [this, scr]() {
                 QString widthStr = QString::number(scr.width());
                 QString heightStr = QString::number(scr.height());
@@ -303,7 +296,7 @@ void MainWindow::setupUi()
     // --- Background Service Initialization & Wiring ---
     m_service = new LinstackService(this);
 
-    // قراءة أبعاد شاشة المستخدم الفعلية وحساب نسبة الأبعاد لتمريرها للأندرويد قبل الإقلاع
+    // Detect user screen resolution and aspect ratio to pass to Android before boot
     QSize androidRes(1920, 1080);
     if (QScreen *scr = QGuiApplication::primaryScreen()) {
         if (scr->size().width() > 0 && scr->size().height() > 0) {
@@ -529,11 +522,9 @@ void MainWindow::handleFullscreenToggle()
 void MainWindow::handleEcoModeToggle(bool active)
 {
     if (active) {
-        m_titleBar->setFpsText("1 FPS");
         m_titleBar->setEngineStatus("Eco Mode (Throttled)", false);
         m_canvas->showToast("⚡ Eco Mode Active: Background framerate clamped to 1 FPS (cgroups v2)");
     } else {
-        m_titleBar->setFpsText("60 FPS");
         m_titleBar->setEngineStatus("LinStack Ready", true);
         m_canvas->showToast("⚡ Eco Mode Disabled: Full performance restored (60-240 FPS)");
     }
@@ -613,21 +604,6 @@ void MainWindow::handleScreenshot()
     }
 }
 
-void MainWindow::handleRotate()
-{
-    if (m_canvas->orientation() == AndroidCanvas::Orientation::Landscape) {
-        m_canvas->setOrientation(AndroidCanvas::Orientation::Portrait);
-    } else {
-        m_canvas->setOrientation(AndroidCanvas::Orientation::Landscape);
-    }
-}
-
-void MainWindow::handleRamTrim()
-{
-    m_canvas->showToast("🧹 RAM Trimmer: Reclaimed 480 MB cached memory via madvise()", 3500);
-}
-
-
 namespace {
 QString defaultSharedPath() {
     QString dl = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
@@ -672,7 +648,7 @@ void runHelperOrBootstrap(const QStringList &helperArgs, std::function<void(int)
         return;
     }
 
-    // تثبيت السكريبت + ملف سياسة Polkit الرسمي (.policy) لمرة واحدة فقط في العمر
+    // One-time installation of storage helper script and official Polkit policy file
     QString bootstrapScript =
         "cat << 'EOF' > /usr/local/bin/linstack-storage-helper\n"
         "#!/bin/bash\n"
@@ -741,7 +717,7 @@ void mountShared(const QString &linuxDir, bool openAfter) {
 
     QString dst = androidSharedMountPoint();
 
-    // إذا كان مربوطاً بالفعل والسكريبت مثبت، افتح المجلد فوراً دون حتى استدعاء pkexec
+    // If already mounted and helper is installed, open folder immediately without invoking pkexec
     QProcess chk; chk.start("mountpoint", QStringList() << "-q" << dst); chk.waitForFinished(400);
     if (chk.exitCode() == 0 && openAfter && isStorageHelperInstalled()) {
         openInAndroidFiles();
@@ -774,9 +750,10 @@ void MainWindow::handleSettings()
         connect(m_settingsDialog, &SettingsDialog::settingsApplied, this, [this]() {
             if (m_service) {
                 m_service->applyDeviceProfileByName(m_settingsDialog->deviceProfile());
+                m_service->setAdbBridgeEnabled(m_settingsDialog->isAdbBridgeEnabled());
             }
             if (m_settingsDialog->isSharedStorageEnabled()) mountShared(m_settingsDialog->sharedStoragePath(), false); else unmountShared(false);
-            // الحفاظ على نسبة أبعاد شاشة المستخدم الفعلية عند حفظ الإعدادات
+            // Preserve user screen aspect ratio when saving settings
             if (QScreen *scr = screen() ? screen() : QGuiApplication::primaryScreen()) {
                 if (scr->size().width() > 0 && scr->size().height() > 0) {
                     m_canvas->setBaseResolution(scr->size().width(), scr->size().height());
@@ -811,11 +788,6 @@ void MainWindow::handleHelp()
     msg.exec();
 }
 
-void MainWindow::handleSearch(const QString &query)
-{
-    m_canvas->showToast(QString("🔍 Searching Play Store for: '%1'").arg(query), 3500);
-}
-
 void MainWindow::handleDiagnostics()
 {
     m_canvas->showToast("🔍 Running full system health diagnostics in background...", 3000);
@@ -827,7 +799,7 @@ void MainWindow::handleDiagnostics()
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
     if (event->type() == QEvent::KeyPress && isActiveWindow()) {
-        // تجاهل الاختصارات إذا كان المستخدم يكتب في مربع نص أو داخل نافذة حوار منبثقة
+        // Ignore global shortcuts while typing in a text field or inside a modal dialog
         if (!qobject_cast<QLineEdit*>(QApplication::focusWidget()) && !QApplication::activeModalWidget()) {
             auto *ke = static_cast<QKeyEvent*>(event);
             int key = ke->key();
@@ -995,7 +967,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
             bool anchorW = (m_resizeEdges & (Qt::LeftEdge | Qt::RightEdge)) != 0;
             m_canvas->aspectRatioWindow()->snapSizeToAspectRatio(netW, netH, anchorW);
 
-            // الحفاظ على الحد الأدنى للنافذة (1024x620) مع احترام نسبة الأبعاد
+            // Enforce minimum window size while preserving aspect ratio
             if (netW + chromeW < minimumWidth()) {
                 netW = minimumWidth() - chromeW;
                 m_canvas->aspectRatioWindow()->snapSizeToAspectRatio(netW, netH, true);
@@ -1052,114 +1024,16 @@ void MainWindow::resizeEvent(QResizeEvent *event)
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    int key = event->key();
-    if (key == Qt::Key_Control || key == Qt::Key_Shift || key == Qt::Key_Alt || key == Qt::Key_Meta) {
-        QMainWindow::keyPressEvent(event);
-        return;
-    }
-
-    QKeySequence pressedSeq(QKeyCombination(event->modifiers(), static_cast<Qt::Key>(key)));
-    QSettings settings("LinStack", "LinStack");
-
-    auto matchesShortcut = [&](const QString &id, const QString &defSeq) {
-        QString saved = settings.value("shortcuts/" + id, defSeq).toString();
-        return !saved.isEmpty() && QKeySequence::fromString(saved, QKeySequence::PortableText) == pressedSeq;
-    };
-
-    // 1A. Enable / Disable Keymapper completely
-    if (matchesShortcut("keymapper_toggle", "Ctrl+Shift+M")) {
-        bool nextActive = !m_sideToolBar->isKeymapperActive();
-        m_sideToolBar->setKeymapperActive(nextActive);
-        handleKeymapperToggle(nextActive);
-        event->accept();
-        return;
-    }
-
-    // 1B. Toggle Keymapper Editor Mode (Only works when Keymapper is already enabled)
-    if (matchesShortcut("keymapper", "Ctrl+Shift+K")) {
-        handleKeymapperEdit();
-        event->accept();
-        return;
-    }
-
-    // 2. Toggle Eco Mode
-
-    if (matchesShortcut("eco_mode", "Ctrl+Shift+E")) {
-        bool eco = !m_sideToolBar->isEcoModeActive();
-        m_sideToolBar->setEcoModeActive(eco);
-        handleEcoModeToggle(eco);
-        event->accept();
-        return;
-    }
-
-    // 3. Take Screenshot
-    if (matchesShortcut("screenshot", "Ctrl+Shift+S")) {
-        handleScreenshot();
-        event->accept();
-        return;
-    }
-
-    // 4. Boss Key (Minimize/Hide)
-    if (matchesShortcut("boss_key", "Ctrl+Shift+H")) {
-        showMinimized();
-        event->accept();
-        return;
-    }
-
-    // 5. Fullscreen
-    if (matchesShortcut("fullscreen", "F11")) {
-        handleFullscreenToggle();
-        event->accept();
-        return;
-    }
-
-    // 6. Lock / Free Mouse Cursor
-    if (matchesShortcut("aim_lock", "Ctrl+Alt") ||
-        ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::AltModifier))) {
-        if (m_canvas->keymapperOverlay() && m_canvas->keymapperOverlay()->translator()) {
-            auto *tr = m_canvas->keymapperOverlay()->translator();
-            tr->setAimLockActive(!tr->isAimLockActive());
-        }
-        event->accept();
-    return;
-        }
-
-        // 7. Diagnostics Dialog
-        if ((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_D) {
-            if (m_healer) {
-                HealthReport rep = m_healer->engine()->latestReport();
-                if (rep.checks.isEmpty()) {
-                    m_healer->startDiagnosticsAsync(false, this);
-                } else {
-                    m_healer->showRecoveryDialog(rep, this);
-                }
-            }
-            event->accept();
+    static bool s_forwardingPress = false;
+    if (!s_forwardingPress && m_canvas && !m_sideToolBar->isKeymapperActive()) {
+        s_forwardingPress = true;
+        QCoreApplication::sendEvent(m_canvas, event);
+        s_forwardingPress = false;
+        if (event->isAccepted()) {
             return;
         }
-
-        // 8. ESC -> Exit Fullscreen
-        if (event->key() == Qt::Key_Escape) {
-            if (isFullScreen()) {
-                showNormal();
-                m_titleBar->show();
-                m_sideToolBar->show();
-                event->accept();
-                return;
-            }
-        }
-
-        static bool s_forwardingPress = false;
-        if (!s_forwardingPress && m_canvas && !m_sideToolBar->isKeymapperActive()) {
-            s_forwardingPress = true;
-            QCoreApplication::sendEvent(m_canvas, event);
-            s_forwardingPress = false;
-            if (event->isAccepted()) {
-                return;
-            }
-        }
-
-        QMainWindow::keyPressEvent(event);
+    }
+    QMainWindow::keyPressEvent(event);
 }
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event)
@@ -1174,6 +1048,22 @@ void MainWindow::keyReleaseEvent(QKeyEvent *event)
         }
     }
     QMainWindow::keyReleaseEvent(event);
+}
+
+void MainWindow::installApkFile(const QString &apkPath)
+{
+    if (apkPath.isEmpty()) return;
+    bringToFront();
+    if (!isContainerInitialized()) {
+        promptFirstTimeInitialization();
+        return;
+    }
+    if (m_service) {
+        if (!m_service->isSessionActive()) {
+            m_service->startSession();
+        }
+        m_service->installApk(apkPath);
+    }
 }
 
 void MainWindow::bringToFront()
@@ -1220,11 +1110,11 @@ void MainWindow::paintEvent(QPaintEvent *event)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    // إخفاء الواجهة فوراً للمستخدم
+    // Hide UI immediately for responsive user feedback
     hide();
     QApplication::processEvents();
 
-    // إيقاف جلسة الأندرويد بنظافة لحماية بيانات المستخدم من التلف
+    // Gracefully stop Android session to protect user data integrity
     unmountShared(true);
     if (m_service) {
         LOG_INFO("Core", "Gracefully stopping LinStack session before exit...");

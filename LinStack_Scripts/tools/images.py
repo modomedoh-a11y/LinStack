@@ -28,14 +28,14 @@ def resize(img_file, size):
     run(["sudo", "resize2fs", img_file, size], ignore="^resize2fs \d+\.\d+\.\d (.+)\n$")
 
 def get_image_dir():
-    # Read linstack config to get image location
+    # Read waydroid config to get image location
     cfg = configparser.ConfigParser()
-    cfg_file = os.environ.get("LINSTACK_CONFIG", "/var/lib/linstack/linstack.cfg")
+    cfg_file = os.environ.get("WAYDROID_CONFIG", "/var/lib/waydroid/waydroid.cfg")
     if not os.path.isfile(cfg_file):
-        Logger.error("Cannot locate linstack config file, reinit wayland and try again!")
+        Logger.error("Cannot locate waydroid config file, reinit wayland and try again!")
         sys.exit(1)
     cfg.read(cfg_file)
-    if "linstack" not in cfg:
+    if "waydroid" not in cfg:
         Logger.error("Required entry in config was not found, Cannot continue!") #magisk
         sys.exit(1)
-    return cfg["linstack"]["images_path"]
+    return cfg["waydroid"]["images_path"]

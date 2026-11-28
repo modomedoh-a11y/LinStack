@@ -1,5 +1,6 @@
 #include "TitleBar.h"
 #include "Theme.h"
+#include "AndroidCanvas.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -104,85 +105,7 @@ void TitleBar::setupUi()
 
     layout->addStretch(1);
 
-    // --- Center Section: Play Store Search Bar ---
-    auto *searchContainer = new QWidget(this);
-    searchContainer->setFixedWidth(440);
-    searchContainer->setFixedHeight(30);
-    searchContainer->setStyleSheet(
-        "QWidget {"
-        "  background-color: #0D121D;"
-        "  border: 1px solid #1F2937;"
-        "  border-radius: 17px;"
-        "}"
-        "QWidget:hover {"
-        "  border: 1px solid rgba(16, 185, 129, 0.6);"
-        "}"
-        "QLineEdit:focus {"
-        "  border: none;"
-        "}"
-    );
-
-    auto *searchLayout = new QHBoxLayout(searchContainer);
-    searchLayout->setContentsMargins(10, 0, 8, 0);
-    searchLayout->setSpacing(6);
-
-    auto *searchIcon = new QLabel(searchContainer);
-    searchIcon->setPixmap(Theme::renderIconPixmap(Theme::IconType::Search, Theme::ColorTextMuted, 14));
-    searchLayout->addWidget(searchIcon);
-
-    m_searchEdit = new QLineEdit(searchContainer);
-    m_searchEdit->setPlaceholderText("Search in Play Store (e.g. Free Fire, PUBG, Roblox...)");
-    m_searchEdit->setStyleSheet(
-        "QLineEdit {"
-        "  background: transparent;"
-        "  border: none;"
-        "  color: #F9FAFB;"
-        "  font-size: 12px;"
-        "  padding: 0px;"
-        "}"
-        "QLineEdit::placeholder {"
-        "  color: #6B7280;"
-        "}"
-    );
-    searchLayout->addWidget(m_searchEdit);
-
-    // Clear / Submit button
-    m_searchBtn = new QPushButton(searchContainer);
-    m_searchBtn->setFixedSize(18, 18);
-    m_searchBtn->setCursor(Qt::PointingHandCursor);
-    m_searchBtn->setIcon(Theme::createIcon(Theme::IconType::PlayStore, Theme::ColorEmerald, 13));
-    m_searchBtn->setToolTip("Search in Play Store");
-    m_searchBtn->setStyleSheet("QPushButton { background: transparent; border: none; } QPushButton:hover { background: rgba(16, 185, 129, 0.2); border-radius: 10px; }");
-    searchLayout->addWidget(m_searchBtn);
-
-    connect(m_searchEdit, &QLineEdit::returnPressed, this, [this]() {
-        if (!m_searchEdit->text().trimmed().isEmpty()) {
-            emit searchTriggered(m_searchEdit->text().trimmed());
-        }
-    });
-    connect(m_searchBtn, &QPushButton::clicked, this, [this]() {
-        if (!m_searchEdit->text().trimmed().isEmpty()) {
-            emit searchTriggered(m_searchEdit->text().trimmed());
-        }
-    });
-
-    layout->addWidget(searchContainer);
-    layout->addStretch(1);
-
-    // --- Right Section: FPS, Help & Window Controls ---
-    m_fpsBadge = new QLabel("60 FPS", this);
-    m_fpsBadge->setStyleSheet(
-        "background-color: #0D121D;"
-        "color: #00FF66;"
-        "border: 1px solid #1F2937;"
-        "border-radius: 4px;"
-        "padding: 2px 7px;"
-        "font-size: 11px;"
-        "font-weight: 700;"
-        "font-family: monospace;"
-    );
-    layout->addWidget(m_fpsBadge);
-
+    // --- Right Section: Help & Window Controls ---
     // Help Button
     m_helpBtn = new QPushButton(this);
     m_helpBtn->setFixedSize(32, 32);
@@ -259,11 +182,6 @@ void TitleBar::setEngineStatus(const QString &text, bool active)
     }
 }
 
-void TitleBar::setFpsText(const QString &fps)
-{
-    m_fpsBadge->setText(fps);
-}
-
 void TitleBar::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
@@ -289,6 +207,13 @@ void TitleBar::paintEvent(QPaintEvent *event)
 
 void TitleBar::mousePressEvent(QMouseEvent *event)
 {
+    if (window()) {
+        if (auto *canvas = window()->findChild<AndroidCanvas *>()) {
+            if (canvas->isAimModeActive()) {
+                canvas->setAimMode(false);
+            }
+        }
+    }
     if (event->button() == Qt::LeftButton) {
         QWidget *child = childAt(event->position().toPoint());
         if (child == m_statusText || child == m_statusDot) {

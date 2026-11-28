@@ -2,7 +2,6 @@
 #define TITLEBAR_H
 
 #include <QWidget>
-#include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
 #include <QHBoxLayout>
@@ -17,13 +16,11 @@ public:
 
     void setMaximizedState(bool maximized);
     void setEngineStatus(const QString &text, bool active = true);
-    void setFpsText(const QString &fps);
 
 signals:
     void minimizeRequested();
     void maximizeRequested();
     void closeRequested();
-    void searchTriggered(const QString &query);
     void helpRequested();
     void windowDragged(const QPoint &globalDelta);
     void maximizeToggled();
@@ -48,10 +45,6 @@ private:
     QLabel *m_statusDot = nullptr;
     QLabel *m_statusText = nullptr;
 
-    QLineEdit *m_searchEdit = nullptr;
-    QPushButton *m_searchBtn = nullptr;
-
-    QLabel *m_fpsBadge = nullptr;
     QPushButton *m_helpBtn = nullptr;
     QPushButton *m_minBtn = nullptr;
     QPushButton *m_maxBtn = nullptr;

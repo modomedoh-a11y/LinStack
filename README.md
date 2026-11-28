@@ -24,7 +24,7 @@ LinStack is a high-performance, Linux-native Android emulation and containerized
 - **Kernel Drivers:**
   - Android Binder IPC driver (`binderfs` or `binder_linux` module)
   - Anonymous Shared Memory (`ashmem_linux` or memfd fallback)
-- **Display Server:** Wayland session (e.g., GNOME Wayland, KDE Plasma Wayland, Sway, Hyprland)
+- **Display Server:** Wayland or X11 session (e.g., GNOME, KDE Plasma, XFCE, Linux Mint/Cinnamon, Sway, Hyprland, i3)
 - **Container Infrastructure:** LXC, `dnsmasq`, `iptables` / `nftables`
 
 ### Required Packages
@@ -34,7 +34,7 @@ LinStack is a high-performance, Linux-native Android emulation and containerized
 sudo apt update
 sudo apt install -y build-essential cmake pkg-config \
     qt6-base-dev libgl1-mesa-dev libwayland-dev wayland-protocols \
-    libwlroots-dev libdrm-dev libepoxy-dev libxkbcommon-dev libinput-dev \
+    libwlroots-dev libdrm-dev libepoxy-dev libxkbcommon-dev libinput-dev libx11-dev \
     lxc dnsmasq python3 python3-requests python3-dbus python3-gi \
     gir1.2-gtk-3.0 curl
 ```
@@ -43,7 +43,7 @@ sudo apt install -y build-essential cmake pkg-config \
 ```bash
 sudo dnf install -y gcc-c++ cmake pkgconf-pkg-config \
     qt6-qtbase-devel mesa-libGL-devel wayland-devel wayland-protocols-devel \
-    wlroots-devel libdrm-devel libepoxy-devel libxkbcommon-devel libinput-devel \
+    wlroots-devel libdrm-devel libepoxy-devel libxkbcommon-devel libinput-devel libX11-devel \
     lxc dnsmasq python3 python3-requests python3-dbus python3-gobject \
     gtk3 curl
 ```
@@ -52,7 +52,7 @@ sudo dnf install -y gcc-c++ cmake pkgconf-pkg-config \
 ```bash
 sudo pacman -S --needed base-devel cmake pkgconf \
     qt6-base mesa wayland wayland-protocols wlroots \
-    libdrm libepoxy libxkbcommon libinput lxc dnsmasq \
+    libdrm libepoxy libxkbcommon libinput libx11 lxc dnsmasq \
     python python-requests python-dbus python-gobject gtk3 curl
 ```
 
@@ -223,7 +223,7 @@ LinStack requires a Wayland desktop environment (GNOME Wayland, KDE Plasma Wayla
   ```
 
 ### 3. Container Network & Firewall Conflicts
-LinStack creates a virtual bridge (`linstack0` / `192.168.240.1`) and uses `dnsmasq` for DHCP and DNS resolution.
+LinStack creates a virtual bridge (`linstack0` / `192.168.245.1`) and uses `dnsmasq` for DHCP and DNS resolution.
 
 - **Missing Internet in Android container:**
   Verify the LinStack bridge interface:
@@ -245,7 +245,7 @@ LinStack creates a virtual bridge (`linstack0` / `192.168.240.1`) and uses `dnsm
     ```bash
     sudo iptables -A FORWARD -i linstack0 -j ACCEPT
     sudo iptables -A FORWARD -o linstack0 -j ACCEPT
-    sudo iptables -t nat -A POSTROUTING -s 192.168.240.0/24 ! -d 192.168.240.0/24 -j MASQUERADE
+    sudo iptables -t nat -A POSTROUTING -s 192.168.245.0/24 ! -d 192.168.245.0/24 -j MASQUERADE
     ```
 
 ### 4. Polkit & `pkexec` Permission Failures
@@ -272,6 +272,15 @@ To cleanly remove the LinStack system service, desktop shortcuts, and binary sym
 ```bash
 ./uninstall.sh
 ```
+---
+
+## ⚠️ Legal Disclaimer & Account Safety
+
+- **Use at Your Own Risk:** LinStack is provided **"AS IS"**, without warranty of any kind, express or implied, in accordance with the GNU General Public License v3.0.
+- **No Responsibility for Account Bans or Penalties:** The developer (`modomedoh-a11y`) and contributors are **NOT responsible** for any account suspensions, bans, restrictions, or data loss resulting from the use of LinStack, custom device spoofing profiles, keymapping tools, or third-party scripts (such as Magisk, MicroG, or ARM translation layers).
+- **Third-Party Terms of Service:** Running Android games or applications inside a containerized/emulated Linux environment or modifying device properties may violate the Terms of Service (ToS) of certain game publishers or app developers. **You are solely responsible** for ensuring compliance with the rules and policies of any software or game you run.
+- **No Affiliation:** "Android", "LineageOS", "BlueStacks", "MSI App Player", and all game titles mentioned are trademarks of their respective owners. LinStack is an independent open-source project and is not affiliated with or endorsed by any of these entities.
+
 
 ---
 

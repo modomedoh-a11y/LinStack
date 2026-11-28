@@ -13,7 +13,7 @@ class Widevine(General):
         "x86_64": {
             "11": ["https://github.com/supremegamers/vendor_google_proprietary_widevine-prebuilt/archive/48d1076a570837be6cdce8252d5d143363e37cc1.zip",
                    "f587b8859f9071da4bca6cea1b9bed6a"],
-            "13": ["https://github.com/LinStack-ATV/vendor_google_proprietary_widevine-prebuilt/archive/679552343d8b2e8d7a19b6df61c7a03963d0c75b.zip",
+            "13": ["https://github.com/WayDroid-ATV/vendor_google_proprietary_widevine-prebuilt/archive/679552343d8b2e8d7a19b6df61c7a03963d0c75b.zip",
                    "80ab79ea85c7b2556baedb371a54e01c"]
         },
         # "armeabi-v7a": ["https://github.com/supremegamers/vendor_google_proprietary_widevine-prebuilt/archive/a1a19361d36311bee042da8cf4ced798d2c76d98.zip", "fed6898b5cfd2a908cb134df97802554"],

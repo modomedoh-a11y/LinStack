@@ -22,6 +22,7 @@ public:
     ~MainWindow() override;
 
     void launchApp(const QString &packageName);
+    void installApkFile(const QString &apkPath);
     void bringToFront();
 
 protected:
@@ -45,11 +46,8 @@ private slots:
     void handleKeymapperEdit();
     void handleInstallApk();
     void handleScreenshot();
-    void handleRotate();
-    void handleRamTrim();
     void handleSettings();
     void handleHelp();
-    void handleSearch(const QString &query);
     void handleDiagnostics();
     void handleSharedStorage();
 

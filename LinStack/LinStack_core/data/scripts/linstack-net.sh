@@ -171,6 +171,10 @@ start() {
         start_iptables
     fi
 
+    if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active -q firewalld; then
+        firewall-cmd --zone=trusted --add-interface=${LXC_BRIDGE} 2>/dev/null || true
+    fi
+
     LXC_DOMAIN_ARG=""
     if [ -n "$LXC_DOMAIN" ]; then
         LXC_DOMAIN_ARG="-s $LXC_DOMAIN -S /$LXC_DOMAIN/"

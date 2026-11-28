@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QThread>
 #include <QCoreApplication>
+#include <QSettings>
 
 LinstackService::LinstackService(QObject *parent)
     : QObject(parent)
@@ -69,11 +70,15 @@ LinstackService::LinstackService(QObject *parent)
     connect(m_adbSocket, &QTcpSocket::connected, this, &LinstackService::handleAdbSocketConnected);
     connect(m_adbSocket, &QTcpSocket::errorOccurred, this, &LinstackService::handleAdbSocketError);
 
-    // Periodic ADB probe timer (every 4 seconds)
+    // Periodic ADB probe timer (every 8 seconds) - only runs when ADB debugging is explicitly enabled
     m_adbPollTimer = new QTimer(this);
     m_adbPollTimer->setInterval(8000);
     connect(m_adbPollTimer, &QTimer::timeout, this, &LinstackService::checkAdbConnection);
-    m_adbPollTimer->start();
+
+    m_adbBridgeEnabled = QSettings("LinStack", "LinStack").value("advanced/adb_bridge_enabled", false).toBool();
+    if (m_adbBridgeEnabled) {
+        m_adbPollTimer->start();
+    }
 
     // Periodic container/session status poller
     m_statusPollTimer = new QTimer(this);
@@ -85,13 +90,13 @@ LinstackService::LinstackService(QObject *parent)
 LinstackService::~LinstackService()
 {
     m_isStopping = true;
-    // إيقاف جميع المؤقتات لمنع إعادة تشغيل الواجهة أثناء إغلاق البرنامج
+    // Stop all timers to prevent UI relaunch during application shutdown
     if (m_adbPollTimer) m_adbPollTimer->stop();
     if (m_statusPollTimer) m_statusPollTimer->stop();
     if (m_sessionPollTimer) m_sessionPollTimer->stop();
     if (m_uiRetryTimer) m_uiRetryTimer->stop();
 
-    // إغلاق عملية الواجهة (show-full-ui) بنظافة
+    // Cleanly terminate the UI process (show-full-ui)
     if (m_uiProcess && m_uiProcess->state() != QProcess::NotRunning) {
         m_uiProcess->terminate();
         if (!m_uiProcess->waitForFinished(1000)) {
@@ -100,7 +105,7 @@ LinstackService::~LinstackService()
         }
     }
 
-    // إغلاق عملية الجلسة (session start) بنظافة
+    // Cleanly terminate the session process (session start)
     if (m_sessionProcess && m_sessionProcess->state() != QProcess::NotRunning) {
         m_sessionProcess->terminate();
         if (!m_sessionProcess->waitForFinished(1500)) {
@@ -109,7 +114,7 @@ LinstackService::~LinstackService()
         }
     }
 
-    // إغلاق أي سكريبت قيد التشغيل
+    // Terminate any currently running script process
     if (m_scriptProcess && m_scriptProcess->state() != QProcess::NotRunning) {
         m_scriptProcess->terminate();
         if (!m_scriptProcess->waitForFinished(1000)) {
@@ -301,7 +306,7 @@ void LinstackService::startSession()
     qputenv("LINSTACK_WAYLAND_DISPLAY", "wayland-linstack-0");
     qputenv("XDG_RUNTIME_DIR", runtimeDir.toUtf8());
 
-    // 1. التأكد من أن خدمة الحاوية (linstack-container) تعمل قبل ضبط الخصائص وبدء الجلسة
+    // 1. Ensure container service (linstack-container) is active before setting properties and starting session
     if (QFileInfo::exists("/run/systemd/system")) {
         QProcess sysChk;
         sysChk.start("systemctl", QStringList() << "is-active" << "--quiet" << "linstack-container.service");
@@ -314,9 +319,9 @@ void LinstackService::startSession()
         }
     }
 
-    // 2. كتابة أوامر تحديد أبعاد شاشة الأندرويد (width & height) بشكل متزامن قبل إقلاع الجلسة
+    // 2. Synchronously configure Android display dimensions (width & height) prior to session boot
     if (m_desiredWidth > 0 && m_desiredHeight > 0) {
-        // حذف أو تحديث display-manager-state.xml حتى لا يفرض DisplayManager ارتفاعاً قديماً (مثل 1080)
+        // Update display-manager-state.xml so DisplayManager does not enforce stale dimensions (e.g. 1080)
         QString dmStateFile = PathResolver::userDataDir() + "/data/system/display-manager-state.xml";
         if (QFile::exists(dmStateFile)) {
             QFile f(dmStateFile);
@@ -334,25 +339,10 @@ void LinstackService::startSession()
             }
         }
         LOG_INFO("Session", QString("Setting container resolution properties: %1x%2").arg(m_desiredWidth).arg(m_desiredHeight));
-        QProcess pW;
-        PathResolver::configureProcess(&pW, QStringList() << "prop" << "set" << "persist.waydroid.width" << QString::number(m_desiredWidth));
-        pW.start();
-        pW.waitForFinished(2000);
-
-        QProcess pH;
-        PathResolver::configureProcess(&pH, QStringList() << "prop" << "set" << "persist.waydroid.height" << QString::number(m_desiredHeight));
-        pH.start();
-        pH.waitForFinished(2000);
-
-        QProcess pLW;
-        PathResolver::configureProcess(&pLW, QStringList() << "prop" << "set" << "persist.linstack.width" << QString::number(m_desiredWidth));
-        pLW.start();
-        pLW.waitForFinished(1500);
-
-        QProcess pLH;
-        PathResolver::configureProcess(&pLH, QStringList() << "prop" << "set" << "persist.linstack.height" << QString::number(m_desiredHeight));
-        pLH.start();
-        pLH.waitForFinished(1500);
+        PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.waydroid.width" << QString::number(m_desiredWidth));
+        PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.waydroid.height" << QString::number(m_desiredHeight));
+        PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.linstack.width" << QString::number(m_desiredWidth));
+        PathResolver::startDetachedLinstack(QStringList() << "prop" << "set" << "persist.linstack.height" << QString::number(m_desiredHeight));
     }
 
     // Pre-flight check
@@ -460,7 +450,7 @@ void LinstackService::launchFullUi()
                 emit logMessage("UI_ERR", err);
                 LOG_WARN("UI[STDERR]", err);
 
-                // إذا كانت الجلسة معلقة/تعمل مسبقاً، نُجبر الأندرويد على عرض شاشته عبر إطلاق تطبيق النظام
+                // If session is already tracked/running, wake Android display surface by launching Settings
                 if (err.contains("Already tracking a session", Qt::CaseInsensitive)) {
                     LOG_INFO("UI", "Session already tracked -> waking Android display surface via app launch...");
                     QProcess *wakeProc = new QProcess(this);
@@ -563,7 +553,7 @@ void LinstackService::stopSession()
         }
     }
 
-    // تنفيذ session stop بشكل متزامن لضمان إغلاق جلسة الأندرويد بالكامل قبل خروج البرنامج
+    // Execute session stop synchronously to ensure Android session closes cleanly before app exit
     QProcess stopProc;
     PathResolver::configureProcess(&stopProc, QStringList() << "session" << "stop");
     stopProc.start();
@@ -872,25 +862,59 @@ void LinstackService::applyDeviceProfile(const DeviceProfileInfo &profile)
 // ADB Socket Connection Handler & APK Installation (127.0.0.1:5555)
 // =========================================================================
 
+void LinstackService::setAdbBridgeEnabled(bool enabled)
+{
+    m_adbBridgeEnabled = enabled;
+    if (enabled) {
+        if (!m_adbPollTimer->isActive()) {
+            m_adbPollTimer->start();
+            checkAdbConnection();
+        }
+    } else {
+        if (m_adbPollTimer->isActive()) {
+            m_adbPollTimer->stop();
+        }
+        if (m_adbSocket && m_adbSocket->state() != QAbstractSocket::UnconnectedState) {
+            m_adbSocket->abort();
+        }
+        if (m_adbConnected) {
+            m_adbConnected = false;
+            emit adbConnectionStatusChanged(false);
+            emit logMessage("ADB", "ADB debugging bridge stopped.");
+        }
+    }
+}
+
 void LinstackService::checkAdbConnection()
 {
+    QString targetIp = "192.168.245.2";
+    QFile leaseFile("/var/lib/misc/dnsmasq.linstack0.leases");
+    if (leaseFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QString content = QString::fromUtf8(leaseFile.readAll());
+        QRegularExpression rx("(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})");
+        auto match = rx.match(content);
+        if (match.hasMatch()) {
+            targetIp = match.captured(1);
+        }
+    }
     if (m_adbSocket->state() == QAbstractSocket::UnconnectedState) {
-        m_adbSocket->connectToHost("127.0.0.1", 5555);
+        m_adbSocket->connectToHost(targetIp, 5555);
     }
 }
 
 void LinstackService::handleAdbSocketConnected()
 {
+    QString peerIp = m_adbSocket->peerAddress().toString();
+    if (peerIp.isEmpty()) peerIp = "192.168.245.2";
     if (!m_adbConnected) {
         m_adbConnected = true;
         emit adbConnectionStatusChanged(true);
-        emit logMessage("ADB", "Established direct socket connection to LinStack ADB daemon at 127.0.0.1:5555.");
+        emit logMessage("ADB", QString("Established ADB connection to %1:5555").arg(peerIp));
 
-        // Automatically connect adb client to local port
         auto *proc = new QProcess(this);
         connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                 proc, &QProcess::deleteLater);
-        proc->start("adb", QStringList() << "connect" << "127.0.0.1:5555");
+        proc->start("adb", QStringList() << "connect" << (peerIp + ":5555"));
     }
     m_adbSocket->disconnectFromHost();
 }

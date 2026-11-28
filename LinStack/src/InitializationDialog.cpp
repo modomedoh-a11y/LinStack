@@ -21,7 +21,7 @@ static const QString DEFAULT_SYS_URL =
 static const QString DEFAULT_VND_URL =
     "https://sourceforge.net/projects/waydroid/files/images/vendor/waydroid_x86_64/lineage-18.1-20250628-MAINLINE-waydroid_x86_64-vendor.zip/download";
 static const QString HELPER_NOTICE_TEXT =
-    "These are links for Waydroid Lineage OS Android 11. You can enter your own Android image links, or copy system.img and vendor.img into LinStack/resources (or /opt/linstack/resources before running Init).";
+    "These are links for Waydroid Lineage OS Android 11. You can enter your own Android image links, or copy system.img and vendor.img into /opt/linstack/resources/ (after installation) or LinStack/resources/ (before running install.sh), then click Init.";
 
 InitializationDialog::InitializationDialog(QWidget *parent)
     : QDialog(parent)
@@ -352,13 +352,7 @@ void InitializationDialog::handleProcessFinished(int exitCode, QProcess::ExitSta
         m_lblStatus->setText("Container initialized successfully!");
         appendLog("LinStack container initialization completed successfully.", "#00FF66");
 
-        // Enable and start linstack-container.service immediately after first-run init
-        appendLog("Activating container daemon: systemctl enable --now linstack-container.service...", "#34D399");
-        if (!QStandardPaths::findExecutable("pkexec").isEmpty()) {
-            QProcess::execute("pkexec", QStringList() << "systemctl" << "enable" << "--now" << "linstack-container.service");
-        } else {
-            QProcess::execute("systemctl", QStringList() << "enable" << "--now" << "linstack-container.service");
-        }
+        appendLog("Container service enabled and started automatically.", "#34D399");
 
         emit initializationSucceeded();
 

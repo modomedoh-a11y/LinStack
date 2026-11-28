@@ -64,6 +64,7 @@ message(STATUS "Found wlroots version ${WLROOTS_VERSION} (minor: ${WLROOTS_VERSI
 
 pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
 pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+pkg_check_modules(X11 IMPORTED_TARGET x11)
 pkg_check_modules(WAYLAND_PROTOCOLS REQUIRED wayland-protocols>=1.24)
 pkg_check_modules(EGL REQUIRED IMPORTED_TARGET egl)
 pkg_check_modules(GLESV2 REQUIRED IMPORTED_TARGET glesv2)
@@ -118,6 +119,17 @@ add_custom_command(
     COMMAND ${WAYLAND_SCANNER_EXECUTABLE} private-code ${PTR_CONSTRAINTS_XML} ${PTR_CONSTRAINTS_SRC}
     DEPENDS ${PTR_CONSTRAINTS_XML}
     COMMENT "Generating Wayland client pointer-constraints protocol"
+)
+
+set(REL_PTR_XML "${WAYLAND_PROTOCOLS_DIR}/unstable/relative-pointer/relative-pointer-unstable-v1.xml")
+set(REL_PTR_HDR "${PROTOCOL_GEN_DIR}/relative-pointer-unstable-v1-client-protocol.h")
+set(REL_PTR_SRC "${PROTOCOL_GEN_DIR}/relative-pointer-unstable-v1-client-protocol.c")
+add_custom_command(
+    OUTPUT ${REL_PTR_HDR} ${REL_PTR_SRC}
+    COMMAND ${WAYLAND_SCANNER_EXECUTABLE} client-header ${REL_PTR_XML} ${REL_PTR_HDR}
+    COMMAND ${WAYLAND_SCANNER_EXECUTABLE} private-code ${REL_PTR_XML} ${REL_PTR_SRC}
+    DEPENDS ${REL_PTR_XML}
+    COMMENT "Generating Wayland client relative-pointer protocol"
 )
 
 
@@ -190,11 +202,13 @@ set(SOURCES
     src/LinstackService.cpp
     src/UInputTouchBridge.h
     src/UInputTouchBridge.cpp
+    src/ScriptEngine.h
+    src/ScriptEngine.cpp
     src/InputTranslator.h
     src/InputTranslator.cpp
 )
 
-add_executable(LinStack ${SOURCES} ${PTR_CONSTRAINTS_HDR} ${PTR_CONSTRAINTS_SRC})
+add_executable(LinStack ${SOURCES} ${PTR_CONSTRAINTS_HDR} ${PTR_CONSTRAINTS_SRC} ${REL_PTR_HDR} ${REL_PTR_SRC})
 
 target_compile_definitions(LinStack PRIVATE
     LIN_STACK_INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}"
@@ -230,6 +244,7 @@ target_link_libraries(LinStack PRIVATE
     Qt6::OpenGLWidgets
     ${LIBEVDEV_LIBRARIES}
     PkgConfig::WAYLAND_CLIENT
+    $<$<BOOL:${X11_FOUND}>:PkgConfig::X11>
 )
 
 

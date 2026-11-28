@@ -159,6 +159,7 @@ private:
     QPushButton *m_btnAddSmartCast  = nullptr;
     QPushButton *m_btnAddBurstTap   = nullptr;
     QPushButton *m_btnAddFreeLook   = nullptr;
+    QPushButton *m_btnAddMacro      = nullptr;
 
     // Draggable Per-node Context Settings Popup
     QWidget        *m_nodeSettingsPanel = nullptr;

@@ -67,3 +67,17 @@ TRADEMARK & EXTERNAL IMAGES DISCLAIMER
   MicroG), and binary translation layers (libndk / libhoudini) are NOT
   bundled with or distributed by LinStack. Users download these components
   directly from their respective third-party sources at runtime.
+
+========================================================================
+LIMITATION OF LIABILITY & USER RESPONSIBILITY
+========================================================================
+
+- LinStack is intended strictly for educational, development, and
+  personal compatibility purposes on GNU/Linux systems.
+- The author (modomedoh-a11y) assumes NO liability or responsibility for
+  any consequences arising from the use or misuse of this software,
+  including but not limited to game account bans, service restrictions,
+  hardware issues, or system instability.
+- Users assume full legal and personal responsibility when utilizing
+  features such as device property spoofing, input mapping, or optional
+  third-party extensions located in LinStack_Scripts.

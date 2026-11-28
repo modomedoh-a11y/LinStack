@@ -23,11 +23,17 @@ int main(int argc, char *argv[])
     Logger::installQtMessageHandler();
     LOG_INFO("Core", "=== LinStack 1.0 (Cyber Emerald Edition) initializing ===");
 
-    // Configure hardware integration for embedded Wayland compositor & Mesa DRI3 DMA-BUF buffer sharing
+    // Configure hardware integration for both X11 (xcb_egl) and Wayland
     qputenv("QSG_RHI_BACKEND", "opengl");
-    qputenv("QT_WAYLAND_HARDWARE_INTEGRATION", "wayland-egl");
-    qputenv("QT_WAYLAND_SERVER_BUFFER_INTEGRATION", "dmabuf-server");
-    qputenv("QT_WAYLAND_CLIENT_BUFFER_INTEGRATION", "wayland-egl");
+    qputenv("QT_XCB_GL_INTEGRATION", "xcb_egl");
+
+    if (qEnvironmentVariable("XDG_SESSION_TYPE") == "x11" || qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
+        qputenv("QT_QPA_PLATFORM", "xcb");
+    } else {
+        qputenv("QT_WAYLAND_HARDWARE_INTEGRATION", "wayland-egl");
+        qputenv("QT_WAYLAND_SERVER_BUFFER_INTEGRATION", "dmabuf-server");
+        qputenv("QT_WAYLAND_CLIENT_BUFFER_INTEGRATION", "wayland-egl");
+    }
 
     // Qt 6 High-DPI and GLES2 configuration
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
@@ -46,12 +52,17 @@ int main(int argc, char *argv[])
 
     bool isScreenshotMode = false;
     QString launchPackage;
+    QString installApkPath;
     for (int i = 1; i < argc; ++i) {
         QString arg = argv[i];
         if (arg.startsWith("--screenshot")) {
             isScreenshotMode = true;
         } else if (arg == "--launch" && i + 1 < argc) {
-            launchPackage = argv[i + 1];
+            launchPackage = argv[++i];
+        } else if (arg == "--install" && i + 1 < argc) {
+            installApkPath = argv[++i];
+        } else if (!arg.startsWith("-") && arg.endsWith(".apk", Qt::CaseInsensitive)) {
+            installApkPath = arg;
         }
     }
 
@@ -65,7 +76,7 @@ int main(int argc, char *argv[])
         clientSocket.connectToServer(serverName);
         if (clientSocket.waitForConnected(400)) {
             LOG_INFO("Core", "LinStack is already running. Forwarding launch command via IPC...");
-            QString msg = launchPackage.isEmpty() ? "ACTIVATE" : ("LAUNCH:" + launchPackage);
+            QString msg = !installApkPath.isEmpty() ? ("INSTALL:" + installApkPath) : (launchPackage.isEmpty() ? "ACTIVATE" : ("LAUNCH:" + launchPackage));
             clientSocket.write(msg.toUtf8() + "\n");
             clientSocket.waitForBytesWritten(1000);
             clientSocket.disconnectFromServer();
@@ -77,7 +88,7 @@ int main(int argc, char *argv[])
 
     // Fast non-session pre-flight diagnostic check (kernel binder / modules)
     // Note: session is NOT started here; MainWindow initializes the embedded compositor first
-    // الفحص التشخيصي يعمل في الخلفية من MainWindow لفتح الواجهة فوراً دون تأخير
+    // Diagnostics run asynchronously from MainWindow so the UI opens immediately without delay
 
     // Apply dark cyber palette
     QPalette cyberPalette;
@@ -134,7 +145,11 @@ int main(int argc, char *argv[])
                     QObject::connect(client, &QLocalSocket::readyRead, [client, &window]() {
                         QByteArray data = client->readAll();
                         QString msg = QString::fromUtf8(data).trimmed();
-                        if (msg.startsWith("LAUNCH:")) {
+                        if (msg.startsWith("INSTALL:")) {
+                            QString apk = msg.mid(8).trimmed();
+                            LOG_INFO("Core", "IPC APK install requested: " + apk);
+                            window.installApkFile(apk);
+                        } else if (msg.startsWith("LAUNCH:")) {
                             QString pkg = msg.mid(7).trimmed();
                             LOG_INFO("Core", "IPC launch requested for package: " + pkg);
                             window.bringToFront();
@@ -150,7 +165,11 @@ int main(int argc, char *argv[])
 
     window.show();
 
-    if (!launchPackage.isEmpty()) {
+    if (!installApkPath.isEmpty()) {
+        QTimer::singleShot(600, [&window, installApkPath]() {
+            window.installApkFile(installApkPath);
+        });
+    } else if (!launchPackage.isEmpty()) {
         QTimer::singleShot(400, [&window, launchPackage]() {
             window.launchApp(launchPackage);
         });

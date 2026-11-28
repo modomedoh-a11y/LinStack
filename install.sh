@@ -86,6 +86,18 @@ Type=Application
 Categories=Game;System;Emulator;Utility;LinStack;
 DESKTOP_EOF
 
+cat > /usr/share/applications/linstack.app.install.desktop << 'APK_DESKTOP_EOF'
+[Desktop Entry]
+Type=Application
+Name=Install with LinStack
+Comment=Install Android Package (APK) into LinStack
+Exec=/usr/local/bin/LinStack --install %f
+Icon=linstack
+MimeType=application/vnd.android.package-archive;
+NoDisplay=true
+Terminal=false
+APK_DESKTOP_EOF
+
 # 7. Clean up duplicate system desktop entries & disable waydroid-container.service
 systemctl disable --now waydroid-container.service 2>/dev/null || true
 
@@ -115,6 +127,7 @@ cp -f "$CORE_DIR/dbus/id.linstack.Container.policy" /usr/share/polkit-1/actions/
 sed "s|/usr/bin/linstack|$CORE_DIR/linstack.py|g" "$CORE_DIR/dbus/id.linstack.Container.service" > /usr/share/dbus-1/system-services/id.linstack.Container.service
 
 systemctl daemon-reload
+systemctl reload dbus.service 2>/dev/null || true
 systemctl enable linstack-container.service 2>/dev/null || true
 if [ -f "/var/lib/linstack/linstack.cfg" ]; then
     echo "Starting linstack-container.service..."
@@ -127,7 +140,7 @@ fi
 # 9. Restore SELinux security contexts if SELinux utilities are available (Fedora/RHEL/CentOS)
 if command -v restorecon >/dev/null 2>&1; then
     echo "Applying SELinux security contexts..."
-    restorecon -Rv "$OPT_DIR" /etc/systemd/system/linstack-container.service /usr/share/dbus-1/system* 2>/dev/null || true
+    restorecon -Rv "$OPT_DIR" /var/lib/linstack /var/lib/misc /etc/systemd/system/linstack-container.service /usr/share/dbus-1/system* 2>/dev/null || true
 fi
 if command -v chcon >/dev/null 2>&1; then
     chcon -t bin_t "$OPT_DIR/bin/LinStack" "$OPT_DIR/LinStack_core/linstack.py" 2>/dev/null || true
@@ -161,7 +174,7 @@ sudo rm -f /usr/share/dbus-1/system.d/id.linstack.Container.conf
 sudo rm -f /usr/share/dbus-1/system-services/id.linstack.Container.service
 sudo rm -f /usr/share/polkit-1/actions/id.linstack.Container.policy
 sudo rm -f /usr/local/bin/LinStack /usr/local/bin/linstack
-sudo rm -f /usr/share/applications/LinStack.desktop /usr/share/icons/hicolor/512x512/apps/linstack.png
+sudo rm -f /usr/share/applications/LinStack.desktop /usr/share/applications/linstack.app.install.desktop /usr/share/icons/hicolor/512x512/apps/linstack.png
 sudo rm -f /usr/share/applications/Linstack.desktop /usr/local/share/applications/Linstack.desktop
 for dentry in Waydroid.desktop waydroid.desktop waydroid.install.desktop waydroid.app.install.desktop waydroid.market.desktop waydroid-helper.desktop; do
     sudo rm -f "/usr/local/share/applications/$dentry"

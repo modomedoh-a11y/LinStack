@@ -22,7 +22,7 @@ from gi.repository import GLib
 
 DEFAULT_SYSTEM_URL = "https://sourceforge.net/projects/waydroid/files/images/system/lineage/waydroid_x86_64/lineage-18.1-20250628-VANILLA-waydroid_x86_64-system.zip/download"
 DEFAULT_VENDOR_URL = "https://sourceforge.net/projects/waydroid/files/images/vendor/waydroid_x86_64/lineage-18.1-20250628-MAINLINE-waydroid_x86_64-vendor.zip/download"
-INFO_NOTE_TEXT = "These are links for Waydroid Lineage OS Android 11. You can enter your own Android image links, or copy system.img and vendor.img into LinStack/resources (or /opt/linstack/resources before running Init)."
+INFO_NOTE_TEXT = "These are links for Waydroid Lineage OS Android 11. You can enter your own Android image links, or copy system.img and vendor.img into /opt/linstack/resources/ (after installation) or LinStack/resources/ (before running install.sh), then click Init."
 
 def resolve_project_resources():
     """Dynamically resolve the resources directory (/opt/linstack/resources or LinStack/resources)."""
@@ -145,16 +145,61 @@ def extract_image_from_zip(zip_path, target_img_name, dest_dir):
 def ensure_images_available(args, system_url=None, vendor_url=None):
     """
     Smart Initialization Logic:
-      Step A: Check if system.img and vendor.img exist in LinStack/resources/.
-      Step B: If both exist, skip downloading and initialize using local files.
-      Step C: If either is missing, download zip archive(s) and extract them into LinStack/resources/.
+      Step A: Search all resources folders (/opt/linstack/resources, LinStack/resources, etc.).
+      Step B: If found, copy/link them into /opt/linstack/resources & /var/lib/linstack/images and skip download.
+      Step C: Otherwise check /var/lib/linstack/images; if still missing, download and extract.
     """
-    # Check /opt/linstack/resources first when installed system-wide
     opt_res = Path("/opt/linstack/resources")
-    if opt_res.is_dir() and (opt_res / "system.img").is_file() and (opt_res / "vendor.img").is_file():
-        res_dir = opt_res.resolve()
-    else:
-        res_dir = resolve_project_resources()
+    var_images = Path("/var/lib/linstack/images")
+
+    search_dirs = []
+    if getattr(args, "images_path", None):
+        search_dirs.append(Path(args.images_path))
+    search_dirs.extend([
+        opt_res,
+        resolve_project_resources(),
+        Path.cwd() / "LinStack" / "resources",
+        Path.cwd() / "resources",
+        var_images,
+    ])
+    for p_str in tools.config.defaults.get("preinstalled_images_paths", []):
+        search_dirs.append(Path(p_str))
+
+    found_dir = None
+    for d in search_dirs:
+        sys_f = d / "system.img"
+        vnd_f = d / "vendor.img"
+        if sys_f.is_file() and sys_f.stat().st_size > 0 and vnd_f.is_file() and vnd_f.stat().st_size > 0:
+            found_dir = d.resolve()
+            break
+
+    if found_dir:
+        logging.info("Step A/B: Found local system.img and vendor.img in %s.", found_dir)
+        # If images exist in project resources/ and not in /opt/linstack/resources, copy them to the install directory
+        if opt_res.is_dir() and found_dir != opt_res.resolve() and found_dir != var_images.resolve() and os.geteuid() == 0:
+            for img_name in ("system.img", "vendor.img"):
+                src_img = found_dir / img_name
+                dst_img = opt_res / img_name
+                if not dst_img.exists() or dst_img.stat().st_size == 0:
+                    logging.info("Copying %s from %s to %s...", img_name, found_dir, opt_res)
+                    shutil.copy2(str(src_img), str(dst_img))
+            found_dir = opt_res.resolve()
+
+        if os.geteuid() == 0:
+            os.makedirs(var_images, exist_ok=True)
+            for img_name in ("system.img", "vendor.img"):
+                src_img = found_dir / img_name
+                link_img = var_images / img_name
+                if src_img.resolve() != link_img.resolve():
+                    if link_img.exists() or link_img.is_symlink():
+                        link_img.unlink()
+                    os.symlink(str(src_img), str(link_img))
+
+        logging.info("Skipping download; initializing container using local images at %s.", found_dir)
+        args.images_path = str(found_dir)
+        return True
+
+    res_dir = opt_res if opt_res.is_dir() else resolve_project_resources()
 
     try:
         os.makedirs(res_dir, exist_ok=True)
@@ -364,6 +409,8 @@ def init(args):
     helpers.lxc.setup_host_perms(args)
     helpers.lxc.set_lxc_config(args)
     helpers.lxc.make_base_props(args)
+    if shutil.which("systemctl") and os.path.exists("/run/systemd/system"):
+        tools.helpers.run.user(args, ["systemctl", "enable", "--now", "linstack-container.service"], check=False)
     if status != "STOPPED":
         try:
             if "running_init_in_service" in args:

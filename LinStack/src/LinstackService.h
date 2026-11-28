@@ -126,6 +126,8 @@ public:
 
     // --- ADB Socket Connection & APK Installation (127.0.0.1:5555) ---
     bool isAdbConnected() const { return m_adbConnected; }
+    bool isAdbBridgeEnabled() const { return m_adbBridgeEnabled; }
+    void setAdbBridgeEnabled(bool enabled);
     void checkAdbConnection();
     void installApk(const QString &apkFilePath);
     void sendAndroidKeyEvent(int androidKeyCode);
@@ -200,6 +202,7 @@ private:
     QTimer *m_adbPollTimer = nullptr;
     QTimer *m_statusPollTimer = nullptr;
     bool m_adbConnected = false;
+    bool m_adbBridgeEnabled = false;
 
     // Active APK install processes queue
     struct ApkInstallJob {

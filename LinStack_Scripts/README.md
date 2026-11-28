@@ -1,14 +1,14 @@
-# Linstack Extras Script
+# Waydroid Extras Script
 
-Script to add GApps and other stuff to Linstack!
+Script to add GApps and other stuff to Waydroid!
 
 # Installation/Usage
 
 ## Interactive terminal interface
 
 ```
-git clone https://github.com/modomedoh-a11y/LinStack.git
-cd LinStack/LinStack_Scripts
+git clone https://github.com/casualsnek/waydroid_script
+cd waydroid_script
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 sudo venv/bin/python3 main.py
@@ -25,8 +25,8 @@ sudo venv/bin/python3 main.py
 ## Command Line
 
 ```bash
-git clone https://github.com/modomedoh-a11y/LinStack.git
-cd LinStack/LinStack_Scripts
+git clone https://github.com/casualsnek/waydroid_script
+cd waydroid_script
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 # install something
@@ -59,11 +59,11 @@ Open terminal and switch to the directory where "main.py" is located then run:
 
     sudo venv/bin/python3 main.py install gapps
 
-Then launch linstack with:
+Then launch waydroid with:
 
-    linstack show-full-ui
+    waydroid show-full-ui
 
-After linstack has finished booting, open terminal and switch to directory where "main.py" is located then run:
+After waydroid has finished booting, open terminal and switch to directory where "main.py" is located then run:
 
     sudo python3 main.py google
 Copy the returned numeric ID, then open ["https://google.com/android/uncertified/?pli=1"](https://google.com/android/uncertified/?pli=1). Enter the ID and register it. Wait 10-20 minutes for device to get registered. Then clear Google Play Service's cache and try logging in!
@@ -83,7 +83,7 @@ Zygisk and modules like LSPosed should work now.
 
 If you want to update Magisk, Please use `Direct Install into system partition` or run this sript again.
 
-This script only focuses on Magisk installation, if you need more management, please check https://github.com/nitanmarcel/linstack-magisk
+This script only focuses on Magisk installation, if you need more management, please check https://github.com/nitanmarcel/waydroid-magisk
 
 ## Install libndk arm translation 
 
@@ -133,7 +133,7 @@ Open terminal and switch to directory where "main.py" is located then run:
 ## Granting full permission for apps data (HACK)
 
 
-This is a temporary hack to combat against the apps permission issue on Android 11. Whenever an app is open it will always enable a property (persist.sys.nodataperm) to make it execute a script to grant the data full permissions (777). The **correct** way is to use `sdcardfs` or `esdfs`, both need to recompile the kernel or LinStack image.
+This is a temporary hack to combat against the apps permission issue on Android 11. Whenever an app is open it will always enable a property (persist.sys.nodataperm) to make it execute a script to grant the data full permissions (777). The **correct** way is to use `sdcardfs` or `esdfs`, both need to recompile the kernel or WayDroid image.
 
 Arknights, PUNISHING: GRAY RAVEN and other games won't freeze on the black screen.
 
@@ -144,10 +144,10 @@ Open terminal and switch to directory where "main.py" is located then run:
 ```
 sudo venv/bin/python3 main.py hack nodataperm
 ```
-**WARNING**: Tested on `lineage-18.1-20230128-VANILLA-linstack_x86_64.img`. This script will replace `/system/framework/service.jar`, which may prevent LinStack from booting. If so, run `sudo venv/bin/python3 main.py uninstall nodataperm` to remove it.
+**WARNING**: Tested on `lineage-18.1-20230128-VANILLA-waydroid_x86_64.img`. This script will replace `/system/framework/service.jar`, which may prevent WayDroid from booting. If so, run `sudo venv/bin/python3 main.py uninstall nodataperm` to remove it.
 
 
-Or you can run the following commands directly in `sudo linstack shell`. In this way, every time a new game is installed, you need to run it again, but it's much less risky.
+Or you can run the following commands directly in `sudo waydroid shell`. In this way, every time a new game is installed, you need to run it again, but it's much less risky.
 
 ```
 chmod 777 -R /sdcard/Android
@@ -194,10 +194,10 @@ Star this repository if you find this useful, if you encounter problem create an
 
 - Magisk installed: N/A
 
-Check [linstack-magisk](https://github.com/nitanmarcel/linstack-magisk)
+Check [waydroid-magisk](https://github.com/nitanmarcel/waydroid-magisk)
 
 ## Credits
-- [LinStack](https://github.com/linstack/linstack)
+- [WayDroid](https://github.com/waydroid/waydroid)
 - [Magisk Delta](https://huskydg.github.io/magisk-files/)
 - [microG Project](https://microg.org)
 - [Open GApps](https://opengapps.org)

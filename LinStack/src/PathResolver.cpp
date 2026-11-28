@@ -17,35 +17,38 @@ QString PathResolver::resolveResourcesDir()
 {
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList candidates = {
-        // 1. Relative to executable / project root (local development & portable builds)
+        // 1. Candidate resources directories (post-install or local project paths)
+        "/opt/linstack/resources",
         appDir + "/resources",
         appDir + "/../resources",
         appDir + "/../../resources",
         appDir + "/../LinStack/resources",
         appDir + "/../../LinStack/resources",
         QDir::currentPath() + "/resources",
+        QDir::currentPath() + "/LinStack/resources",
         QDir::currentPath() + "/../resources",
-        // 2. Standard system installation directories
-        "/opt/linstack/resources",
+        QDir::homePath() + "/LinStack/LinStack/resources",
+        QDir::homePath() + "/LinStack/resources",
+        // 2. System Android images directory
+        "/var/lib/linstack/images",
         QString(LIN_STACK_DATADIR) + "/resources",
         "/usr/share/linstack/resources",
-        "/usr/local/share/linstack/resources",
-        "/var/lib/linstack/images",
-        "/usr/share/linstack-extra/images",
-        "/etc/linstack-extra/images"
+        "/usr/local/share/linstack/resources"
     };
 
+    // Prioritize any directory containing valid non-empty system.img and vendor.img
     for (const QString &dir : candidates) {
-        QFileInfo fi(dir);
-        if (fi.exists() && fi.isDir()) {
-            // Prefer directory that actually contains system.img if present
-            if (QFileInfo::exists(dir + "/system.img")) {
-                return QDir::cleanPath(dir);
-            }
+        QFileInfo sysFi(dir + "/system.img");
+        QFileInfo vndFi(dir + "/vendor.img");
+        if (sysFi.exists() && sysFi.size() > 0 && vndFi.exists() && vndFi.size() > 0) {
+            return QDir::cleanPath(dir);
         }
     }
 
-    // Fallback: return the first existing candidate directory
+    // Fallback to default install resources directory if images are not found yet
+    if (QFileInfo::exists("/opt/linstack/resources") && QFileInfo("/opt/linstack/resources").isDir()) {
+        return "/opt/linstack/resources";
+    }
     for (const QString &dir : candidates) {
         if (QFileInfo::exists(dir) && QFileInfo(dir).isDir()) {
             return QDir::cleanPath(dir);

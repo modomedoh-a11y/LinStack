@@ -1,4 +1,5 @@
 #include <QDir>
+#include <QSettings>
 #include <QTextStream>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -39,8 +40,21 @@
 extern "C" {
     #include <wayland-client.h>
     #include "pointer-constraints-unstable-v1-client-protocol.h"
+    #include "relative-pointer-unstable-v1-client-protocol.h"
     }
 #include <unistd.h>
+#include <X11/Xlib.h>
+#undef None
+#undef Bool
+#undef Status
+#undef KeyPress
+#undef KeyRelease
+#undef FocusIn
+#undef FocusOut
+#undef FontChange
+#undef CursorShape
+#undef Unsorted
+
 #include <fcntl.h>
 #include "AndroidCanvas.h"
 #include "KeymapperOverlay.h"
@@ -114,6 +128,9 @@ void AndroidCanvas::setupUi()
     connect(m_keymapperOverlay, &KeymapperOverlay::toastRequested, this, [this](const QString &msg) {
         showToast(msg, 3500);
     });
+    connect(m_keymapperOverlay, &KeymapperOverlay::aimLockAnchorChanged, this, [this](bool active, QPointF anchorNorm) {
+        setAimMode(active, anchorNorm);
+    });
 
     // Floating Toast Notification
     m_toastLabel = new QLabel(this);
@@ -152,7 +169,7 @@ QWidget *AndroidCanvas::createHomeScreen()
     auto *sbLayout = new QHBoxLayout(statusBar);
     sbLayout->setContentsMargins(4, 0, 4, 0);
 
-    auto *osInfo = new QLabel("⚡ LinStack OS 13 | Mesa DRI3 Zero-Copy (wlroots) | 120 FPS", statusBar);
+    auto *osInfo = new QLabel("⚡ LinStack Android | Mesa DRI3 Zero-Copy (wlroots) | 120 FPS", statusBar);
     osInfo->setStyleSheet("color: #6B7280; font-size: 11px; font-weight: 600; font-family: monospace;");
     sbLayout->addWidget(osInfo);
 
@@ -528,7 +545,7 @@ void AndroidCanvas::paintGL()
 
     bool rendered = false;
 
-    // 1. المسار السريع Zero-Copy الحقيقي (يدعم تعدد المستويات لبطاقات Intel HD 530)
+    // 1. True Zero-Copy DMA-BUF fast path (supports multi-plane buffers on Intel GPUs)
     struct wlr_bridge_dmabuf_attribs dmabuf = {};
     if (wlr_bridge_surface_get_dmabuf(activeSurface, &dmabuf)) {
         static auto s_eglCreateImageKHR = reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(
@@ -584,18 +601,28 @@ void AndroidCanvas::paintGL()
         }
     }
 
-    // 2. المسار الاحتياطي (CPU Readback) فقط إذا فشل DMA-BUF أو كان التطبيق يستخدم wl_shm
-    if (!rendered && m_compositor->makeCurrent()) {
-        struct wlr_texture *wlrTex = wlr_bridge_surface_get_texture(activeSurface);
-        int texW = 0, texH = 0;
-        wlr_bridge_texture_get_size(wlrTex, &texW, &texH);
-        if (wlrTex && texW > 0 && texH > 0) {
-            uint32_t stride = static_cast<uint32_t>(texW) * 4u;
-            m_cpuReadbackBuffer.resize(stride * texH);
-
-            bool readOk = wlr_bridge_texture_read_pixels(wlrTex, DRM_FORMAT_ABGR8888, stride, m_cpuReadbackBuffer.data());
-            eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
-
+    // 2. CPU Readback fallback path if DMA-BUF import fails or client uses wl_shm
+    if (!rendered) {
+        if (qtDpy != EGL_NO_DISPLAY) {
+            eglMakeCurrent(qtDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        }
+        if (m_compositor->makeCurrent()) {
+            struct wlr_texture *wlrTex = wlr_bridge_surface_get_texture(activeSurface);
+            int texW = 0, texH = 0;
+            wlr_bridge_texture_get_size(wlrTex, &texW, &texH);
+            bool readOk = false;
+            if (wlrTex && texW > 0 && texH > 0) {
+                uint32_t stride = static_cast<uint32_t>(texW) * 4u;
+                m_cpuReadbackBuffer.resize(stride * texH);
+                readOk = wlr_bridge_texture_read_pixels(wlrTex, DRM_FORMAT_ABGR8888, stride, m_cpuReadbackBuffer.data());
+            }
+            EGLDisplay wlrDpy = m_compositor->getEglDisplay();
+            if (wlrDpy != EGL_NO_DISPLAY) {
+                eglMakeCurrent(wlrDpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+            }
+            if (qtDpy != EGL_NO_DISPLAY) {
+                eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
+            }
             if (readOk) {
                 rendered = m_surfaceRenderer->renderCpuPixels(
                     m_cpuReadbackBuffer.data(),
@@ -603,14 +630,13 @@ void AndroidCanvas::paintGL()
                     texH,
                     vp, w, h);
             }
-        } else {
+        } else if (qtDpy != EGL_NO_DISPLAY) {
             eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
         }
     }
 
-    if (rendered && m_compositor->makeCurrent()) {
+    if (rendered) {
         m_surfaceRenderer->sendFrameDone(activeSurface);
-        eglMakeCurrent(qtDpy, qtDraw, qtRead, qtCtx);
     }
 }
 
@@ -700,7 +726,7 @@ void AndroidCanvas::initWaylandCompositor()
     qputenv("WAYLAND_DISPLAY", m_waylandSocketName.toUtf8());
     qputenv("LINSTACK_WAYLAND_DISPLAY", m_waylandSocketName.toUtf8());
 
-    // قراءة معدل تحديث شاشة المستخدم تلقائياً (75Hz, 60Hz, 120Hz, 144Hz, إلخ)
+    // Auto-detect host display refresh rate (60Hz, 75Hz, 120Hz, 144Hz, etc.)
     int screenHz = 60;
     if (QScreen *scr = this->screen() ? this->screen() : QGuiApplication::primaryScreen()) {
         if (scr->refreshRate() > 1.0) {
@@ -731,7 +757,7 @@ void AndroidCanvas::initWaylandCompositor()
         m_keymapperOverlay->setInputMapper(m_inputMapper.get());
     }
 
-    // ربط حلقة أحداث Wayland بحلقة Qt عبر QSocketNotifier
+    // Integrate Wayland event loop into Qt event loop via QSocketNotifier
     int wlFd = m_compositor->getEventLoopFd();
     if (wlFd >= 0) {
         m_waylandNotifier = new QSocketNotifier(wlFd, QSocketNotifier::Read, this);
@@ -742,7 +768,7 @@ void AndroidCanvas::initWaylandCompositor()
         });
     }
 
-    // ضبط مؤقت الإرسال ليتناسب مع تردد شاشة المستخدم دون إرهاق المعالج    // ضبط مؤقت الإرسال كاحتياطي خفيف (50ms) لأن QSocketNotifier يتولى الاستجابة الفورية
+    // Lightweight fallback dispatch timer (50ms) since QSocketNotifier handles instant events
     m_waylandDispatchTimer = new QTimer(this);
     connect(m_waylandDispatchTimer, &QTimer::timeout, this, [this]() {
         if (m_compositor) {
@@ -751,20 +777,22 @@ void AndroidCanvas::initWaylandCompositor()
     });
     m_waylandDispatchTimer->start(50);
 
-    auto *inputTickTimer = new QTimer(this);
-    connect(inputTickTimer, &QTimer::timeout, this, [this]() {
-        struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
-        if (m_inputMapper && activeSurface) {
-            m_inputMapper->tick(activeSurface);
-            if (m_compositor) {
-                m_compositor->flush();
+    if (!m_inputTickTimer) {
+        m_inputTickTimer = new QTimer(this);
+        connect(m_inputTickTimer, &QTimer::timeout, this, [this]() {
+            struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+            if (m_inputMapper && activeSurface) {
+                m_inputMapper->tick(activeSurface);
+                if (m_compositor) {
+                    m_compositor->flush();
+                }
             }
-        }
-    });
-    inputTickTimer->start(10);
+        });
+    }
+    m_inputTickTimer->start(10);
 
 
-    // ربط دوال دورة حياة السطح
+    // Connect Wayland surface lifecycle callbacks
     m_compositor->onClientConnected = [this](struct wl_client *client) {
         Q_UNUSED(client);
         QMetaObject::invokeMethod(this, [this]() {
@@ -802,7 +830,7 @@ void AndroidCanvas::initWaylandCompositor()
                 LOG_INFO("AndroidCanvas", ">>> First Android surface buffer committed — signalling firstFrameRendered <<<");
                 emit firstFrameRendered();
                 if (m_stack) m_stack->hide();
-                showToast("LinStack Android 13 — First Frame Received!", 3000);
+                showToast("LinStack Android — First Frame Received!", 3000);
             }, Qt::QueuedConnection);
         }
         QMetaObject::invokeMethod(this, "update", Qt::QueuedConnection);
@@ -839,6 +867,10 @@ void AndroidCanvas::sendWaylandSystemKey(uint32_t evdevKeyCode)
 
 void AndroidCanvas::showToast(const QString &message, int durationMs)
 {
+    if (!QSettings("LinStack", "LinStack").value("preferences/show_toasts", true).toBool()) {
+        if (m_toastLabel) m_toastLabel->hide();
+        return;
+    }
     m_toastLabel->setText(message);
     m_toastLabel->adjustSize();
 
@@ -885,74 +917,147 @@ void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
         if (m_keymapperOverlay) m_keymapperOverlay->setCursor(Qt::BlankCursor);
         QGuiApplication::setOverrideCursor(Qt::BlankCursor);
 
-        // 1. قفل مؤشر النظام الحقيقي على مستوى Wayland
+        // 1. Lock host system pointer natively at Wayland protocol level
         auto *pni = QGuiApplication::platformNativeInterface();
         struct wl_surface *surf = (pni && window() && window()->windowHandle())
         ? static_cast<struct wl_surface *>(pni->nativeResourceForWindow("surface", window()->windowHandle()))
         : nullptr;
 
-        if (wlApp && surf && !m_wlLockedPointer) {
+        if (wlApp) {
+            if (surf && !m_wlLockedPointer) {
+                struct wl_display *dpy = wlApp->display();
+                struct wl_pointer *ptr = wlApp->pointer();
 
+                if (dpy && ptr) {
+                    if (!m_wlPointerConstraints || !m_wlRelPointerMgr) {
+                        struct BindCtx { void **constraints; void **relMgr; };
+                        BindCtx ctx{&m_wlPointerConstraints, &m_wlRelPointerMgr};
+                        struct wl_registry *reg = wl_display_get_registry(dpy);
+                        static struct wl_registry_listener regListener = {
+                            [](void *data, struct wl_registry *r, uint32_t id, const char *iface, uint32_t ver) {
+                                auto *c = static_cast<BindCtx *>(data);
+                                if (std::string(iface) == zwp_pointer_constraints_v1_interface.name && !*c->constraints) {
+                                    *c->constraints = wl_registry_bind(r, id, &zwp_pointer_constraints_v1_interface, std::min(ver, 1u));
+                                } else if (std::string(iface) == zwp_relative_pointer_manager_v1_interface.name && !*c->relMgr) {
+                                    *c->relMgr = wl_registry_bind(r, id, &zwp_relative_pointer_manager_v1_interface, std::min(ver, 1u));
+                                }
+                            },
+                            [](void *, struct wl_registry *, uint32_t) {}
+                        };
+                        wl_registry_add_listener(reg, &regListener, &ctx);
+                        wl_display_roundtrip(dpy);
+                        wl_registry_destroy(reg);
+                    }
 
-            struct wl_display *dpy = wlApp->display();
-            struct wl_pointer *ptr = wlApp->pointer();
-
-            if (dpy && ptr && surf) {
-
-
-                if (!m_wlPointerConstraints) {
-                    struct wl_registry *reg = wl_display_get_registry(dpy);
-                    static struct wl_registry_listener regListener = {
-                        [](void *data, struct wl_registry *r, uint32_t id, const char *iface, uint32_t ver) {
-                            if (std::string(iface) == zwp_pointer_constraints_v1_interface.name) {
-                                *static_cast<void **>(data) = wl_registry_bind(
-                                    r, id, &zwp_pointer_constraints_v1_interface, std::min(ver, 1u));
+                    if (m_wlPointerConstraints) {
+                        m_wlLockedPointer = zwp_pointer_constraints_v1_lock_pointer(
+                            static_cast<struct zwp_pointer_constraints_v1 *>(m_wlPointerConstraints),
+                            surf, ptr, nullptr, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+                    }
+                    if (m_wlRelPointerMgr && !m_wlRelPointer) {
+                        m_wlRelPointer = zwp_relative_pointer_manager_v1_get_relative_pointer(
+                            static_cast<struct zwp_relative_pointer_manager_v1 *>(m_wlRelPointerMgr), ptr);
+                        static const struct zwp_relative_pointer_v1_listener relListener = {
+                            [](void *data, struct zwp_relative_pointer_v1 *, uint32_t, uint32_t,
+                               wl_fixed_t dx, wl_fixed_t dy, wl_fixed_t dx_unaccel, wl_fixed_t dy_unaccel) {
+                                auto *self = static_cast<AndroidCanvas *>(data);
+                                if (!self->m_aimModeActive) return;
+                                float fx = static_cast<float>(wl_fixed_to_double(dx_unaccel));
+                                float fy = static_cast<float>(wl_fixed_to_double(dy_unaccel));
+                                struct wlr_surface *activeSurface = self->m_compositor ? self->m_compositor->getRenderableSurface() : nullptr;
+                                if (self->m_inputMapper && activeSurface && (fx != 0.0f || fy != 0.0f)) {
+                                    self->m_inputMapper->handleMouseMove(0, 0, fx, fy, activeSurface);
+                                    if (self->m_compositor) self->m_compositor->flush();
+                                }
                             }
-                        },
-                        [](void *, struct wl_registry *, uint32_t) {}
-                    };
-                    wl_registry_add_listener(reg, &regListener, &m_wlPointerConstraints);
-                    wl_display_roundtrip(dpy);
-                    wl_registry_destroy(reg);
-                }
-
-                if (m_wlPointerConstraints) {
-                    m_wlLockedPointer = zwp_pointer_constraints_v1_lock_pointer(
-                        static_cast<struct zwp_pointer_constraints_v1 *>(m_wlPointerConstraints),
-                                                                                surf, ptr, nullptr, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+                        };
+                        zwp_relative_pointer_v1_add_listener(
+                            static_cast<struct zwp_relative_pointer_v1 *>(m_wlRelPointer), &relListener, this);
+                    }
                     wl_display_flush(dpy);
                 }
             }
+        } else {
+            // Confine pointer inside window via X11 XGrabPointer without grabMouse() so buttons remain clickable
+            if (auto *x11App = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+                Display *xdpy = x11App->display();
+                WId xwin = window() ? window()->winId() : winId();
+                if (xdpy && xwin) {
+                    XUngrabPointer(xdpy, CurrentTime);
+                    XGrabPointer(
+                        xdpy,
+                        static_cast<Window>(xwin),
+                        True,
+                        PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
+                        GrabModeAsync,
+                        GrabModeAsync,
+                        static_cast<Window>(xwin),
+                        0L,
+                        CurrentTime
+                    );
+                    XFlush(xdpy);
+                }
+            }
+            QPoint localAnchor(
+                m_viewportRect.x() + qRound(m_aimAnchorNorm.x() * m_viewportRect.width()),
+                m_viewportRect.y() + qRound(m_aimAnchorNorm.y() * m_viewportRect.height())
+            );
+            QPoint globalAnchor = mapToGlobal(localAnchor);
+            m_lastMousePos = globalAnchor;
+            m_ignoreNextMouseMove = true;
+            QCursor::setPos(globalAnchor);
         }
 
-        // 2. قراءة حركة الماوس الخام مباشرة من /dev/input/mice
+        showToast("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)", 2000);
+
+        // 2. Read raw mouse deltas directly from /dev/input/mice
         if (m_rawMouseFd < 0) {
             m_rawMouseFd = ::open("/dev/input/mice", O_RDONLY | O_NONBLOCK);
             if (m_rawMouseFd >= 0) {
                 m_rawMouseNotifier = new QSocketNotifier(m_rawMouseFd, QSocketNotifier::Read, this);
                 connect(m_rawMouseNotifier, &QSocketNotifier::activated, this, [this]() {
                     if (!m_aimModeActive || m_rawMouseFd < 0) return;
+                    static int s_pendingDx = 0;
+                    static int s_pendingDy = 0;
+                    static bool s_flushScheduled = false;
+
                     signed char packet[3];
-                    int totalDx = 0, totalDy = 0;
                     while (::read(m_rawMouseFd, packet, sizeof(packet)) == 3) {
-                        totalDx += static_cast<int>(packet[1]);
-                        totalDy -= static_cast<int>(packet[2]);
+                        s_pendingDx += static_cast<int>(packet[1]);
+                        s_pendingDy -= static_cast<int>(packet[2]);
                     }
-                    struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
-                    if (m_inputMapper && activeSurface && (totalDx != 0 || totalDy != 0)) {
-                        m_inputMapper->handleMouseMove(0, 0, totalDx, totalDy, activeSurface);
-                        if (m_compositor) m_compositor->flush();
+
+                    if (s_pendingDx != 0 || s_pendingDy != 0) {
+                        int dx = s_pendingDx;
+                        int dy = s_pendingDy;
+                        s_pendingDx = 0;
+                        s_pendingDy = 0;
+                        struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
+                        if (m_aimModeActive && m_inputMapper && activeSurface) {
+                            m_inputMapper->handleMouseMove(0, 0, dx, dy, activeSurface);
+                            if (m_compositor) m_compositor->flush();
+                        }
                     }
                 });
             }
         }
 
-        showToast("🎯 Aim Lock Active (Press Aim Key or ESC to unlock)", 2000);
-    } else {
+            } else {
+        if (m_wlRelPointer) {
+            zwp_relative_pointer_v1_destroy(static_cast<struct zwp_relative_pointer_v1 *>(m_wlRelPointer));
+            m_wlRelPointer = nullptr;
+        }
         if (m_wlLockedPointer) {
             zwp_locked_pointer_v1_destroy(static_cast<struct zwp_locked_pointer_v1 *>(m_wlLockedPointer));
             m_wlLockedPointer = nullptr;
             if (wlApp && wlApp->display()) wl_display_flush(wlApp->display());
+        } else if (!wlApp) {
+            if (auto *x11App = qGuiApp->nativeInterface<QNativeInterface::QX11Application>()) {
+                if (Display *xdpy = x11App->display()) {
+                    XUngrabPointer(xdpy, CurrentTime);
+                    XFlush(xdpy);
+                }
+            }
         }
 
         while (QGuiApplication::overrideCursor()) {
@@ -978,9 +1083,14 @@ void AndroidCanvas::setAimMode(bool active, QPointF anchorNorm)
 void AndroidCanvas::mousePressEvent(QMouseEvent *event)
 {
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
-    int button = (event->button() == Qt::LeftButton) ? 1 : ((event->button() == Qt::RightButton) ? 3 : 2);
+    int button = 0;
+    if (event->button() == Qt::LeftButton) button = 1;
+    else if (event->button() == Qt::RightButton) button = 3;
+    else if (event->button() == Qt::MiddleButton) button = 2;
+    else if (event->button() == Qt::BackButton || event->button() == Qt::XButton1) button = 4;
+    else if (event->button() == Qt::ForwardButton || event->button() == Qt::XButton2) button = 5;
 
-    if (m_inputMapper && activeSurface) {
+    if (m_inputMapper && activeSurface && button > 0) {
         int surfW = m_baseWidth;
         int surfH = m_baseHeight;
         wlr_bridge_surface_get_size(activeSurface, &surfW, &surfH);
@@ -995,6 +1105,13 @@ void AndroidCanvas::mousePressEvent(QMouseEvent *event)
 
         if (m_inputMapper->handleMouseDown(button, qRound(event->position().x()), qRound(event->position().y()), activeSurface)) {
             if (m_compositor) m_compositor->flush();
+            bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
+            if (isKeymapperVisible() && nowLocked != m_aimModeActive) {
+                QPointF anchor(0.5, 0.5);
+                if (const auto *aim = m_inputMapper->activeAimNode()) anchor = QPointF(aim->centerX, aim->centerY);
+                else if (const auto *fl = m_inputMapper->activeFreeLookNode()) anchor = QPointF(fl->centerX, fl->centerY);
+                setAimMode(nowLocked, anchor);
+            }
             event->accept();
             return;
         }
@@ -1007,11 +1124,12 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
 
     if (isKeymapperVisible() && m_aimModeActive) {
-        // تجاهل أحداث Qt إذا كان قارئ الماوس الخام يعمل لمنع تضاعف الحركة
-        if (m_rawMouseFd >= 0) {
+        // Ignore Qt mouse events when Wayland Relative Pointer or raw mouse reader is active to prevent double-input or drift
+        if (m_wlRelPointer || m_rawMouseFd >= 0) {
             event->accept();
             return;
         }
+        
 
         QPoint currentGlobal = event->globalPosition().toPoint();
         if (m_ignoreNextMouseMove) {
@@ -1025,8 +1143,8 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
         int dy = currentGlobal.y() - m_lastMousePos.y();
         m_lastMousePos = currentGlobal;
 
-        // تجاهل الارتداد العكسي المفاجئ الناتج عن قفزة المؤشر على Wayland
-        if (std::abs(dx) > 250 || std::abs(dy) > 250) {
+        // Ignore only extreme nonsensical jumps (> 800px) to prevent aim stutter on fast flicks
+        if (std::abs(dx) > 800 || std::abs(dy) > 800) {
             event->accept();
             return;
         }
@@ -1036,7 +1154,7 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
             if (m_compositor) m_compositor->flush();
         }
 
-        // إعادة المؤشر للمنتصف فقط عند الاقتراب من الحواف لمنع التردد
+        // Re-center cursor only near window edges to prevent jitter
         QPoint localPos = event->position().toPoint();
         const int margin = 90;
         if (localPos.x() < margin || localPos.x() > width() - margin ||
@@ -1074,11 +1192,26 @@ void AndroidCanvas::mouseMoveEvent(QMouseEvent *event)
 void AndroidCanvas::mouseReleaseEvent(QMouseEvent *event)
 {
     struct wlr_surface *activeSurface = m_compositor ? m_compositor->getRenderableSurface() : nullptr;
-    int button = (event->button() == Qt::LeftButton) ? 1 : ((event->button() == Qt::RightButton) ? 3 : 2);
+    int button = 0;
+    if (event->button() == Qt::LeftButton) button = 1;
+    else if (event->button() == Qt::RightButton) button = 3;
+    else if (event->button() == Qt::MiddleButton) button = 2;
+    else if (event->button() == Qt::BackButton || event->button() == Qt::XButton1) button = 4;
+    else if (event->button() == Qt::ForwardButton || event->button() == Qt::XButton2) button = 5;
 
-    if (m_inputMapper && activeSurface) {
+    if (m_inputMapper && activeSurface && button > 0) {
         if (m_inputMapper->handleMouseUp(button, qRound(event->position().x()), qRound(event->position().y()), activeSurface)) {
             if (m_compositor) m_compositor->flush();
+            bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
+            QPointF anchor(0.5, 0.5);
+            if (const auto *aim = m_inputMapper->activeAimNode()) {
+                anchor = QPointF(aim->centerX, aim->centerY);
+            } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                anchor = QPointF(fl->centerX, fl->centerY);
+            }
+            if (isKeymapperVisible() && (nowLocked != m_aimModeActive || (nowLocked && anchor != m_aimAnchorNorm))) {
+                setAimMode(nowLocked, anchor);
+            }
             event->accept();
             return;
         }
@@ -1106,13 +1239,13 @@ void AndroidCanvas::keyPressEvent(QKeyEvent *event)
             if (m_inputMapper->handleScanCodeDown(scanCode, activeSurface)) {
                 if (m_compositor) m_compositor->flush();
                 bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
-                if (nowLocked != m_aimModeActive) {
-                    QPointF anchor(0.5, 0.5);
-                    if (const auto *aim = m_inputMapper->activeAimNode()) {
-                        anchor = QPointF(aim->centerX, aim->centerY);
-                    } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
-                        anchor = QPointF(fl->centerX, fl->centerY);
-                    }
+                QPointF anchor(0.5, 0.5);
+                if (const auto *aim = m_inputMapper->activeAimNode()) {
+                    anchor = QPointF(aim->centerX, aim->centerY);
+                } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                    anchor = QPointF(fl->centerX, fl->centerY);
+                }
+                if (nowLocked != m_aimModeActive || (nowLocked && anchor != m_aimAnchorNorm)) {
                     setAimMode(nowLocked, anchor);
                 }
                 event->accept();
@@ -1151,13 +1284,13 @@ void AndroidCanvas::keyReleaseEvent(QKeyEvent *event)
             if (m_inputMapper->handleScanCodeUp(scanCode, activeSurface)) {
                 if (m_compositor) m_compositor->flush();
                 bool nowLocked = m_inputMapper->isAimLockActive() || m_inputMapper->isFreeLookActive();
-                if (nowLocked != m_aimModeActive) {
-                    QPointF anchor(0.5, 0.5);
-                    if (const auto *aim = m_inputMapper->activeAimNode()) {
-                        anchor = QPointF(aim->centerX, aim->centerY);
-                    } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
-                        anchor = QPointF(fl->centerX, fl->centerY);
-                    }
+                QPointF anchor(0.5, 0.5);
+                if (const auto *aim = m_inputMapper->activeAimNode()) {
+                    anchor = QPointF(aim->centerX, aim->centerY);
+                } else if (const auto *fl = m_inputMapper->activeFreeLookNode()) {
+                    anchor = QPointF(fl->centerX, fl->centerY);
+                }
+                if (nowLocked != m_aimModeActive || (nowLocked && anchor != m_aimAnchorNorm)) {
                     setAimMode(nowLocked, anchor);
                 }
                 event->accept();

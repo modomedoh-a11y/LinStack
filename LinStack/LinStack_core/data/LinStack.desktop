@@ -2,7 +2,7 @@
 Type=Application
 Name=LinStack
 GenericName=Android Container
-GenericName[ru]=Контейнер с Android
+GenericName[ar]=حاوية أندرويد
 Exec=LinStack
 Comment=Zero-Copy Embedded Android Virtualization & Gaming Engine
 Icon=linstack
@@ -12,11 +12,11 @@ X-Purism-FormFactor=Workstation;Mobile;
 
 [Desktop Action stop]
 Name=Stop LinStack
-Name[ru]=Остановить LinStack
+Name[ar]=إيقاف LinStack
 Exec=linstack session stop
 Icon=linstack
 
 [Desktop Action initialize]
 Name=Initialize LinStack
-Name[ru]=Инициализировать LinStack
+Name[ar]=تهيئة LinStack
 Exec=LinStack

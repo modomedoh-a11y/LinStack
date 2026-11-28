@@ -9,6 +9,7 @@
 #include <QTimer>
 
 class UInputTouchBridge;
+class ScriptEngine;
 
 enum class KeyNodeType {
     Tap,
@@ -18,7 +19,8 @@ enum class KeyNodeType {
     SmartCast,
     BurstTap,
     FreeLook,
-    EdgeScroll
+    EdgeScroll,
+    Macro
 };
 
 struct KeyBindingNode {
@@ -28,6 +30,7 @@ struct KeyBindingNode {
     QString action;
     int primaryKey = 0;
     quint32 primaryScanCode = 0;
+    int primaryMouseButton = 0;
 
     // Relative coordinates (0.0 to 1.0)
     qreal relX = 0.5;
@@ -67,6 +70,9 @@ struct KeyBindingNode {
     qreal castRadius = 160.0;
     bool isCasting = false;
 
+    // For Macro (ScriptEngine sequence)
+    QString macroScript;
+
     int touchSlot = -1;
 };
 
@@ -93,6 +99,7 @@ public:
     int activeAimNodeIndex() const { return m_activeAimIndex; }
     QPointF activeAimAnchorNormalized() const;
     void setAimLockActive(bool active, int nodeIndex = 0);
+    ScriptEngine *scriptEngine() const { return m_scriptEngine; }
 
 signals:
     void aimLockToggled(bool active, QPointF anchorNorm);
@@ -155,6 +162,7 @@ private:
     QPoint m_lastMousePos;
 
     QMap<quint32, int> m_scanToSlot;
+    ScriptEngine *m_scriptEngine = nullptr;
 };
 
 #endif // INPUTTRANSLATOR_H

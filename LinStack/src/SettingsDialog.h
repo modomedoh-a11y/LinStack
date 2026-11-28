@@ -2,7 +2,8 @@
 #define SETTINGSDIALOG_H
 
 #include <QDialog>
-#include <QTabWidget>
+#include <QListWidget>
+#include <QStackedWidget>
 #include <QComboBox>
 #include <QSlider>
 #include <QCheckBox>
@@ -29,51 +30,79 @@ public:
     bool    isVsyncEnabled()     const;
     bool    isSharedStorageEnabled() const;
     QString sharedStoragePath()  const;
+    bool    isSwiftShaderEnabled() const;
+    bool    confirmExitEnabled() const;
 
 signals:
     void settingsApplied();
-    void memoryTrimRequested();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
     void setupUi();
+
+    // 9 Exact Sidebar Sections
     QWidget *createPerformanceTab();
     QWidget *createDisplayTab();
-    QWidget *createGraphicsTab();
+    QWidget *createGraphicsAudioTab();
+    QWidget *createDevicesTab();
+    QWidget *createPreferencesTab();
     QWidget *createPhoneProfileTab();
     QWidget *createShortcutsTab();
     QWidget *createSharedStorageTab();
+    QWidget *createAdvancedTab();
 
-    QTabWidget *m_tabs = nullptr;
+    // Navigation Widgets
+    QListWidget    *m_sidebar = nullptr;
+    QStackedWidget *m_stack   = nullptr;
 
-    // Performance (Updated: CPU/Memory allocation removed)
+    // 1. Performance
     QComboBox *m_comboPerfMode = nullptr;
-    QSlider *m_sliderFps = nullptr;
-    QLabel *m_lblFpsValue = nullptr;
-    QCheckBox *m_checkVsync = nullptr;
-    QPushButton *m_btnTrimMemory = nullptr;
+    QSlider   *m_sliderFps     = nullptr;
+    QLabel    *m_lblFpsValue   = nullptr;
+    QCheckBox *m_checkVsync     = nullptr;
 
-    // Display (960x540 to 3840x2160)
-    QRadioButton *m_radioLandscape = nullptr;
-    QRadioButton *m_radioPortrait = nullptr;
-    QComboBox *m_comboResolution = nullptr;
-    QComboBox *m_comboDpi = nullptr;
+    // 2. Display
+    QRadioButton *m_radioLandscape  = nullptr;
+    QRadioButton *m_radioPortrait   = nullptr;
+    QComboBox    *m_comboResolution = nullptr;
+    QComboBox    *m_comboDpi        = nullptr;
 
-    // Graphics
-    QComboBox *m_comboRenderer = nullptr;
-    QComboBox *m_comboAstc = nullptr;
+    // 3. Graphics & Audio
+    QComboBox *m_comboRenderer     = nullptr;
+    QComboBox *m_comboAstc         = nullptr;
     QComboBox *m_comboAudioBackend = nullptr;
 
-    // Phone Profile
-    QComboBox *m_comboPhoneProfile = nullptr;
-    QCheckBox *m_checkAdbBridge = nullptr;
+    // 4. Devices
+    QComboBox *m_comboPassthrough  = nullptr;
+    QCheckBox *m_checkGamepadAuto  = nullptr;
+    QComboBox *m_comboMicDevice    = nullptr;
+    QComboBox *m_comboCameraDevice = nullptr;
 
-    // Shortcuts (Hotkey Manager)
+    // 5. Preferences
+    QCheckBox *m_checkConfirmExit      = nullptr;
+    QCheckBox *m_checkShowToasts       = nullptr;
+    QCheckBox *m_checkRememberGeometry = nullptr;
+    QCheckBox *m_checkAutostartSession = nullptr;
+    QCheckBox *m_checkPauseMinimized   = nullptr;
+
+    // 6. Phone Profile
+    QComboBox *m_comboPhoneProfile = nullptr;
+
+    // 7. Shortcuts
     QTableWidget *m_tableShortcuts = nullptr;
+
+    // 8. Shared Storage
     QCheckBox *m_checkSharedEnabled = nullptr;
-    QLineEdit *m_editSharedPath = nullptr;
+    QLineEdit *m_editSharedPath     = nullptr;
+
+    // 9. Advanced
+    QCheckBox   *m_checkAdbBridge    = nullptr;
+    QCheckBox   *m_checkSwiftShader  = nullptr;
+    QCheckBox   *m_checkDirectDmaBuf = nullptr;
+    QPushButton *m_btnOpenLogs       = nullptr;
+    QPushButton *m_btnOpenLogDir     = nullptr;
 };
 
 #endif // SETTINGSDIALOG_H

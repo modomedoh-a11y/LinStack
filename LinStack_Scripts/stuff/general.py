@@ -27,9 +27,9 @@ class General:
     @property
     def copy_dir(self):
         if container.use_overlayfs():
-            return "/var/lib/linstack/overlay"
+            return "/var/lib/waydroid/overlay"
         else:
-            return "/tmp/linstack"
+            return "/tmp/waydroid"
 
     def download(self):
         Logger.info("Downloading {} now to {} .....".format(
@@ -80,7 +80,7 @@ class General:
             with open(os.path.join(bin_dir, "resetprop.sh"), "w") as f:
                 f.write("#!/system/bin/sh\n")
                 f.write(
-                    "while read line; do /system/etc/resetprop ${line%=*} ${line#*=}; done < /vendor/linstack.prop\n")
+                    "while read line; do /system/etc/resetprop ${line%=*} ${line#*=}; done < /vendor/waydroid.prop\n")
             os.chmod(os.path.join(bin_dir, "resetprop.sh"), 0o755)
         if not os.path.isfile(resetprop_rc):
             if not os.path.exists(os.path.dirname(resetprop_rc)):
@@ -91,13 +91,13 @@ class General:
             os.chmod(resetprop_rc, 0o644)
 
         cfg = configparser.ConfigParser()
-        cfg.read("/var/lib/linstack/linstack.cfg")
+        cfg.read("/var/lib/waydroid/waydroid.cfg")
 
         for key in self.apply_props.keys():
             if self.apply_props[key]:
                 cfg.set('properties', key, self.apply_props[key])
 
-        with open("/var/lib/linstack/linstack.cfg", "w") as f:
+        with open("/var/lib/waydroid/waydroid.cfg", "w") as f:
             cfg.write(f)
 
     def extract_app_lib(self, apk_file_path):
@@ -153,12 +153,12 @@ class General:
 
     def remove_props(self):
         cfg = configparser.ConfigParser()
-        cfg.read("/var/lib/linstack/linstack.cfg")
+        cfg.read("/var/lib/waydroid/waydroid.cfg")
 
         for key in self.apply_props.keys():
             cfg.remove_option('properties', key)
 
-        with open("/var/lib/linstack/linstack.cfg", "w") as f:
+        with open("/var/lib/waydroid/waydroid.cfg", "w") as f:
             cfg.write(f)
 
     def copy(self):

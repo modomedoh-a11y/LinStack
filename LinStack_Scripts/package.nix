@@ -6,7 +6,7 @@
 let
   wrappedPath = lib.makeBinPath [ lzip ];
 in stdenvNoCC.mkDerivation {
-  name = "linstack_script";
+  name = "waydroid_script";
 
   buildInputs = [
     (python3.withPackages(ps: with ps; [ tqdm requests inquirerpy ]))
@@ -24,9 +24,9 @@ in stdenvNoCC.mkDerivation {
 
   installPhase = ''
     mkdir -p $out/libexec
-    cp -r . $out/libexec/linstack_script
+    cp -r . $out/libexec/waydroid_script
     mkdir -p $out/bin
-    makeShellWrapper $out/libexec/linstack_script/main.py $out/bin/linstack_script \
+    makeShellWrapper $out/libexec/waydroid_script/main.py $out/bin/waydroid_script \
       --prefix PATH : "${wrappedPath}"
   '';
 }

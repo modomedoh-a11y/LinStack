@@ -5,7 +5,7 @@
 
   <name>LinStack</name>
   <summary>Run Android apps natively alongside desktop programs</summary>
-  <summary xml:lang="ru">Запуск Android-приложений рядом с обычными программами</summary>
+  <summary xml:lang="ar">تشغيل تطبيقات أندرويد أصلياً بجانب برامج سطح المكتب</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
@@ -29,7 +29,7 @@
     <p>
       LinStack is a container-based approach to boot a full Android system on a regular GNU/Linux system. The Android system inside the container has direct access to needed hardware through LXC and the binder interface.
     </p>
-    <p xml:lang="ru">LinStack запускает полноценную систему Android в контейнере поверх обычной системы GNU/Linux. Android внутри контейнера получает прямой доступ к нужному оборудованию через LXC и интерфейс binder.</p>
+    <p xml:lang="ar">يقوم LinStack بتشغيل نظام أندرويد متكامل داخل حاوية على نظام GNU/Linux، مع وصول مباشر للعتاد عبر LXC وواجهة binder.</p>
   </description>
 
   <launchable type="desktop-id">LinStack.desktop</launchable>

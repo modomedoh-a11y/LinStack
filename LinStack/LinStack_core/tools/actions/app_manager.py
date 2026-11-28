@@ -12,6 +12,7 @@ from tools.interfaces import IStatusBarService
 import dbus
 
 def install(args):
+    import sys
     try:
         tools.helpers.ipc.DBusSessionService()
 
@@ -21,21 +22,38 @@ def install(args):
             cm.Unfreeze()
 
         tmp_dir = tools.config.session_defaults["linstack_data"] + "/linstack_tmp"
-        if not os.path.exists(tmp_dir):
-            os.makedirs(tmp_dir)
+        os.makedirs(tmp_dir, mode=0o755, exist_ok=True)
+        os.chmod(tmp_dir, 0o755)
 
-        shutil.copyfile(args.PACKAGE, tmp_dir + "/base.apk")
+        dest_apk = tmp_dir + "/base.apk"
+        shutil.copyfile(args.PACKAGE, dest_apk)
+        os.chmod(dest_apk, 0o644)
+
+        installed = False
         platformService = IPlatform.get_service(args)
         if platformService:
-            platformService.installApp("/data/linstack_tmp/base.apk")
-        else:
-            logging.error("Failed to access IPlatform service")
-        os.remove(tmp_dir + "/base.apk")
+            ret = platformService.installApp("/data/linstack_tmp/base.apk")
+            if ret == 0 or ret is None:
+                installed = True
+        if not installed:
+            ip = tools.helpers.net.get_device_ip_address() or "192.168.245.2"
+            tools.helpers.run.user(args, ["adb", "connect", f"{ip}:5555"], check=False)
+            code = tools.helpers.run.user(args, ["adb", "-s", f"{ip}:5555", "install", "-r", args.PACKAGE], check=False)
+            if code == 0:
+                installed = True
+
+        if os.path.exists(dest_apk):
+            os.remove(dest_apk)
 
         if session["state"] == "FROZEN":
             cm.Freeze()
+
+        if not installed:
+            logging.error("Failed to install APK package")
+            sys.exit(1)
     except (dbus.DBusException, KeyError):
         logging.error("LinStack session is stopped")
+        sys.exit(1)
 
 def remove(args):
     try:

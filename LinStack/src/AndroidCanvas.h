@@ -132,6 +132,7 @@ private:
     std::unique_ptr<InputMapper> m_inputMapper;
     QSocketNotifier *m_waylandNotifier = nullptr;
     QTimer *m_waylandDispatchTimer = nullptr;
+    QTimer *m_inputTickTimer = nullptr;
 
     QStackedWidget *m_stack = nullptr;
     QWidget *m_homeWidget = nullptr;
@@ -146,6 +147,8 @@ private:
     QSocketNotifier *m_rawMouseNotifier = nullptr;
     void *m_wlPointerConstraints = nullptr;
     void *m_wlLockedPointer = nullptr;
+    void *m_wlRelPointerMgr = nullptr;
+    void *m_wlRelPointer = nullptr;
 
     bool m_simulatedActive = true;
     bool m_hasFirstFrame = false;

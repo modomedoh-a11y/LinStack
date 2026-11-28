@@ -91,7 +91,7 @@ def install_app(args):
         install_list.append(FDroidPriv(args.android_version))
 
     if not container.use_overlayfs():
-        copy_dir = "/tmp/linstack"
+        copy_dir = "/tmp/waydroid"
         container.stop()
 
         resize_system, resize_vendor = False, False
@@ -146,7 +146,7 @@ def remove_app(args):
         remove_list.append(HideStatusBar())
 
     if not container.use_overlayfs():
-        copy_dir = "/tmp/linstack"
+        copy_dir = "/tmp/waydroid"
         container.stop()
 
     for item in remove_list:
@@ -171,7 +171,7 @@ def hack_option(args):
         hack_list.append(HideStatusBar())
 
     if not container.use_overlayfs():
-        copy_dir = "/tmp/linstack"
+        copy_dir = "/tmp/waydroid"
         container.stop()
 
         resize_system, resize_vendor = False, False
@@ -313,7 +313,7 @@ gapps: Install Open GApps (Android 11) or MindTheGapps (Android 13)
 microg: Add microG, Aurora Store and Aurora Droid to WayDriod
 libndk: Add libndk arm translation, better for AMD CPUs
 libhoudini: Add libhoudini arm translation, better for Intel CPUs
-magisk: Install Magisk Delta to LinStack
+magisk: Install Magisk Delta to WayDroid
 mitm -c CA_CERT_FILE: Install root CA cert into system trust store
 smartdock: A desktop mode launcher for Android
 widevine: Add support for widevine DRM L3

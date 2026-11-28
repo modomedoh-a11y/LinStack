@@ -126,7 +126,7 @@ on property:init.svc.zygote=stopped
     # Delete the contents of upperdir
     def delete_upper(self):
         if container.use_overlayfs():
-            sys_overlay_rw = "/var/lib/linstack/overlay_rw"
+            sys_overlay_rw = "/var/lib/waydroid/overlay_rw"
             files = [
                 "system/system/etc/init/bootanim.rc",
                 "system/system/etc/init/bootanim.rc.gz",
